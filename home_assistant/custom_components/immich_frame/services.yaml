@@ -1,0 +1,70 @@
+set_album:
+  fields:
+    album_id:
+      required: false
+      selector:
+        text:
+    album_ids:
+      required: false
+      selector:
+        object:
+
+set_profile:
+  fields:
+    profile_id:
+      required: true
+      selector:
+        text:
+
+refresh_albums:
+  fields: {}
+
+set_renderer_options:
+  fields:
+    durationSeconds:
+      required: false
+      selector:
+        number:
+          min: 5
+          max: 3600
+          unit_of_measurement: s
+    imageFit:
+      required: false
+      selector:
+        select:
+          options:
+            - contain
+            - cover
+            - none
+    showTime:
+      required: false
+      selector:
+        boolean:
+    showDate:
+      required: false
+      selector:
+        boolean:
+    showWeather:
+      required: false
+      selector:
+        boolean:
+    albumOrder:
+      required: false
+      selector:
+        select:
+          options:
+            - random
+            - newest
+            - oldest
+
+set_network_mode:
+  fields:
+    network_mode:
+      required: true
+      selector:
+        select:
+          options:
+            - auto
+            - local
+            - external
+

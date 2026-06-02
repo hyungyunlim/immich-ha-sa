@@ -1,0 +1,34 @@
+services:
+  immich-frame-controller:
+    build: .
+    container_name: immich-frame-controller
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      PORT: "8082"
+      DATA_DIR: /data
+
+      IMMICH_INTERNAL_URL: "http://immich_server:2283"
+      IMMICH_API_KEY: "${IMMICH_API_KEY}"
+      KIOSK_INTERNAL_URL: "http://immich-kiosk:3000"
+
+      LOCAL_PUBLIC_CONTROLLER_URL: "http://192.168.1.251:8082"
+      LOCAL_PUBLIC_KIOSK_URL: "http://192.168.1.251:3000"
+      EXTERNAL_PUBLIC_CONTROLLER_URL: "https://frame.example.com"
+      EXTERNAL_PUBLIC_KIOSK_URL: "https://frame.example.com/kiosk"
+
+      DEFAULT_FRAME_ID: lenovo
+      DEFAULT_FRAME_NAME: "Lenovo Smart Frame"
+      DEFAULT_NETWORK_MODE: auto
+      POLL_INTERVAL_SECONDS: "20"
+      CONTROLLER_API_TOKEN: "${CONTROLLER_API_TOKEN}"
+    volumes:
+      - ./data:/data
+    networks:
+      - immich
+
+networks:
+  immich:
+    external: true
+

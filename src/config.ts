@@ -1,0 +1,75 @@
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { z } from 'zod';
+import type { FrameDevice, NetworkMode } from './types.js';
+
+const NetworkModeSchema = z.enum(['auto', 'local', 'external']);
+
+const EnvSchema = z.object({
+  PORT: z.coerce.number().int().positive().default(8082),
+  DATA_DIR: z.string().default('./data'),
+  IMMICH_INTERNAL_URL: z.string().url().optional(),
+  IMMICH_API_KEY: z.string().optional(),
+  KIOSK_INTERNAL_URL: z.string().url().optional(),
+  LOCAL_PUBLIC_CONTROLLER_URL: z.string().url(),
+  LOCAL_PUBLIC_KIOSK_URL: z.string().url(),
+  EXTERNAL_PUBLIC_CONTROLLER_URL: z.string().url().optional(),
+  EXTERNAL_PUBLIC_KIOSK_URL: z.string().url().optional(),
+  DEFAULT_FRAME_ID: z.string().min(1).default('lenovo'),
+  DEFAULT_FRAME_NAME: z.string().min(1).default('Lenovo Smart Frame'),
+  DEFAULT_NETWORK_MODE: NetworkModeSchema.default('auto'),
+  POLL_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(300).default(20),
+  CONTROLLER_API_TOKEN: z.string().optional(),
+});
+
+export interface AppConfig {
+  port: number;
+  dataDir: string;
+  storePath: string;
+  immichInternalUrl?: string;
+  immichApiKey?: string;
+  kioskInternalUrl?: string;
+  defaultDevice: FrameDevice;
+  controllerApiToken?: string;
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  const parsed = EnvSchema.parse(env);
+  const dataDir = resolve(parsed.DATA_DIR);
+  mkdirSync(dataDir, { recursive: true });
+
+  const defaultDevice: FrameDevice = {
+    id: parsed.DEFAULT_FRAME_ID,
+    name: parsed.DEFAULT_FRAME_NAME,
+    networkMode: parsed.DEFAULT_NETWORK_MODE as NetworkMode,
+    localControllerBaseUrl: trimTrailingSlash(parsed.LOCAL_PUBLIC_CONTROLLER_URL),
+    externalControllerBaseUrl: parsed.EXTERNAL_PUBLIC_CONTROLLER_URL
+      ? trimTrailingSlash(parsed.EXTERNAL_PUBLIC_CONTROLLER_URL)
+      : undefined,
+    localKioskBaseUrl: trimTrailingSlash(parsed.LOCAL_PUBLIC_KIOSK_URL),
+    externalKioskBaseUrl: parsed.EXTERNAL_PUBLIC_KIOSK_URL
+      ? trimTrailingSlash(parsed.EXTERNAL_PUBLIC_KIOSK_URL)
+      : undefined,
+    pollIntervalSeconds: parsed.POLL_INTERVAL_SECONDS,
+  };
+
+  return {
+    port: parsed.PORT,
+    dataDir,
+    storePath: resolve(dataDir, 'state.json'),
+    immichInternalUrl: parsed.IMMICH_INTERNAL_URL
+      ? trimTrailingSlash(parsed.IMMICH_INTERNAL_URL)
+      : undefined,
+    immichApiKey: parsed.IMMICH_API_KEY,
+    kioskInternalUrl: parsed.KIOSK_INTERNAL_URL
+      ? trimTrailingSlash(parsed.KIOSK_INTERNAL_URL)
+      : undefined,
+    defaultDevice,
+    controllerApiToken: parsed.CONTROLLER_API_TOKEN || undefined,
+  };
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '');
+}
+

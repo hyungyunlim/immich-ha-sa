@@ -1,0 +1,11 @@
+tunnel: immich-frame
+credentials-file: /etc/cloudflared/immich-frame.json
+
+ingress:
+  - hostname: frame.example.com
+    path: /kiosk/*
+    service: http://localhost:3000
+  - hostname: frame.example.com
+    service: http://localhost:8082
+  - service: http_status:404
+

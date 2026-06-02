@@ -1,0 +1,17 @@
+DOMAIN = "immich_frame"
+
+CONF_CONTROLLER_URL = "controller_url"
+CONF_API_TOKEN = "api_token"
+CONF_DEVICE_ID = "device_id"
+
+DEFAULT_DEVICE_ID = "lenovo"
+
+DATA_CLIENT = "client"
+DATA_COORDINATOR = "coordinator"
+
+SERVICE_SET_ALBUM = "set_album"
+SERVICE_SET_PROFILE = "set_profile"
+SERVICE_REFRESH_ALBUMS = "refresh_albums"
+SERVICE_SET_RENDERER_OPTIONS = "set_renderer_options"
+SERVICE_SET_NETWORK_MODE = "set_network_mode"
+
