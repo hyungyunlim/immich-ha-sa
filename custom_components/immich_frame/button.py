@@ -20,6 +20,8 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ImmichFrameCommandButton(coordinator, "reload", "Reload", "reload"),
             ImmichFrameCommandButton(coordinator, "screen_on", "Screen On", "screen-on"),
             ImmichFrameCommandButton(coordinator, "screen_off", "Screen Off", "screen-off"),
+            ImmichFrameCommandButton(coordinator, "volume_up", "Volume Up", "volume-up"),
+            ImmichFrameCommandButton(coordinator, "volume_down", "Volume Down", "volume-down"),
         ]
     )
 

@@ -7,7 +7,7 @@ export type KioskLayout = 'single' | 'portrait' | 'landscape' | 'splitview' | 's
 export type ImageEffect = 'none' | 'zoom' | 'smart-zoom';
 export type ProgressBarPosition = 'top' | 'bottom';
 export type RemoteControlType = 'none' | 'freekiosk';
-export type FrameCommand = 'next' | 'previous' | 'play-pause' | 'reload' | 'screen-on' | 'screen-off';
+export type FrameCommand = 'next' | 'previous' | 'play-pause' | 'reload' | 'screen-on' | 'screen-off' | 'volume-up' | 'volume-down';
 
 export interface FrameCommandEvent {
   command: FrameCommand;
@@ -37,6 +37,7 @@ export interface FrameState {
   showTime: boolean;
   showDate: boolean;
   showWeather: boolean;
+  showVideos: boolean;
   albumOrder: AlbumOrder;
   networkMode: NetworkMode;
   transition: KioskTransition;
@@ -78,6 +79,7 @@ export interface FrameProfile {
   showTime: boolean;
   showDate: boolean;
   showWeather: boolean;
+  showVideos: boolean;
   albumOrder: AlbumOrder;
   preferredNetworkMode: NetworkMode;
   transition: KioskTransition;

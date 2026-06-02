@@ -22,6 +22,7 @@ const state: FrameState = {
   showTime: false,
   showDate: false,
   showWeather: true,
+  showVideos: false,
   albumOrder: 'random',
   networkMode: 'auto',
   transition: 'none',
@@ -95,6 +96,7 @@ describe('renderer URL generation', () => {
   it('adds display and kiosk UX URL overrides', () => {
     const resolved = buildRendererUrl(device, {
       ...state,
+      showVideos: true,
       transition: 'fade',
       fadeTransitionDuration: 1.5,
       layout: 'splitview',
@@ -115,6 +117,7 @@ describe('renderer URL generation', () => {
     expect(resolved.rendererUrl).toContain('layout=splitview');
     expect(resolved.rendererUrl).toContain('image_effect=smart-zoom');
     expect(resolved.rendererUrl).toContain('image_effect_amount=240');
+    expect(resolved.rendererUrl).toContain('show_videos=true');
     expect(resolved.rendererUrl).toContain('background_blur=false');
     expect(resolved.rendererUrl).toContain('frameless=true');
     expect(resolved.rendererUrl).toContain('disable_navigation=true');

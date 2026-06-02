@@ -68,6 +68,7 @@ export function buildRendererUrl(
   url.searchParams.set('show_time', String(state.showTime));
   url.searchParams.set('show_date', String(state.showDate));
   url.searchParams.set('show_weather', String(state.showWeather));
+  url.searchParams.set('show_videos', String(state.showVideos));
   url.searchParams.set('transition', state.transition);
   url.searchParams.set('fade_transition_duration', String(state.fadeTransitionDuration));
   url.searchParams.set('cross_fade_transition_duration', String(state.crossFadeTransitionDuration));

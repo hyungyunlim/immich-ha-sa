@@ -19,6 +19,7 @@ const FrameStatePatchSchema = z.object({
   showTime: z.boolean().optional(),
   showDate: z.boolean().optional(),
   showWeather: z.boolean().optional(),
+  showVideos: z.boolean().optional(),
   albumOrder: z.enum(['random', 'newest', 'oldest']).optional(),
   networkMode: z.enum(['auto', 'local', 'external']).optional(),
   transition: z.enum(['none', 'fade', 'cross-fade']).optional(),
@@ -52,6 +53,7 @@ const ProfileSchema = z.object({
   showTime: z.boolean(),
   showDate: z.boolean().default(false),
   showWeather: z.boolean(),
+  showVideos: z.boolean().default(false),
   albumOrder: z.enum(['random', 'newest', 'oldest']),
   preferredNetworkMode: z.enum(['auto', 'local', 'external']),
   transition: z.enum(['none', 'fade', 'cross-fade']).default('none'),
@@ -137,7 +139,7 @@ const DevicePatchSchema = z.object({
 });
 
 const FrameCommandSchema = z.object({
-  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'screen-on', 'screen-off']),
+  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'screen-on', 'screen-off', 'volume-up', 'volume-down']),
 });
 
 export interface ServerDeps {
@@ -244,6 +246,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           disableNavigation: frameState?.disableNavigation,
           hideCursor: frameState?.hideCursor,
           showProgressBar: frameState?.showProgressBar,
+          showVideos: frameState?.showVideos,
           progressBarPosition: frameState?.progressBarPosition,
           burnInInterval: frameState?.burnInInterval,
           burnInDuration: frameState?.burnInDuration,
@@ -551,6 +554,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       showTime: profile.showTime,
       showDate: profile.showDate,
       showWeather: profile.showWeather,
+      showVideos: profile.showVideos,
       albumOrder: profile.albumOrder,
       networkMode: profile.preferredNetworkMode,
       transition: profile.transition,
@@ -730,6 +734,10 @@ function freeKioskEndpoint(command: FrameCommand): string {
       return '/api/screen/on';
     case 'screen-off':
       return '/api/screen/off';
+    case 'volume-up':
+      return '/api/remote/keyboard/volumeup';
+    case 'volume-down':
+      return '/api/remote/keyboard/volumedown';
   }
 }
 

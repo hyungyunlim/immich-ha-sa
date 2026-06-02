@@ -36,6 +36,7 @@ interface SetupPageDevice {
   disableNavigation?: boolean;
   hideCursor?: boolean;
   showProgressBar?: boolean;
+  showVideos?: boolean;
   progressBarPosition?: string;
   burnInInterval?: number;
   burnInDuration?: number;
@@ -724,6 +725,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Navigation', device.disableNavigation ? 'Disabled' : 'Enabled')}
         ${renderKeyValue('Cursor', device.hideCursor ? 'Hidden' : 'Visible')}
         ${renderKeyValue('Progress Bar', `${boolLabel(device.showProgressBar)} / ${device.progressBarPosition ?? 'top'}`)}
+        ${renderKeyValue('Videos', boolLabel(device.showVideos))}
         ${renderKeyValue('Burn-in', `${device.burnInInterval ?? 0}m / ${device.burnInDuration ?? 30}s / ${device.burnInOpacity ?? 30}%`)}
         ${renderKeyValue('Sleep', sleepWindow)}
         ${renderKeyValue('Remote', `${device.remoteControlType ?? 'none'}${device.remoteApiUrl ? ' / configured' : ''}`)}

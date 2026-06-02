@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.12
+
+- Add Home Assistant volume up and volume down buttons for FreeKiosk frame devices.
+- Route volume commands through FreeKiosk keyboard media key endpoints.
+- Add a Show Videos switch that passes `show_videos` to immich-kiosk renderer URLs.
+
 ## 0.1.11
 
 - Handle `text/javascript` kiosk assets with the JavaScript-safe proxy rewriter.

@@ -69,6 +69,13 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 "showProgressBar",
                 False,
             ),
+            ImmichFrameSleepSwitch(
+                coordinator,
+                "show_videos",
+                "Show Videos",
+                "showVideos",
+                False,
+            ),
         ]
     )
 

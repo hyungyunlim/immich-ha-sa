@@ -289,7 +289,7 @@ describe('controller API', () => {
     await server.close();
   });
 
-  it('sends FreeKiosk screen commands for configured frames', async () => {
+  it('sends FreeKiosk remote commands for configured frames', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const requests: Array<{ method?: string; url?: string; apiKey?: string | string[] }> = [];
@@ -326,6 +326,21 @@ describe('controller API', () => {
     expect(requests[0]).toMatchObject({
       method: 'POST',
       url: '/api/screen/on',
+      apiKey: 'test-key',
+    });
+
+    const volume = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'volume-up' },
+    });
+
+    expect(volume.statusCode).toBe(200);
+    expect(volume.json().data.endpoint).toBe('/api/remote/keyboard/volumeup');
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toMatchObject({
+      method: 'POST',
+      url: '/api/remote/keyboard/volumeup',
       apiKey: 'test-key',
     });
 

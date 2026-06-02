@@ -53,9 +53,13 @@ If the frame runs FreeKiosk, open the device settings in the add-on console and 
 - Remote API URL: the FreeKiosk REST API base URL, for example `http://192.168.1.160:8080`
 - Remote API Key: optional, only if enabled in FreeKiosk
 
-The Home Assistant device page exposes buttons for next, previous, play/pause, reload, screen on, and screen off. Next, previous, play/pause, and reload are sent to the fixed frame page over the controller event stream, then bridged into the same-origin immich-kiosk iframe. Screen on and screen off still require FreeKiosk REST endpoints such as `/api/screen/on` and `/api/screen/off`.
+The Home Assistant device page exposes buttons for next, previous, play/pause, reload, screen on, screen off, volume up, and volume down. Next, previous, play/pause, and reload are sent to the fixed frame page over the controller event stream, then bridged into the same-origin immich-kiosk iframe. Screen and volume controls require FreeKiosk REST endpoints such as `/api/screen/on`, `/api/screen/off`, `/api/remote/keyboard/volumeup`, and `/api/remote/keyboard/volumedown`.
 
 Keep the frame's `disableNavigation` setting off when using next/previous buttons. immich-kiosk's `disable_navigation` option blocks touch/click, keyboard, and menu navigation, so bridged commands and physical key events will be ignored by immich-kiosk if this is enabled.
+
+## Video Playback
+
+Turn on the frame's Show Videos switch in Home Assistant to pass `show_videos=true` to immich-kiosk. immich-kiosk also requires server-side `kiosk.prefetch` / `KIOSK_PREFETCH` to be enabled for video playback; that setting cannot be overridden through the frame URL.
 
 Use Home Assistant entities and services for actual control. Sleep settings are exposed as `sleepStart`, `sleepEnd`, `sleepIcon`, `sleepDimScreen`, and `disableSleep`, and are applied to immich-kiosk as URL query overrides.
 

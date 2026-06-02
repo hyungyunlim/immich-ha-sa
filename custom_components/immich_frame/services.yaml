@@ -72,6 +72,10 @@ set_renderer_options:
       required: false
       selector:
         boolean:
+    showVideos:
+      required: false
+      selector:
+        boolean:
     albumOrder:
       required: false
       selector:

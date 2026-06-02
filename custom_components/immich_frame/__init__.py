@@ -191,6 +191,7 @@ def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional("showTime"): cv.boolean,
                 vol.Optional("showDate"): cv.boolean,
                 vol.Optional("showWeather"): cv.boolean,
+                vol.Optional("showVideos"): cv.boolean,
                 vol.Optional("albumOrder"): vol.In(["random", "newest", "oldest"]),
                 vol.Optional("transition"): vol.In(["none", "fade", "cross-fade"]),
                 vol.Optional("fadeTransitionDuration"): vol.Coerce(float),
