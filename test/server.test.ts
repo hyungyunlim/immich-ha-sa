@@ -399,6 +399,14 @@ describe('controller API', () => {
         response.end('const dataAttr = /^data-[\\w]+$/; navigator.serviceWorker.register("/assets/js/sw.js");');
         return;
       }
+      if (request.url?.startsWith('/video')) {
+        response.statusCode = request.headers.range ? 206 : 200;
+        response.setHeader('accept-ranges', 'bytes');
+        response.setHeader('content-range', 'bytes 0-3/8');
+        response.setHeader('content-type', 'video/mp4');
+        response.end(Buffer.from([0, 1, 2, 3]));
+        return;
+      }
       response.setHeader('content-type', 'text/html; charset=utf-8');
       response.end('<link href="/style.css"><script src="/kiosk.js"></script><main hx-post="/asset/new"><img src="/image"></main>');
     });
@@ -449,9 +457,21 @@ describe('controller API', () => {
     expect(javascript.body).toContain('register("/kiosk-proxy/lenovo/assets/js/sw.js")');
     expect(javascript.body).not.toContain('/kiosk-proxy/lenovo/^data');
 
+    const video = await server.inject({
+      method: 'GET',
+      url: '/kiosk-proxy/lenovo/video/asset-1',
+      headers: { host: '10.0.0.10:18082', range: 'bytes=0-3' },
+    });
+    expect(video.statusCode).toBe(206);
+    expect(video.headers['accept-ranges']).toBe('bytes');
+    expect(video.headers['content-range']).toBe('bytes 0-3/8');
+    expect(video.headers['content-type']).toContain('video/mp4');
+    expect(video.body.length).toBe(4);
+
     expect(kioskRequests).toContain('/?duration=60');
     expect(kioskRequests).toContain('/style.css');
     expect(kioskRequests).toContain('/kiosk.js');
+    expect(kioskRequests).toContain('/video/asset-1');
 
     await server.close();
     await new Promise<void>((resolve) => kiosk.close(() => resolve()));

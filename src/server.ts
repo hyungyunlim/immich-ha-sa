@@ -781,7 +781,17 @@ function proxyRequestBody(request: FastifyRequest): BodyInit | undefined {
 }
 
 function forwardProxyHeaders(response: Response, reply: FastifyReply): void {
-  for (const header of ['cache-control', 'etag', 'expires', 'last-modified', 'set-cookie']) {
+  for (const header of [
+    'accept-ranges',
+    'cache-control',
+    'content-disposition',
+    'content-range',
+    'etag',
+    'expires',
+    'last-modified',
+    'set-cookie',
+    'vary',
+  ]) {
     const value = response.headers.get(header);
     if (value) reply.header(header, value);
   }

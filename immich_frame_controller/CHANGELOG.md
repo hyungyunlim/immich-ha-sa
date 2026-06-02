@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.13
+
+- Preserve `Accept-Ranges` and `Content-Range` headers for proxied immich-kiosk video playback.
+
 ## 0.1.12
 
 - Add Home Assistant volume up and volume down buttons for FreeKiosk frame devices.

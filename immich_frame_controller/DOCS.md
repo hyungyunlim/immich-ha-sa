@@ -61,6 +61,8 @@ Keep the frame's `disableNavigation` setting off when using next/previous button
 
 Turn on the frame's Show Videos switch in Home Assistant to pass `show_videos=true` to immich-kiosk. immich-kiosk also requires server-side `kiosk.prefetch` / `KIOSK_PREFETCH` to be enabled for video playback; that setting cannot be overridden through the frame URL.
 
+The controller proxy preserves HTTP range headers required by WebView video playback. If videos show a poster but do not start, confirm the add-on is running `0.1.13` or newer.
+
 Use Home Assistant entities and services for actual control. Sleep settings are exposed as `sleepStart`, `sleepEnd`, `sleepIcon`, `sleepDimScreen`, and `disableSleep`, and are applied to immich-kiosk as URL query overrides.
 
 For album control:
