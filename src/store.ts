@@ -3,6 +3,8 @@ import { dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import type {
   AlbumCache,
+  ControllerApiToken,
+  ControllerPairingState,
   FrameDevice,
   FrameProfile,
   FrameState,
@@ -42,6 +44,36 @@ export class JsonStore {
 
   getAlbumCache(): AlbumCache {
     return structuredClone(this.data.albumCache);
+  }
+
+  getAuthTokens(): ControllerApiToken[] {
+    return Object.values(this.data.auth.tokens).map((token) => structuredClone(token));
+  }
+
+  getPairingState(): ControllerPairingState | undefined {
+    return this.data.auth.pairing ? structuredClone(this.data.auth.pairing) : undefined;
+  }
+
+  setPairingState(pairing: ControllerPairingState | undefined): void {
+    if (pairing) {
+      this.data.auth.pairing = structuredClone(pairing);
+    } else {
+      delete this.data.auth.pairing;
+    }
+    this.save();
+  }
+
+  upsertAuthToken(token: ControllerApiToken): ControllerApiToken {
+    this.data.auth.tokens[token.id] = structuredClone(token);
+    this.save();
+    return structuredClone(token);
+  }
+
+  markAuthTokenUsed(tokenId: string): void {
+    const token = this.data.auth.tokens[tokenId];
+    if (!token) return;
+    token.lastUsedAt = new Date().toISOString();
+    this.save();
   }
 
   setAlbumCache(albumCache: AlbumCache): void {
@@ -111,6 +143,13 @@ export class JsonStore {
         ...(data.profiles ?? {}),
       },
       albumCache: data.albumCache ?? defaults.albumCache,
+      auth: {
+        tokens: {
+          ...defaults.auth.tokens,
+          ...(data.auth?.tokens ?? {}),
+        },
+        pairing: data.auth?.pairing,
+      },
     };
   }
 
@@ -125,4 +164,3 @@ export class JsonStore {
     renameSync(tempPath, this.filePath);
   }
 }
-

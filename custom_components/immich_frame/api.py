@@ -34,6 +34,13 @@ class ImmichFrameClient:
     async def refresh_albums(self) -> dict[str, Any]:
         return await self._request("POST", "/api/immich/albums/refresh", auth=True)
 
+    async def pair(self, pairing_code: str, name: str) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/api/pairing/token",
+            json={"pairingCode": pairing_code, "name": name},
+        )
+
     async def frame_state(self) -> dict[str, Any]:
         return await self._request("GET", f"/api/frame/{self.device_id}/state")
 
@@ -82,4 +89,3 @@ class ImmichFrameClient:
                     str(error.get("message") or "Immich frame controller request failed"),
                 )
             return payload["data"]
-

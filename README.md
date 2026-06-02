@@ -57,10 +57,12 @@ LOCAL_PUBLIC_CONTROLLER_URL=http://<rpi-lan-ip>:<controller-host-port>
 LOCAL_PUBLIC_KIOSK_URL=http://<rpi-lan-ip>:3000
 EXTERNAL_PUBLIC_CONTROLLER_URL=https://frame.example.com
 EXTERNAL_PUBLIC_KIOSK_URL=https://frame.example.com/kiosk
-CONTROLLER_API_TOKEN=...
+CONTROLLER_API_TOKEN=
 ```
 
 `PORT` is the internal app port. `CONTROLLER_HOST_PORT` is the Docker host port exposed on the RPi or server. If `8082` is already in use, choose another host port and update `LOCAL_PUBLIC_CONTROLLER_URL`, the Home Assistant controller URL, and the Lenovo/Fully Kiosk fixed URL to match.
+
+`CONTROLLER_API_TOKEN` is an optional static fallback. Most users should leave it blank and use the pairing flow from Home Assistant instead. Complete pairing before exposing the controller through an external tunnel.
 
 3. Run locally without Docker:
 
@@ -74,6 +76,7 @@ npm run dev
 ```text
 http://localhost:8080/api/health
 http://localhost:8080/frame/lenovo
+http://localhost:8080/setup
 ```
 
 ## Docker
@@ -97,7 +100,7 @@ https://frame.example.com/frame/lenovo
 https://frame.example.com/kiosk/...
 ```
 
-`cloudflared.example.yml` routes `/kiosk/*` to `immich-kiosk` and everything else to the controller. Point the controller service at the host port you chose, for example `http://localhost:8082`. Remote mode should use polling fallback if SSE is unreliable through the tunnel.
+`cloudflared.example.yml` routes `/kiosk/*` to `immich-kiosk` and everything else to the controller. Point the controller service at the host port you chose, for example `http://localhost:8082`. The setup page blocks requests that arrive on the configured external controller host. Remote mode should use polling fallback if SSE is unreliable through the tunnel.
 
 ## Home Assistant
 
@@ -115,10 +118,17 @@ https://github.com/hyungyunlim/immich-ha-sa
 5. Download `Immich Frame Controller`.
 6. Restart Home Assistant.
 7. Go to Settings -> Devices & services -> Add integration -> `Immich Frame Controller`.
-8. Enter:
+8. Open the controller setup page on the LAN:
+
+```text
+http://<rpi-lan-ip>:<controller-host-port>/setup
+```
+
+9. Enter:
    - Controller URL: `http://<rpi-lan-ip>:<controller-host-port>`
-   - Controller API token: the value of `CONTROLLER_API_TOKEN`
+   - Pairing code: the short code shown on `/setup`
    - Device ID: `lenovo`
+   - Controller API token: leave blank unless you configured `CONTROLLER_API_TOKEN`
 
 HACS custom repositories are intended for public GitHub repositories. If this repository stays private, HACS may not be able to add it from the Home Assistant UI unless the HACS GitHub connection has access to the private repository.
 
@@ -130,6 +140,8 @@ immich_frame:
   api_token: !secret immich_frame_controller_token
   device_id: lenovo
 ```
+
+When the pairing flow succeeds, Home Assistant stores the issued controller API token in the config entry. Users do not need to SSH into the RPi or copy `CONTROLLER_API_TOKEN` from `.env`.
 
 Provided services:
 

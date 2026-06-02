@@ -1,11 +1,13 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { ControllerAuthManager } from './auth.js';
 import type { AppConfig } from './config.js';
 import { FrameEventHub } from './events.js';
 import { renderFramePage } from './framePage.js';
-import { fail, ok, requestContext, requireMutationAuth } from './http.js';
+import { fail, ok, requestContext } from './http.js';
 import { ImmichClient } from './immichClient.js';
 import { buildRendererUrl } from './rendererUrl.js';
+import { renderSetupBlockedPage, renderSetupPage } from './setupPage.js';
 import { JsonStore } from './store.js';
 import type { AlbumCache, FrameState } from './types.js';
 
@@ -34,11 +36,17 @@ const ProfileSchema = z.object({
   preferredNetworkMode: z.enum(['auto', 'local', 'external']),
 });
 
+const PairingTokenSchema = z.object({
+  pairingCode: z.string().min(1),
+  name: z.string().min(1).max(80).optional(),
+});
+
 export interface ServerDeps {
   config: AppConfig;
   store?: JsonStore;
   immichClient?: ImmichClient;
   events?: FrameEventHub;
+  auth?: ControllerAuthManager;
 }
 
 export function createServer(deps: ServerDeps): FastifyInstance {
@@ -54,6 +62,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     apiKey: deps.config.immichApiKey,
   });
   const events = deps.events ?? new FrameEventHub();
+  const auth = deps.auth ?? new ControllerAuthManager(store, deps.config.controllerApiToken);
 
   setInterval(() => events.heartbeat(), 25000).unref();
 
@@ -80,7 +89,39 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         localKioskBaseUrl: device.localKioskBaseUrl,
         externalKioskBaseUrl: device.externalKioskBaseUrl,
       }])),
+      auth: auth.status(),
     });
+  });
+
+  app.get('/setup', async (request, reply) => {
+    const device = store.getDevice(deps.config.defaultDevice.id) ?? deps.config.defaultDevice;
+    if (isExternalSetupRequest(device.externalControllerBaseUrl, request)) {
+      reply.status(403).type('text/html; charset=utf-8').send(renderSetupBlockedPage());
+      return;
+    }
+    const pairing = auth.ensurePairingCode();
+    reply.type('text/html; charset=utf-8').send(renderSetupPage({
+      controllerUrl: controllerUrlForRequest(request, device.localControllerBaseUrl),
+      deviceId: device.id,
+      pairingCode: pairing.code,
+      expiresAt: pairing.expiresAt,
+    }));
+  });
+
+  app.get('/api/pairing/status', async () => ok(auth.status()));
+
+  app.post('/api/pairing/token', async (request, reply) => {
+    const parsed = PairingTokenSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid pairing request.'));
+      return;
+    }
+    const paired = auth.completePairing(parsed.data.pairingCode, parsed.data.name);
+    if (!paired) {
+      reply.status(401).send(fail('PAIRING_FAILED', 'Invalid or expired pairing code.'));
+      return;
+    }
+    return ok(paired);
   });
 
   app.get('/frame/:deviceId', async (request, reply) => {
@@ -104,7 +145,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   });
 
   app.put('/api/frame/:deviceId/state', async (request, reply) => {
-    if (!requireMutationAuth(deps.config.controllerApiToken, request, reply)) return;
+    if (!auth.requireMutationAuth(request, reply)) return;
     const { deviceId } = request.params as { deviceId: string };
     const parsed = FrameStatePatchSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -165,7 +206,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   });
 
   app.post('/api/immich/albums/refresh', async (request, reply) => {
-    if (!requireMutationAuth(deps.config.controllerApiToken, request, reply)) return;
+    if (!auth.requireMutationAuth(request, reply)) return;
     try {
       const items = await immich.listAlbums();
       const cache: AlbumCache = {
@@ -190,7 +231,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   app.get('/api/profiles', async () => ok({ items: store.getProfiles() }));
 
   app.put('/api/profiles/:profileId', async (request, reply) => {
-    if (!requireMutationAuth(deps.config.controllerApiToken, request, reply)) return;
+    if (!auth.requireMutationAuth(request, reply)) return;
     const { profileId } = request.params as { profileId: string };
     const parsed = ProfileSchema.safeParse({ ...(request.body as object), id: profileId });
     if (!parsed.success) {
@@ -206,7 +247,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   });
 
   app.post('/api/frames/:deviceId/apply-profile', async (request, reply) => {
-    if (!requireMutationAuth(deps.config.controllerApiToken, request, reply)) return;
+    if (!auth.requireMutationAuth(request, reply)) return;
     const { deviceId } = request.params as { deviceId: string };
     const parsed = z.object({ profileId: z.string().min(1) }).safeParse(request.body);
     if (!parsed.success) {
@@ -265,6 +306,25 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   }
 
   return app;
+}
+
+function controllerUrlForRequest(request: Parameters<typeof requestContext>[0], fallback: string): string {
+  const context = requestContext(request);
+  if (!context.host) return fallback;
+  return `${context.protocol ?? 'http'}://${context.host}`.replace(/\/+$/, '');
+}
+
+function isExternalSetupRequest(externalControllerBaseUrl: string | undefined, request: Parameters<typeof requestContext>[0]): boolean {
+  if (!externalControllerBaseUrl) return false;
+  const context = requestContext(request);
+  if (!context.host) return false;
+  try {
+    const externalHostname = new URL(externalControllerBaseUrl).hostname.toLowerCase();
+    const requestHostname = context.host.split(':')[0]?.toLowerCase();
+    return externalHostname === requestHostname;
+  } catch {
+    return false;
+  }
 }
 
 function bumpState(state: FrameState): FrameState {

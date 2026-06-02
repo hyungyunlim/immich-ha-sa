@@ -348,6 +348,7 @@ Responsibilities:
 
 - Install from a GitHub repository through HACS custom repositories.
 - Provide a Home Assistant config flow for GUI setup.
+- Support a pairing flow so users can enter a short setup code instead of manually copying controller API tokens from the server.
 - Discover/connect to Frame Controller.
 - Expose album list as HA select entity.
 - Expose frame profile as HA select entity.
@@ -569,7 +570,8 @@ This single-domain topology is preferred for remote frames because it avoids mix
 Cloudflare Tunnel requirements:
 
 - Public frame route must not expose Immich API keys.
-- Public API mutation routes should require a token or be restricted to HA-controlled access.
+- Public API mutation routes should require a paired controller token or a configured static fallback token.
+- Pairing code display should be available from the LAN setup URL and blocked from the configured external controller host.
 - Frame read routes may use a per-device secret path or token if the domain is public.
 - Cache headers should not cache state/event responses incorrectly.
 - WebSocket/SSE support through the tunnel must be tested; polling fallback is required.
@@ -826,7 +828,7 @@ Acceptance:
 2. Does the Lenovo Smart Frame browser allow iframe embedding of `immich-kiosk` reliably?
 3. Is Fully Kiosk on the Lenovo frame able to keep SSE connections stable?
 4. What host/IP should be canonical for the frame URL on the LAN?
-5. Should controller access be limited by LAN only, static token, or HA long-lived token?
+5. Should controller access support token revocation and re-pairing from the HA UI?
 6. Should profiles live only in the controller, or be represented as HA helpers too?
 7. Should external mode expose `immich-kiosk` as a separate tunnel hostname or proxy it under the controller domain?
 8. What authentication model should protect public mutation APIs when using Cloudflare Tunnel?

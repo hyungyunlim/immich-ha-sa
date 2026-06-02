@@ -68,6 +68,26 @@ export interface StoreData {
   frames: Record<string, FrameState>;
   profiles: Record<string, FrameProfile>;
   albumCache: AlbumCache;
+  auth: ControllerAuth;
+}
+
+export interface ControllerAuth {
+  tokens: Record<string, ControllerApiToken>;
+  pairing?: ControllerPairingState;
+}
+
+export interface ControllerApiToken {
+  id: string;
+  name: string;
+  tokenHash: string;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+
+export interface ControllerPairingState {
+  codeHash: string;
+  createdAt: string;
+  expiresAt: string;
 }
 
 export interface ApiEnvelope<T> {
@@ -85,4 +105,3 @@ export interface ApiErrorEnvelope {
 }
 
 export type ApiResponse<T> = ApiEnvelope<T> | ApiErrorEnvelope;
-

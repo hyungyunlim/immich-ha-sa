@@ -50,6 +50,8 @@ export function createDefaultStore(device: FrameDevice): StoreData {
     },
     profiles: createDefaultProfiles(),
     albumCache: createEmptyAlbumCache(),
+    auth: {
+      tokens: {},
+    },
   };
 }
-

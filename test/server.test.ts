@@ -78,5 +78,65 @@ describe('controller API', () => {
     expect(response.json().error.code).toBe('ALBUM_NOT_FOUND');
     await server.close();
   });
-});
 
+  it('issues paired API tokens for authenticated controllers', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = {
+      ...buildConfig(dir),
+      controllerApiToken: 'static-secret',
+    };
+    const server = createServer({ config });
+
+    const unauthenticated = await server.inject({
+      method: 'PUT',
+      url: '/api/frame/lenovo/state',
+      payload: { durationSeconds: 90 },
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const setup = await server.inject({
+      method: 'GET',
+      url: '/setup',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    const pairingCode = setup.body.match(/<code class="code">([^<]+)<\/code>/)?.[1];
+    expect(pairingCode).toBeTruthy();
+
+    const paired = await server.inject({
+      method: 'POST',
+      url: '/api/pairing/token',
+      payload: { pairingCode, name: 'Home Assistant Test' },
+    });
+    expect(paired.statusCode).toBe(200);
+    const apiToken = paired.json().data.apiToken;
+    expect(apiToken).toMatch(/^ifha_/);
+
+    const authenticated = await server.inject({
+      method: 'PUT',
+      url: '/api/frame/lenovo/state',
+      headers: { authorization: `Bearer ${apiToken}` },
+      payload: { durationSeconds: 90 },
+    });
+    expect(authenticated.statusCode).toBe(200);
+    expect(authenticated.json().data.durationSeconds).toBe(90);
+
+    await server.close();
+  });
+
+  it('blocks setup page from the external controller host', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createServer({ config });
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/setup',
+      headers: { host: 'frame.example.com', 'x-forwarded-proto': 'https' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    await server.close();
+  });
+});

@@ -1,4 +1,4 @@
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyRequest } from 'fastify';
 import type { ApiErrorEnvelope, ApiEnvelope } from './types.js';
 
 export function ok<T>(data: T, meta?: Record<string, unknown>): ApiEnvelope<T> {
@@ -24,17 +24,5 @@ export function requestContext(request: FastifyRequest): { host?: string; protoc
     host,
     protocol: protocol ?? request.protocol,
   };
-}
-
-export function requireMutationAuth(
-  token: string | undefined,
-  request: FastifyRequest,
-  reply: FastifyReply,
-): boolean {
-  if (!token) return true;
-  const authorization = request.headers.authorization;
-  if (authorization === `Bearer ${token}`) return true;
-  reply.status(401).send(fail('UNAUTHORIZED', 'Missing or invalid controller API token.'));
-  return false;
 }
 
