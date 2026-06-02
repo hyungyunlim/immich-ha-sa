@@ -128,7 +128,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       ...state,
       ...stripNullProfile(parsed.data),
     }));
-    const resolved = buildRendererUrl(device, updated, requestContext(request));
+    const resolved = buildRendererUrl(device, updated, requestContext(request), {
+      kioskPassword: deps.config.kioskPassword,
+    });
     store.updateFrameState(deviceId, (state) => ({
       ...state,
       lastKnownGoodRendererUrl: resolved.rendererUrl,
@@ -149,6 +151,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       reply,
       device,
       context: requestContext(request),
+      kioskPassword: deps.config.kioskPassword,
     }, state);
     return reply;
   });
@@ -232,7 +235,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       albumOrder: profile.albumOrder,
       networkMode: profile.preferredNetworkMode,
     }));
-    const resolved = buildRendererUrl(device, updated, requestContext(request));
+    const resolved = buildRendererUrl(device, updated, requestContext(request), {
+      kioskPassword: deps.config.kioskPassword,
+    });
     store.updateFrameState(deviceId, (state) => ({
       ...state,
       lastKnownGoodRendererUrl: resolved.rendererUrl,
@@ -246,7 +251,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     const state = store.getFrameState(deviceId);
     if (!device || !state) return null;
     try {
-      return buildRendererUrl(device, state, requestContext(request));
+      return buildRendererUrl(device, state, requestContext(request), {
+        kioskPassword: deps.config.kioskPassword,
+      });
     } catch (error) {
       if (!state.lastKnownGoodRendererUrl) throw error;
       return {

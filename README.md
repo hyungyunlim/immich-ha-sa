@@ -34,6 +34,8 @@ Immich
 
 The controller owns desired state and generates the browser-facing `immich-kiosk` URL. It keeps Immich credentials server-side and separates internal service URLs from URLs that the frame browser can reach.
 
+If your existing `immich-kiosk` instance uses `KIOSK_PASSWORD`, set the same value as `KIOSK_PASSWORD` for the controller. The controller appends the required `password` query parameter when it generates the iframe URL.
+
 ## Controller Setup
 
 1. Copy the env template:
@@ -48,6 +50,7 @@ cp .env.example .env
 IMMICH_INTERNAL_URL=http://127.0.0.1:2283
 IMMICH_API_KEY=...
 KIOSK_INTERNAL_URL=http://127.0.0.1:3000
+KIOSK_PASSWORD=...
 LOCAL_PUBLIC_CONTROLLER_URL=http://192.168.1.251:8082
 LOCAL_PUBLIC_KIOSK_URL=http://192.168.1.251:3000
 EXTERNAL_PUBLIC_CONTROLLER_URL=https://frame.example.com
@@ -173,4 +176,3 @@ curl -X POST http://localhost:8082/api/immich/albums/refresh \
 - External mode emits Cloudflare domain URLs.
 - Lenovo/Fully Kiosk renders the page.
 - Polling fallback works when SSE is unavailable.
-

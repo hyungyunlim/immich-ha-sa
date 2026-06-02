@@ -6,6 +6,7 @@ interface SseClient {
   reply: FastifyReply;
   device: FrameDevice;
   context: RequestContext;
+  kioskPassword?: string;
 }
 
 export class FrameEventHub {
@@ -23,7 +24,9 @@ export class FrameEventHub {
       'X-Accel-Buffering': 'no',
     });
     client.reply.raw.write('\n');
-    this.send(client, 'state', buildRendererUrl(client.device, state, client.context));
+    this.send(client, 'state', buildRendererUrl(client.device, state, client.context, {
+      kioskPassword: client.kioskPassword,
+    }));
 
     const cleanup = (): void => {
       clients.delete(client);
@@ -36,7 +39,9 @@ export class FrameEventHub {
     const clients = this.clients.get(deviceId);
     if (!clients) return;
     for (const client of clients) {
-      this.send(client, 'state', buildRendererUrl(client.device, state, client.context));
+      this.send(client, 'state', buildRendererUrl(client.device, state, client.context, {
+        kioskPassword: client.kioskPassword,
+      }));
     }
   }
 
@@ -53,4 +58,3 @@ export class FrameEventHub {
     client.reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
   }
 }
-

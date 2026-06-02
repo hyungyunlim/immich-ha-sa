@@ -10,6 +10,10 @@ export interface RequestContext {
   protocol?: string;
 }
 
+export interface RendererUrlOptions {
+  kioskPassword?: string;
+}
+
 export function resolveNetworkMode(
   device: FrameDevice,
   state: Pick<FrameState, 'networkMode'>,
@@ -39,13 +43,20 @@ export function buildRendererUrl(
   device: FrameDevice,
   state: FrameState,
   request?: RequestContext,
+  options: RendererUrlOptions = {},
 ): ResolvedFrameState {
   const resolvedNetworkMode = resolveNetworkMode(device, state, request);
   const baseUrl = selectKioskBaseUrl(device, resolvedNetworkMode);
   const url = new URL(baseUrl);
 
   if (state.activeAlbumIds.length > 0) {
-    url.searchParams.set('albums', state.activeAlbumIds.join(','));
+    url.searchParams.delete('album');
+    for (const albumId of state.activeAlbumIds) {
+      url.searchParams.append('album', albumId);
+    }
+  }
+  if (options.kioskPassword) {
+    url.searchParams.set('password', options.kioskPassword);
   }
   url.searchParams.set('duration', String(state.durationSeconds));
   url.searchParams.set('image_fit', state.imageFit);
@@ -84,4 +95,3 @@ function matchesUrlHost(host: string, urlString: string | undefined): boolean {
     return false;
   }
 }
-

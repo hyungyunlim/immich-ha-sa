@@ -11,6 +11,7 @@ const EnvSchema = z.object({
   IMMICH_INTERNAL_URL: z.string().url().optional(),
   IMMICH_API_KEY: z.string().optional(),
   KIOSK_INTERNAL_URL: z.string().url().optional(),
+  KIOSK_PASSWORD: z.string().optional(),
   LOCAL_PUBLIC_CONTROLLER_URL: z.string().url(),
   LOCAL_PUBLIC_KIOSK_URL: z.string().url(),
   EXTERNAL_PUBLIC_CONTROLLER_URL: z.string().url().optional(),
@@ -29,6 +30,7 @@ export interface AppConfig {
   immichInternalUrl?: string;
   immichApiKey?: string;
   kioskInternalUrl?: string;
+  kioskPassword?: string;
   defaultDevice: FrameDevice;
   controllerApiToken?: string;
 }
@@ -64,6 +66,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     kioskInternalUrl: parsed.KIOSK_INTERNAL_URL
       ? trimTrailingSlash(parsed.KIOSK_INTERNAL_URL)
       : undefined,
+    kioskPassword: parsed.KIOSK_PASSWORD || undefined,
     defaultDevice,
     controllerApiToken: parsed.CONTROLLER_API_TOKEN || undefined,
   };
@@ -72,4 +75,3 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
-

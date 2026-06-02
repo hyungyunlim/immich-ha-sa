@@ -34,7 +34,8 @@ describe('renderer URL generation', () => {
     const resolved = buildRendererUrl(device, state, { host: '192.168.1.251:8082' });
     expect(resolved.resolvedNetworkMode).toBe('local');
     expect(resolved.rendererUrl).toContain('http://192.168.1.251:3000/');
-    expect(resolved.rendererUrl).toContain('albums=album-1%2Calbum-2');
+    expect(resolved.rendererUrl).toContain('album=album-1');
+    expect(resolved.rendererUrl).toContain('album=album-2');
     expect(resolved.rendererUrl).toContain('duration=60');
   });
 
@@ -49,5 +50,9 @@ describe('renderer URL generation', () => {
     expect(resolved.resolvedNetworkMode).toBe('external');
     expect(resolved.rendererUrl).toContain('https://frame.example.com/kiosk');
   });
-});
 
+  it('adds kiosk password when configured', () => {
+    const resolved = buildRendererUrl(device, state, { host: '192.168.1.251:8082' }, { kioskPassword: 'secret' });
+    expect(resolved.rendererUrl).toContain('password=secret');
+  });
+});

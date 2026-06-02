@@ -12,6 +12,7 @@ services:
       IMMICH_INTERNAL_URL: "http://immich_server:2283"
       IMMICH_API_KEY: "${IMMICH_API_KEY}"
       KIOSK_INTERNAL_URL: "http://immich-kiosk:3000"
+      KIOSK_PASSWORD: "${KIOSK_PASSWORD}"
 
       LOCAL_PUBLIC_CONTROLLER_URL: "http://192.168.1.251:8082"
       LOCAL_PUBLIC_KIOSK_URL: "http://192.168.1.251:3000"
