@@ -21,7 +21,8 @@ interface SetupPageDevice {
   remoteApiUrl?: string;
   remoteApiKeyConfigured?: boolean;
   isDefault: boolean;
-  frameUrl: string;
+  localFrameUrl: string;
+  externalFrameUrl?: string;
   rendererUrl?: string;
   networkMode?: string;
   resolvedNetworkMode?: string;
@@ -169,6 +170,19 @@ export function renderSetupPage(params: SetupPageParams): string {
     }
     .muted {
       color: #697586;
+    }
+    .help-text {
+      color: #697586;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .url-missing {
+      border: 1px dashed #cfd8e2;
+      border-radius: 7px;
+      padding: 10px 12px;
+      color: #697586;
+      background: #fbfcfd;
+      font-size: 13px;
     }
     .section-title {
       display: flex;
@@ -475,6 +489,7 @@ export function renderSetupPage(params: SetupPageParams): string {
         <label class="field full">
           <span class="label">External Controller URL</span>
           <input name="externalControllerBaseUrl" type="url" placeholder="https://frame.example.com">
+          <span class="help-text">Use a tunnel hostname that routes to this controller add-on, not the Immich server or direct immich-kiosk URL.</span>
         </label>
         <label class="field full">
           <span class="label">External Kiosk URL</span>
@@ -702,10 +717,19 @@ function renderDeviceCard(device: SetupPageDevice): string {
     <div class="device-body">
       <div class="stack">
         <div class="row">
-          <span class="label">Frame URL</span>
-          <button type="button" data-copy="${escapeAttribute(device.frameUrl)}">Copy</button>
+          <span class="label">Local Frame URL</span>
+          <button type="button" data-copy="${escapeAttribute(device.localFrameUrl)}">Copy</button>
         </div>
-        <code>${escapeHtml(device.frameUrl)}</code>
+        <code>${escapeHtml(device.localFrameUrl)}</code>
+      </div>
+      <div class="stack">
+        <div class="row">
+          <span class="label">External Frame URL</span>
+          ${device.externalFrameUrl ? `<button type="button" data-copy="${escapeAttribute(device.externalFrameUrl)}">Copy</button>` : ''}
+        </div>
+        ${device.externalFrameUrl
+          ? `<code>${escapeHtml(device.externalFrameUrl)}</code>`
+          : '<div class="url-missing">Set External Controller URL to show the remote frame URL.</div>'}
       </div>
       <div class="stack">
         <div class="row">
@@ -754,6 +778,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
           <label class="field full">
             <span class="label">External Controller URL</span>
             <input name="externalControllerBaseUrl" type="url" value="${escapeAttribute(device.externalControllerBaseUrl ?? '')}">
+            <span class="help-text">For remote frames, point this to the controller add-on tunnel. The frame will load /frame/${escapeHtml(device.id)} from that hostname.</span>
           </label>
           <label class="field full">
             <span class="label">External Kiosk URL</span>

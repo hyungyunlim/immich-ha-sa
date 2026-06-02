@@ -88,4 +88,6 @@ For frames outside the LAN, expose the fixed frame URL with a tunnel such as Clo
 https://frame.example.com/frame/lenovo
 ```
 
-Set `external_public_controller_url` after local pairing works. With the controller proxy, the public frame only needs the controller domain; a separate public immich-kiosk URL is optional. The setup page is intended for LAN or authenticated add-on access, not public unauthenticated setup.
+The tunnel hostname should point to this controller add-on, for example `http://<home-assistant-lan-ip>:8082`. Do not point the frame at the Immich server domain or the direct immich-kiosk domain. With the controller proxy, the public frame only needs the controller domain; a separate public immich-kiosk URL is optional.
+
+Set `external_public_controller_url` after local pairing works. The add-on console shows both Local Frame URL and External Frame URL for each device. The setup page is intended for LAN or authenticated add-on access, not public unauthenticated setup.

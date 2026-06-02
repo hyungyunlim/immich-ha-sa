@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.14
+
+- Show separate Local Frame URL and External Frame URL values in the add-on console.
+- Clarify that remote frames should use a controller tunnel hostname, not the Immich server or direct immich-kiosk hostname.
+
 ## 0.1.13
 
 - Preserve `Accept-Ranges` and `Content-Range` headers for proxied immich-kiosk video playback.

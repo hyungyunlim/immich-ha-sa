@@ -142,6 +142,26 @@ describe('controller API', () => {
     await server.close();
   });
 
+  it('shows local and external frame URLs in setup console', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createServer({ config });
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/setup',
+      headers: { host: '10.0.0.10:18082' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('Local Frame URL');
+    expect(response.body).toContain('External Frame URL');
+    expect(response.body).toContain('http://10.0.0.10:18082/frame/lenovo');
+    expect(response.body).toContain('https://frame.example.com/frame/lenovo');
+    await server.close();
+  });
+
   it('manages multiple devices with separate frame state', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);

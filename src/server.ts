@@ -231,7 +231,10 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           remoteApiUrl: candidate.remoteApiUrl,
           remoteApiKeyConfigured: Boolean(candidate.remoteApiKey),
           isDefault: candidate.id === deps.config.defaultDevice.id,
-          frameUrl: `${candidate.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${candidate.id}`,
+          localFrameUrl: buildFrameUrl(candidate.localControllerBaseUrl, candidate.id),
+          externalFrameUrl: candidate.externalControllerBaseUrl
+            ? buildFrameUrl(candidate.externalControllerBaseUrl, candidate.id)
+            : undefined,
           rendererUrl: resolved?.rendererUrl,
           networkMode: frameState?.networkMode ?? candidate.networkMode,
           resolvedNetworkMode: resolved?.resolvedNetworkMode,
@@ -286,7 +289,11 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return ok({
       items: Object.values(data.devices).map((device) => ({
         ...publicDevice(device),
-        frameUrl: `${device.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${device.id}`,
+        frameUrl: buildFrameUrl(device.localControllerBaseUrl, device.id),
+        localFrameUrl: buildFrameUrl(device.localControllerBaseUrl, device.id),
+        externalFrameUrl: device.externalControllerBaseUrl
+          ? buildFrameUrl(device.externalControllerBaseUrl, device.id)
+          : undefined,
         hasState: Boolean(data.frames[device.id]),
         isDefault: device.id === deps.config.defaultDevice.id,
       })),
@@ -309,7 +316,11 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return ok({
       device: publicDevice(created),
       state: store.getFrameState(created.id),
-      frameUrl: `${created.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${created.id}`,
+      frameUrl: buildFrameUrl(created.localControllerBaseUrl, created.id),
+      localFrameUrl: buildFrameUrl(created.localControllerBaseUrl, created.id),
+      externalFrameUrl: created.externalControllerBaseUrl
+        ? buildFrameUrl(created.externalControllerBaseUrl, created.id)
+        : undefined,
     });
   });
 
@@ -338,7 +349,11 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return ok({
       device: publicDevice(updated),
       state,
-      frameUrl: `${updated.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${updated.id}`,
+      frameUrl: buildFrameUrl(updated.localControllerBaseUrl, updated.id),
+      localFrameUrl: buildFrameUrl(updated.localControllerBaseUrl, updated.id),
+      externalFrameUrl: updated.externalControllerBaseUrl
+        ? buildFrameUrl(updated.externalControllerBaseUrl, updated.id)
+        : undefined,
     });
   });
 
@@ -946,6 +961,10 @@ function hasPatchKey(input: z.infer<typeof DevicePatchSchema>, key: keyof z.infe
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
+}
+
+function buildFrameUrl(controllerBaseUrl: string, deviceId: string): string {
+  return `${trimTrailingSlash(controllerBaseUrl)}/frame/${deviceId}`;
 }
 
 function validateAlbumIds(albumIds: string[] | undefined, cache: AlbumCache): string | undefined {
