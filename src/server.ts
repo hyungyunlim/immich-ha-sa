@@ -791,7 +791,7 @@ function isTextResponse(contentType: string): boolean {
 function rewriteProxyText(value: string, proxyPrefix: string, contentType: string): string {
   const normalizedPrefix = proxyPrefix.replace(/\/+$/, '');
   const normalizedContentType = contentType.toLowerCase();
-  if (normalizedContentType.includes('application/javascript')) {
+  if (normalizedContentType.includes('javascript')) {
     return value.replace(/(["'`])\/(assets)(?=[/"'`?])/g, `$1${normalizedPrefix}/$2`);
   }
   if (normalizedContentType.startsWith('text/css')) {

@@ -380,7 +380,7 @@ describe('controller API', () => {
         return;
       }
       if (request.url?.startsWith('/kiosk.js')) {
-        response.setHeader('content-type', 'application/javascript');
+        response.setHeader('content-type', 'text/javascript');
         response.end('const dataAttr = /^data-[\\w]+$/; navigator.serviceWorker.register("/assets/js/sw.js");');
         return;
       }

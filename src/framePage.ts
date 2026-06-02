@@ -82,6 +82,39 @@ export function renderFramePage(device: FrameDevice): string {
         }
       }
 
+      function iframeWindow() {
+        try {
+          return iframe.contentWindow;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function triggerKioskApi(command) {
+        var win = iframeWindow();
+        if (!win || !win.kiosk) return false;
+        try {
+          if (command === 'next' && typeof win.kiosk.triggerNewAsset === 'function') {
+            win.kiosk.triggerNewAsset();
+            return true;
+          }
+        } catch (error) {}
+        return false;
+      }
+
+      function clickKioskControl(command) {
+        var doc = iframeDocument();
+        if (!doc) return false;
+        var selector = null;
+        if (command === 'next') selector = '.navigation--next-asset, [aria-label="Next"], [title="Next"]';
+        if (command === 'previous') selector = '.navigation--prev-asset, [aria-label="Previous"], [title="Previous"]';
+        if (!selector) return false;
+        var control = doc.querySelector(selector);
+        if (!control || typeof control.click !== 'function') return false;
+        control.click();
+        return true;
+      }
+
       function dispatchKioskKey(command) {
         var target = keyMap[command];
         var doc = iframeDocument();
@@ -96,6 +129,7 @@ export function renderFramePage(device: FrameDevice): string {
         };
         var nodes = [doc.body, doc.documentElement, doc, iframe.contentWindow].filter(Boolean);
         nodes.forEach(function (node) {
+          node.dispatchEvent(new KeyboardEvent('keydown', eventInit));
           node.dispatchEvent(new KeyboardEvent('keyup', eventInit));
         });
         return true;
@@ -111,7 +145,7 @@ export function renderFramePage(device: FrameDevice): string {
             return false;
           }
         }
-        return dispatchKioskKey(command);
+        return triggerKioskApi(command) || clickKioskControl(command) || dispatchKioskKey(command);
       }
 
       iframe.addEventListener('load', function () {

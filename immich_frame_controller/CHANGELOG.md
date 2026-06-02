@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.11
+
+- Handle `text/javascript` kiosk assets with the JavaScript-safe proxy rewriter.
+- Make frame commands try the proxied kiosk API and navigation controls before falling back to keyboard events.
+
 ## 0.1.10
 
 - Fix kiosk proxy rewriting so JavaScript regular expressions are not modified.
