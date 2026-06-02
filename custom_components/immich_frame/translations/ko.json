@@ -1,0 +1,25 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Immich Frame Controller",
+        "description": "프레임 컨트롤러 서비스에 Home Assistant를 연결합니다.",
+        "data": {
+          "controller_url": "Controller URL",
+          "api_token": "Controller API token",
+          "device_id": "Device ID"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "프레임 컨트롤러에 연결할 수 없습니다.",
+      "invalid_url": "http:// 또는 https://로 시작하는 URL을 입력하세요.",
+      "invalid_auth": "Controller API token이 올바르지 않습니다.",
+      "required": "필수 항목입니다.",
+      "unknown": "예상하지 못한 오류가 발생했습니다."
+    },
+    "abort": {
+      "already_configured": "이 프레임 컨트롤러는 이미 설정되어 있습니다."
+    }
+  }
+}

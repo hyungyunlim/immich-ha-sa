@@ -8,7 +8,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import aiohttp_client, config_validation as cv
+from homeassistant.helpers import aiohttp_client
 
 from .api import ImmichFrameApiError, ImmichFrameClient
 from .const import CONF_API_TOKEN, CONF_CONTROLLER_URL, CONF_DEVICE_ID, DEFAULT_DEVICE_ID, DOMAIN
@@ -24,9 +24,9 @@ class InvalidAuth(Exception):
 
 DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_CONTROLLER_URL): cv.url,
-        vol.Optional(CONF_API_TOKEN): cv.string,
-        vol.Optional(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): cv.string,
+        vol.Required(CONF_CONTROLLER_URL): str,
+        vol.Optional(CONF_API_TOKEN): str,
+        vol.Optional(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): str,
     }
 )
 
@@ -69,20 +69,25 @@ class ImmichFrameConfigFlow(ConfigFlow, domain=DOMAIN):
             data[CONF_CONTROLLER_URL] = data[CONF_CONTROLLER_URL].rstrip("/")
             data[CONF_DEVICE_ID] = data.get(CONF_DEVICE_ID, DEFAULT_DEVICE_ID)
 
-            try:
-                info = await validate_input(self.hass, data)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
-            except Exception:
-                errors["base"] = "unknown"
+            if not data[CONF_CONTROLLER_URL].startswith(("http://", "https://")):
+                errors[CONF_CONTROLLER_URL] = "invalid_url"
+            elif not data[CONF_DEVICE_ID]:
+                errors[CONF_DEVICE_ID] = "required"
             else:
-                await self.async_set_unique_id(
-                    f"{data[CONF_CONTROLLER_URL]}:{data[CONF_DEVICE_ID]}"
-                )
-                self._abort_if_unique_id_configured()
-                return self.async_create_entry(title=info["title"], data=data)
+                try:
+                    info = await validate_input(self.hass, data)
+                except CannotConnect:
+                    errors["base"] = "cannot_connect"
+                except InvalidAuth:
+                    errors["base"] = "invalid_auth"
+                except Exception:
+                    errors["base"] = "unknown"
+                else:
+                    await self.async_set_unique_id(
+                        f"{data[CONF_CONTROLLER_URL]}:{data[CONF_DEVICE_ID]}"
+                    )
+                    self._abort_if_unique_id_configured()
+                    return self.async_create_entry(title=info["title"], data=data)
 
         return self.async_show_form(
             step_id="user",
