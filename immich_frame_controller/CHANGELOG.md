@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4
+
+- Add local-console device management for multiple frame endpoints.
+- Group Home Assistant entities under one Home Assistant device per frame device ID.
+- Add a writable Albums text entity and album-name service fields for multi-album frame selection.
+
 ## 0.1.3
 
 - Redesign the add-on Web UI into a denser operations console.

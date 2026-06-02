@@ -11,6 +11,13 @@ interface SetupPageParams {
 interface SetupPageDevice {
   id: string;
   name: string;
+  localControllerBaseUrl: string;
+  externalControllerBaseUrl?: string;
+  localKioskBaseUrl: string;
+  externalKioskBaseUrl?: string;
+  deviceNetworkMode: string;
+  pollIntervalSeconds: number;
+  isDefault: boolean;
   frameUrl: string;
   rendererUrl?: string;
   networkMode?: string;
@@ -275,6 +282,79 @@ export function renderSetupPage(params: SetupPageParams): string {
       border-color: #8aa0b6;
       background: #f8fafc;
     }
+    .primary {
+      border-color: #087e8b;
+      background: #087e8b;
+      color: #ffffff;
+    }
+    .primary:hover {
+      border-color: #066a75;
+      background: #066a75;
+    }
+    .danger {
+      color: #991b1b;
+      border-color: #fecaca;
+      background: #fff7f7;
+    }
+    .danger:hover {
+      border-color: #fca5a5;
+      background: #fee2e2;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .field {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+    .field.full {
+      grid-column: 1 / -1;
+    }
+    input,
+    select {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid #cfd8e2;
+      border-radius: 7px;
+      padding: 8px 10px;
+      background: #ffffff;
+      color: #171b22;
+      font: inherit;
+      font-size: 14px;
+    }
+    input:focus,
+    select:focus {
+      outline: 2px solid rgb(8 126 139 / 22%);
+      border-color: #087e8b;
+    }
+    details {
+      border: 1px solid #e5ebf1;
+      border-radius: 8px;
+      background: #ffffff;
+      padding: 12px;
+    }
+    summary {
+      cursor: pointer;
+      color: #263241;
+      font-weight: 700;
+    }
+    .form-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      grid-column: 1 / -1;
+    }
+    .form-status {
+      flex: 1;
+      min-width: 160px;
+      color: #697586;
+      font-size: 13px;
+    }
     .recommendations {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -304,6 +384,9 @@ export function renderSetupPage(params: SetupPageParams): string {
         justify-content: flex-start;
       }
       .kv {
+        grid-template-columns: 1fr;
+      }
+      .form-grid {
         grid-template-columns: 1fr;
       }
     }
@@ -342,6 +425,55 @@ export function renderSetupPage(params: SetupPageParams): string {
         <div class="value">${params.albumCount} albums</div>
         <p class="muted">${escapeHtml(refreshedAt)}</p>
       </div>
+    </section>
+
+    <div class="section-title">
+      <h2>Device Management</h2>
+      <span class="pill ok">Separate frame state</span>
+    </div>
+    <section class="panel">
+      <form class="form-grid" data-device-create>
+        <label class="field">
+          <span class="label">Device ID</span>
+          <input name="id" required pattern="[a-z0-9][a-z0-9_-]*" maxlength="64" placeholder="kitchen">
+        </label>
+        <label class="field">
+          <span class="label">Name</span>
+          <input name="name" required maxlength="80" placeholder="Kitchen Frame">
+        </label>
+        <label class="field">
+          <span class="label">Network Mode</span>
+          <select name="networkMode">
+            <option value="auto">auto</option>
+            <option value="local">local</option>
+            <option value="external">external</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Poll Interval</span>
+          <input name="pollIntervalSeconds" type="number" min="5" max="300" step="1" value="20">
+        </label>
+        <label class="field full">
+          <span class="label">Local Controller URL</span>
+          <input name="localControllerBaseUrl" type="url" placeholder="${escapeAttribute(params.controllerUrl)}">
+        </label>
+        <label class="field full">
+          <span class="label">Local Kiosk URL</span>
+          <input name="localKioskBaseUrl" type="url" placeholder="http://homeassistant.local:3000">
+        </label>
+        <label class="field full">
+          <span class="label">External Controller URL</span>
+          <input name="externalControllerBaseUrl" type="url" placeholder="https://frame.example.com">
+        </label>
+        <label class="field full">
+          <span class="label">External Kiosk URL</span>
+          <input name="externalKioskBaseUrl" type="url" placeholder="https://frame.example.com/kiosk">
+        </label>
+        <div class="form-actions">
+          <span class="form-status" data-form-status></span>
+          <button type="submit" class="primary">Add Device</button>
+        </div>
+      </form>
     </section>
 
     <div class="section-title">
@@ -386,6 +518,98 @@ export function renderSetupPage(params: SetupPageParams): string {
           setTimeout(() => { button.textContent = original; }, 1200);
         } catch {
           window.prompt('Copy value', value);
+        }
+      });
+    }
+
+    function setStatus(form, message, failed) {
+      const status = form.querySelector('[data-form-status]');
+      if (!status) return;
+      status.textContent = message || '';
+      status.style.color = failed ? '#991b1b' : '#697586';
+    }
+
+    function optionalValue(formData, name) {
+      const value = String(formData.get(name) || '').trim();
+      return value ? value : undefined;
+    }
+
+    function payloadFromForm(form, includeId) {
+      const formData = new FormData(form);
+      const payload = {
+        name: String(formData.get('name') || '').trim(),
+        networkMode: String(formData.get('networkMode') || 'auto'),
+        pollIntervalSeconds: Number(formData.get('pollIntervalSeconds') || 20),
+        localControllerBaseUrl: optionalValue(formData, 'localControllerBaseUrl'),
+        externalControllerBaseUrl: optionalValue(formData, 'externalControllerBaseUrl') ?? null,
+        localKioskBaseUrl: optionalValue(formData, 'localKioskBaseUrl'),
+        externalKioskBaseUrl: optionalValue(formData, 'externalKioskBaseUrl') ?? null,
+      };
+      if (includeId) {
+        payload.id = String(formData.get('id') || '').trim().toLowerCase();
+      }
+      return payload;
+    }
+
+    async function requestJson(path, options) {
+      const response = await fetch(path, {
+        ...options,
+        headers: {
+          'content-type': 'application/json',
+          ...(options && options.headers ? options.headers : {}),
+        },
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !body || body.success === false) {
+        throw new Error(body && body.error ? body.error.message : 'Request failed');
+      }
+      return body;
+    }
+
+    for (const form of document.querySelectorAll('[data-device-create]')) {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        setStatus(form, 'Adding device...', false);
+        try {
+          await requestJson('/api/devices', {
+            method: 'POST',
+            body: JSON.stringify(payloadFromForm(form, true)),
+          });
+          window.location.reload();
+        } catch (error) {
+          setStatus(form, error instanceof Error ? error.message : String(error), true);
+        }
+      });
+    }
+
+    for (const form of document.querySelectorAll('[data-device-edit]')) {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const deviceId = form.getAttribute('data-device-edit') || '';
+        setStatus(form, 'Saving device...', false);
+        try {
+          await requestJson('/api/devices/' + encodeURIComponent(deviceId), {
+            method: 'PATCH',
+            body: JSON.stringify(payloadFromForm(form, false)),
+          });
+          window.location.reload();
+        } catch (error) {
+          setStatus(form, error instanceof Error ? error.message : String(error), true);
+        }
+      });
+    }
+
+    for (const button of document.querySelectorAll('[data-delete-device]')) {
+      button.addEventListener('click', async () => {
+        const deviceId = button.getAttribute('data-delete-device') || '';
+        if (!window.confirm('Delete ' + deviceId + '?')) return;
+        const form = button.closest('form');
+        if (form) setStatus(form, 'Deleting device...', false);
+        try {
+          await requestJson('/api/devices/' + encodeURIComponent(deviceId), { method: 'DELETE' });
+          window.location.reload();
+        } catch (error) {
+          if (form) setStatus(form, error instanceof Error ? error.message : String(error), true);
         }
       });
     }
@@ -479,6 +703,46 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Burn-in', `${device.burnInInterval ?? 0}m / ${device.burnInDuration ?? 30}s / ${device.burnInOpacity ?? 30}%`)}
         ${renderKeyValue('Sleep', sleepWindow)}
       </dl>
+      <details>
+        <summary>Device Settings</summary>
+        <form class="form-grid" data-device-edit="${escapeAttribute(device.id)}">
+          <label class="field">
+            <span class="label">Name</span>
+            <input name="name" required maxlength="80" value="${escapeAttribute(device.name)}">
+          </label>
+          <label class="field">
+            <span class="label">Network Mode</span>
+            <select name="networkMode">
+              ${renderNetworkModeOptions(device.networkMode ?? device.deviceNetworkMode)}
+            </select>
+          </label>
+          <label class="field full">
+            <span class="label">Local Controller URL</span>
+            <input name="localControllerBaseUrl" type="url" required value="${escapeAttribute(device.localControllerBaseUrl)}">
+          </label>
+          <label class="field full">
+            <span class="label">Local Kiosk URL</span>
+            <input name="localKioskBaseUrl" type="url" required value="${escapeAttribute(device.localKioskBaseUrl)}">
+          </label>
+          <label class="field full">
+            <span class="label">External Controller URL</span>
+            <input name="externalControllerBaseUrl" type="url" value="${escapeAttribute(device.externalControllerBaseUrl ?? '')}">
+          </label>
+          <label class="field full">
+            <span class="label">External Kiosk URL</span>
+            <input name="externalKioskBaseUrl" type="url" value="${escapeAttribute(device.externalKioskBaseUrl ?? '')}">
+          </label>
+          <label class="field">
+            <span class="label">Poll Interval</span>
+            <input name="pollIntervalSeconds" type="number" min="5" max="300" step="1" value="${device.pollIntervalSeconds}">
+          </label>
+          <div class="form-actions">
+            <span class="form-status" data-form-status></span>
+            ${device.isDefault ? '' : `<button type="button" class="danger" data-delete-device="${escapeAttribute(device.id)}">Delete</button>`}
+            <button type="submit" class="primary">Save Device</button>
+          </div>
+        </form>
+      </details>
     </div>
   </article>`;
 }
@@ -490,6 +754,12 @@ function renderKeyValue(label: string, value: string): string {
 function renderStatusPill(value: string): string {
   const className = value === 'local' || value === 'external' ? 'ok' : 'warn';
   return `<span class="pill ${className}">${escapeHtml(value)}</span>`;
+}
+
+function renderNetworkModeOptions(value: string): string {
+  return ['auto', 'local', 'external']
+    .map((option) => `<option value="${option}"${option === value ? ' selected' : ''}>${option}</option>`)
+    .join('');
 }
 
 function boolLabel(value: boolean | undefined): string {

@@ -35,11 +35,14 @@ export class FrameEventHub {
     client.reply.raw.on('close', cleanup);
   }
 
-  emitState(deviceId: string, state: FrameState): void {
+  emitState(deviceId: string, state: FrameState, device?: FrameDevice): void {
     const clients = this.clients.get(deviceId);
     if (!clients) return;
     for (const client of clients) {
-      this.send(client, 'state', buildRendererUrl(client.device, state, client.context, {
+      if (device) {
+        client.device = device;
+      }
+      this.send(client, 'state', buildRendererUrl(device ?? client.device, state, client.context, {
         kioskPassword: client.kioskPassword,
       }));
     }

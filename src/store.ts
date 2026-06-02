@@ -34,6 +34,43 @@ export class JsonStore {
     return structuredClone(this.data.frames[deviceId]);
   }
 
+  createDevice(device: FrameDevice): FrameDevice | undefined {
+    if (this.data.devices[device.id]) return undefined;
+    this.data.devices[device.id] = structuredClone(device);
+    this.data.frames[device.id] = createDefaultFrameState(device);
+    this.save();
+    return structuredClone(device);
+  }
+
+  updateDevice(deviceId: string, patch: Partial<FrameDevice>): FrameDevice | undefined {
+    const current = this.data.devices[deviceId];
+    if (!current) return undefined;
+    const next = {
+      ...current,
+      ...patch,
+      id: current.id,
+    };
+    this.data.devices[deviceId] = next;
+    if (patch.networkMode && this.data.frames[deviceId]) {
+      this.data.frames[deviceId] = {
+        ...this.data.frames[deviceId],
+        networkMode: patch.networkMode,
+        version: this.data.frames[deviceId].version + 1,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    this.save();
+    return structuredClone(next);
+  }
+
+  deleteDevice(deviceId: string): boolean {
+    if (!this.data.devices[deviceId]) return false;
+    delete this.data.devices[deviceId];
+    delete this.data.frames[deviceId];
+    this.save();
+    return true;
+  }
+
   getProfiles(): FrameProfile[] {
     return Object.values(this.data.profiles).map((profile) => structuredClone(profile));
   }

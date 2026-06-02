@@ -114,9 +114,18 @@ def _register_services(hass: HomeAssistant) -> None:
         client, coordinator = _runtime_for_call(hass, call)
         album_ids = call.data.get("album_ids")
         album_id = call.data.get("album_id")
-        if not album_ids and not album_id:
-            raise HomeAssistantError("album_id or album_ids is required")
-        await client.update_frame_state({"activeAlbumIds": album_ids or [album_id]})
+        album_names = call.data.get("album_names")
+        album_name = call.data.get("album_name")
+        if album_names or album_name:
+            selected_album_ids = _album_ids_for_names(
+                coordinator.data.get("albums", {}).get("items", []),
+                album_names or [album_name],
+            )
+        elif album_ids or album_id:
+            selected_album_ids = album_ids or [album_id]
+        else:
+            raise HomeAssistantError("album_id, album_ids, album_name, or album_names is required")
+        await client.update_frame_state({"activeAlbumIds": selected_album_ids})
         await coordinator.async_request_refresh()
 
     async def set_profile(call: ServiceCall) -> None:
@@ -153,6 +162,8 @@ def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional(CONF_DEVICE_ID): cv.string,
                 vol.Optional("album_id"): cv.string,
                 vol.Optional("album_ids"): vol.All(cv.ensure_list, [cv.string]),
+                vol.Optional("album_name"): cv.string,
+                vol.Optional("album_names"): vol.All(cv.ensure_list, [cv.string]),
             }
         ),
     )
@@ -240,3 +251,27 @@ def _runtime_for_call(
 
     runtime = next(iter(runtimes.values()))
     return runtime[DATA_CLIENT], runtime[DATA_COORDINATOR]
+
+
+def _album_ids_for_names(albums: list[dict], names: list[str]) -> list[str]:
+    selected: list[str] = []
+    unknown: list[str] = []
+    for name in names:
+        normalized = str(name).strip().casefold()
+        album = next(
+            (
+                album
+                for album in albums
+                if album.get("albumName", "").casefold() == normalized or album.get("id") == name
+            ),
+            None,
+        )
+        if album:
+            selected.append(album["id"])
+        else:
+            unknown.append(str(name))
+
+    if unknown:
+        raise HomeAssistantError(f"Unknown Immich album: {', '.join(unknown)}")
+
+    return list(dict.fromkeys(selected))

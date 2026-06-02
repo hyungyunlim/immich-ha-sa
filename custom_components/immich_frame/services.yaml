@@ -12,6 +12,14 @@ set_album:
       required: false
       selector:
         object:
+    album_name:
+      required: false
+      selector:
+        text:
+    album_names:
+      required: false
+      selector:
+        object:
 
 set_profile:
   fields:

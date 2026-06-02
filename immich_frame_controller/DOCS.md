@@ -34,8 +34,23 @@ The Web UI is an operational console. It shows:
 - Device IDs and fixed frame URLs.
 - Resolved immich-kiosk renderer URLs with sensitive query values redacted.
 - Current sleep, display, motion, UI, progress, and burn-in override state.
+- Local device management controls for creating, editing, and deleting non-default frame devices.
+
+Device management is only available from the local console. For each new device, the controller creates:
+
+- A fixed URL at `/frame/<device_id>`.
+- A separate frame state record for album, renderer, sleep, and display settings.
+- Optional local and external controller/kiosk URL overrides.
+
+Add the Home Assistant integration once per frame device ID. Home Assistant entities for the same device ID are grouped under one Home Assistant device page, so `lenovo`, `kitchen`, and `office` can each be adjusted independently.
 
 Use Home Assistant entities and services for actual control. Sleep settings are exposed as `sleepStart`, `sleepEnd`, `sleepIcon`, `sleepDimScreen`, and `disableSleep`, and are applied to immich-kiosk as URL query overrides.
+
+For album control:
+
+- Use the Album select entity for quick single-album selection.
+- Use the Albums text entity for multiple albums, separated by commas. Values may be Immich album names or album IDs.
+- Use the `set_album` service with `album_ids` or `album_names` for automations.
 
 The controller also exposes common immich-kiosk URL override settings for frame-specific behavior:
 

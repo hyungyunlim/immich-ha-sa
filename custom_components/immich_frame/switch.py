@@ -6,7 +6,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DATA_COORDINATOR, DOMAIN
 from .coordinator import ImmichFrameCoordinator
-from .entity_helpers import frame_label, frame_unique_id
+from .entity_helpers import frame_device_info, frame_label, frame_unique_id
 
 
 async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
@@ -89,6 +89,7 @@ class ImmichFrameSleepSwitch(CoordinatorEntity[ImmichFrameCoordinator], SwitchEn
         self._default = default
         self._attr_name = f"{frame_label(device_id)} Frame {label}"
         self._attr_unique_id = frame_unique_id(device_id, key)
+        self._attr_device_info = frame_device_info(device_id)
 
     @property
     def is_on(self) -> bool:

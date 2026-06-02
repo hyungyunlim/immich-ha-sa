@@ -8,7 +8,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DATA_COORDINATOR, DOMAIN
 from .coordinator import ImmichFrameCoordinator
-from .entity_helpers import frame_label, frame_unique_id
+from .entity_helpers import frame_device_info, frame_label, frame_unique_id
 
 
 async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
@@ -56,6 +56,7 @@ class ImmichFrameAlbumSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEn
         device_id = coordinator.client.device_id
         self._attr_name = f"{frame_label(device_id)} Frame Album"
         self._attr_unique_id = frame_unique_id(device_id, "album")
+        self._attr_device_info = frame_device_info(device_id)
 
     @property
     def options(self) -> list[str]:
@@ -64,7 +65,7 @@ class ImmichFrameAlbumSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEn
     @property
     def current_option(self) -> str | None:
         active = self.coordinator.data.get("state", {}).get("activeAlbumIds", [])
-        if not active:
+        if len(active) != 1:
             return None
         album = next((album for album in self._albums if album["id"] == active[0]), None)
         return album["albumName"] if album else active[0]
@@ -85,6 +86,7 @@ class ImmichFrameProfileSelect(CoordinatorEntity[ImmichFrameCoordinator], Select
         device_id = coordinator.client.device_id
         self._attr_name = f"{frame_label(device_id)} Frame Profile"
         self._attr_unique_id = frame_unique_id(device_id, "profile")
+        self._attr_device_info = frame_device_info(device_id)
 
     @property
     def options(self) -> list[str]:
@@ -116,6 +118,7 @@ class ImmichFrameNetworkModeSelect(CoordinatorEntity[ImmichFrameCoordinator], Se
         device_id = coordinator.client.device_id
         self._attr_name = f"{frame_label(device_id)} Frame Network Mode"
         self._attr_unique_id = frame_unique_id(device_id, "network_mode")
+        self._attr_device_info = frame_device_info(device_id)
 
     @property
     def current_option(self) -> str | None:
@@ -140,6 +143,7 @@ class ImmichFrameStateSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEn
         self._patch_key = patch_key
         self._attr_name = f"{frame_label(device_id)} Frame {label}"
         self._attr_unique_id = frame_unique_id(device_id, key)
+        self._attr_device_info = frame_device_info(device_id)
         self._attr_options = options
 
     @property

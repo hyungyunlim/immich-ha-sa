@@ -8,7 +8,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DATA_COORDINATOR, DOMAIN
 from .coordinator import ImmichFrameCoordinator
-from .entity_helpers import frame_label, frame_unique_id
+from .entity_helpers import frame_device_info, frame_label, frame_unique_id
 
 SENSITIVE_QUERY_PARAMS = {"api_key", "apikey", "key", "password", "secret", "token"}
 MAX_STATE_LENGTH = 255
@@ -29,8 +29,9 @@ class ImmichFrameCurrentAlbumSensor(CoordinatorEntity[ImmichFrameCoordinator], S
     def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
         super().__init__(coordinator)
         device_id = coordinator.client.device_id
-        self._attr_name = f"{frame_label(device_id)} Frame Current Album"
+        self._attr_name = f"{frame_label(device_id)} Frame Current Albums"
         self._attr_unique_id = frame_unique_id(device_id, "current_album")
+        self._attr_device_info = frame_device_info(device_id)
 
     @property
     def native_value(self) -> str | None:
@@ -38,8 +39,16 @@ class ImmichFrameCurrentAlbumSensor(CoordinatorEntity[ImmichFrameCoordinator], S
         if not active:
             return None
         albums = self.coordinator.data.get("albums", {}).get("items", [])
-        album = next((album for album in albums if album["id"] == active[0]), None)
-        return album["albumName"] if album else active[0]
+        labels = []
+        for album_id in active:
+            album = next((album for album in albums if album["id"] == album_id), None)
+            labels.append(album["albumName"] if album else album_id)
+        return ", ".join(labels)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, list[str]] | None:
+        active = self.coordinator.data.get("state", {}).get("activeAlbumIds", [])
+        return {"album_ids": active}
 
 
 class ImmichFrameRendererUrlSensor(CoordinatorEntity[ImmichFrameCoordinator], SensorEntity):
@@ -48,6 +57,7 @@ class ImmichFrameRendererUrlSensor(CoordinatorEntity[ImmichFrameCoordinator], Se
         device_id = coordinator.client.device_id
         self._attr_name = f"{frame_label(device_id)} Frame Renderer URL"
         self._attr_unique_id = frame_unique_id(device_id, "renderer_url")
+        self._attr_device_info = frame_device_info(device_id)
 
     @property
     def native_value(self) -> str | None:
@@ -79,6 +89,7 @@ class ImmichFrameResolvedNetworkModeSensor(CoordinatorEntity[ImmichFrameCoordina
         device_id = coordinator.client.device_id
         self._attr_name = f"{frame_label(device_id)} Frame Resolved Network Mode"
         self._attr_unique_id = frame_unique_id(device_id, "resolved_network_mode")
+        self._attr_device_info = frame_device_info(device_id)
 
     @property
     def native_value(self) -> str | None:

@@ -140,6 +140,121 @@ describe('controller API', () => {
     await server.close();
   });
 
+  it('manages multiple devices with separate frame state', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createServer({ config });
+
+    const created = await server.inject({
+      method: 'POST',
+      url: '/api/devices',
+      headers: { host: '10.0.0.10:18082' },
+      payload: { id: 'kitchen', name: 'Kitchen Frame' },
+    });
+    expect(created.statusCode).toBe(200);
+    expect(created.json().data.device.id).toBe('kitchen');
+    expect(created.json().data.frameUrl).toBe('http://10.0.0.10:18082/frame/kitchen');
+
+    const kitchenUpdate = await server.inject({
+      method: 'PUT',
+      url: '/api/frame/kitchen/state',
+      payload: { durationSeconds: 120, layout: 'splitview' },
+    });
+    expect(kitchenUpdate.statusCode).toBe(200);
+
+    const kitchenState = await server.inject({
+      method: 'GET',
+      url: '/api/frame/kitchen/state',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    const lenovoState = await server.inject({
+      method: 'GET',
+      url: '/api/frame/lenovo/state',
+      headers: { host: '10.0.0.10:18082' },
+    });
+
+    expect(kitchenState.statusCode).toBe(200);
+    expect(kitchenState.json().data.durationSeconds).toBe(120);
+    expect(kitchenState.json().data.layout).toBe('splitview');
+    expect(lenovoState.json().data.durationSeconds).toBe(60);
+    expect(lenovoState.json().data.layout).toBe('single');
+
+    await server.close();
+  });
+
+  it('updates and deletes console-managed devices', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createServer({ config });
+
+    await server.inject({
+      method: 'POST',
+      url: '/api/devices',
+      headers: { host: '10.0.0.10:18082' },
+      payload: { id: 'office', name: 'Office Frame' },
+    });
+
+    const updated = await server.inject({
+      method: 'PATCH',
+      url: '/api/devices/office',
+      headers: { host: '10.0.0.10:18082' },
+      payload: {
+        name: 'Office Desk',
+        networkMode: 'local',
+        localControllerBaseUrl: 'http://10.0.0.11:18082/',
+        localKioskBaseUrl: 'http://10.0.0.11:3000/',
+        pollIntervalSeconds: 15,
+      },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().data.device.name).toBe('Office Desk');
+    expect(updated.json().data.device.localControllerBaseUrl).toBe('http://10.0.0.11:18082');
+    expect(updated.json().data.state.networkMode).toBe('local');
+
+    const defaultDelete = await server.inject({
+      method: 'DELETE',
+      url: '/api/devices/lenovo',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(defaultDelete.statusCode).toBe(400);
+
+    const deleted = await server.inject({
+      method: 'DELETE',
+      url: '/api/devices/office',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(deleted.statusCode).toBe(200);
+
+    const missing = await server.inject({
+      method: 'GET',
+      url: '/api/frame/office/state',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(missing.statusCode).toBe(404);
+
+    await server.close();
+  });
+
+  it('blocks device management from the external controller host', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createServer({ config });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/devices',
+      headers: { host: 'frame.example.com', 'x-forwarded-proto': 'https' },
+      payload: { id: 'remote', name: 'Remote Frame' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe('CONSOLE_FORBIDDEN');
+    await server.close();
+  });
+
   it('serves the add-on console from root and double-slash setup paths', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);

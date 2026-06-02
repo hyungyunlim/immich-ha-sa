@@ -9,7 +9,7 @@ import { ImmichClient } from './immichClient.js';
 import { buildRendererUrl } from './rendererUrl.js';
 import { renderSetupBlockedPage, renderSetupPage } from './setupPage.js';
 import { JsonStore } from './store.js';
-import type { AlbumCache, FrameState } from './types.js';
+import type { AlbumCache, FrameDevice, FrameState } from './types.js';
 
 const FrameStatePatchSchema = z.object({
   activeAlbumIds: z.array(z.string().min(1)).optional(),
@@ -79,6 +79,50 @@ const ProfileSchema = z.object({
 const PairingTokenSchema = z.object({
   pairingCode: z.string().min(1),
   name: z.string().min(1).max(80).optional(),
+});
+
+const DeviceIdSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? value.trim().toLowerCase() : value),
+  z.string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9_-]*$/, 'Use lowercase letters, numbers, hyphens, or underscores.'),
+);
+
+const DeviceNameSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? value.trim() : value),
+  z.string().min(1).max(80),
+);
+
+const OptionalUrlSchema = z.preprocess(
+  (value) => (value === '' || value === null ? undefined : value),
+  z.string().url().optional(),
+);
+
+const RequiredUrlSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? value.trim() : value),
+  z.string().url(),
+);
+
+const DeviceCreateSchema = z.object({
+  id: DeviceIdSchema,
+  name: DeviceNameSchema,
+  networkMode: z.enum(['auto', 'local', 'external']).default('auto'),
+  localControllerBaseUrl: OptionalUrlSchema,
+  externalControllerBaseUrl: OptionalUrlSchema,
+  localKioskBaseUrl: OptionalUrlSchema,
+  externalKioskBaseUrl: OptionalUrlSchema,
+  pollIntervalSeconds: z.number().int().min(5).max(300).default(20),
+});
+
+const DevicePatchSchema = z.object({
+  name: DeviceNameSchema.optional(),
+  networkMode: z.enum(['auto', 'local', 'external']).optional(),
+  localControllerBaseUrl: RequiredUrlSchema.optional(),
+  externalControllerBaseUrl: OptionalUrlSchema,
+  localKioskBaseUrl: RequiredUrlSchema.optional(),
+  externalKioskBaseUrl: OptionalUrlSchema,
+  pollIntervalSeconds: z.number().int().min(5).max(300).optional(),
 });
 
 export interface ServerDeps {
@@ -154,6 +198,13 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         return {
           id: candidate.id,
           name: candidate.name,
+          localControllerBaseUrl: candidate.localControllerBaseUrl,
+          externalControllerBaseUrl: candidate.externalControllerBaseUrl,
+          localKioskBaseUrl: candidate.localKioskBaseUrl,
+          externalKioskBaseUrl: candidate.externalKioskBaseUrl,
+          deviceNetworkMode: candidate.networkMode,
+          pollIntervalSeconds: candidate.pollIntervalSeconds,
+          isDefault: candidate.id === deps.config.defaultDevice.id,
           frameUrl: `${candidate.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${candidate.id}`,
           rendererUrl: resolved?.rendererUrl,
           networkMode: frameState?.networkMode ?? candidate.networkMode,
@@ -200,6 +251,87 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       return;
     }
     return ok(paired);
+  });
+
+  app.get('/api/devices', async (request, reply) => {
+    if (!requireLocalConsoleAccess(request, reply)) return;
+    const data = store.getData();
+    return ok({
+      items: Object.values(data.devices).map((device) => ({
+        ...device,
+        frameUrl: `${device.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${device.id}`,
+        hasState: Boolean(data.frames[device.id]),
+        isDefault: device.id === deps.config.defaultDevice.id,
+      })),
+    });
+  });
+
+  app.post('/api/devices', async (request, reply) => {
+    if (!requireLocalConsoleAccess(request, reply)) return;
+    const parsed = DeviceCreateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid device.'));
+      return;
+    }
+    const device = createDeviceFromInput(parsed.data, deps.config.defaultDevice);
+    const created = store.createDevice(device);
+    if (!created) {
+      reply.status(409).send(fail('DEVICE_EXISTS', `Device already exists: ${device.id}`));
+      return;
+    }
+    return ok({
+      device: created,
+      state: store.getFrameState(created.id),
+      frameUrl: `${created.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${created.id}`,
+    });
+  });
+
+  app.patch('/api/devices/:deviceId', async (request, reply) => {
+    if (!requireLocalConsoleAccess(request, reply)) return;
+    const { deviceId } = request.params as { deviceId: string };
+    const parsedDeviceId = DeviceIdSchema.safeParse(deviceId);
+    if (!parsedDeviceId.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsedDeviceId.error.errors[0]?.message ?? 'Invalid device id.'));
+      return;
+    }
+    const parsed = DevicePatchSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid device.'));
+      return;
+    }
+    const updated = store.updateDevice(parsedDeviceId.data, normalizeDevicePatch(parsed.data));
+    if (!updated) {
+      reply.status(404).send(fail('DEVICE_NOT_FOUND', `Device not found: ${parsedDeviceId.data}`));
+      return;
+    }
+    const state = store.getFrameState(updated.id);
+    if (state) {
+      events.emitState(updated.id, state, updated);
+    }
+    return ok({
+      device: updated,
+      state,
+      frameUrl: `${updated.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${updated.id}`,
+    });
+  });
+
+  app.delete('/api/devices/:deviceId', async (request, reply) => {
+    if (!requireLocalConsoleAccess(request, reply)) return;
+    const { deviceId } = request.params as { deviceId: string };
+    const parsedDeviceId = DeviceIdSchema.safeParse(deviceId);
+    if (!parsedDeviceId.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsedDeviceId.error.errors[0]?.message ?? 'Invalid device id.'));
+      return;
+    }
+    if (parsedDeviceId.data === deps.config.defaultDevice.id) {
+      reply.status(400).send(fail('DEFAULT_DEVICE', 'The default device cannot be deleted.'));
+      return;
+    }
+    if (!store.deleteDevice(parsedDeviceId.data)) {
+      reply.status(404).send(fail('DEVICE_NOT_FOUND', `Device not found: ${parsedDeviceId.data}`));
+      return;
+    }
+    return ok({ deleted: true, deviceId: parsedDeviceId.data });
   });
 
   app.get('/frame/:deviceId', async (request, reply) => {
@@ -385,6 +517,13 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return ok(resolved, { version: resolved.version, updatedAt: resolved.updatedAt });
   });
 
+  function requireLocalConsoleAccess(request: FastifyRequest, reply: FastifyReply): boolean {
+    const device = store.getDevice(deps.config.defaultDevice.id) ?? deps.config.defaultDevice;
+    if (!isExternalSetupRequest(device.externalControllerBaseUrl, request)) return true;
+    reply.status(403).send(fail('CONSOLE_FORBIDDEN', 'Device management is only available from the local console.'));
+    return false;
+  }
+
   function resolveFrameForRequest(deviceId: string, request: Parameters<typeof requestContext>[0]) {
     const device = store.getDevice(deviceId);
     const state = store.getFrameState(deviceId);
@@ -442,6 +581,49 @@ function stripNullProfile(patch: z.infer<typeof FrameStatePatchSchema>): Partial
     };
   }
   return patch as Partial<FrameState>;
+}
+
+function createDeviceFromInput(
+  input: z.infer<typeof DeviceCreateSchema>,
+  defaultDevice: FrameDevice,
+): FrameDevice {
+  return {
+    ...defaultDevice,
+    id: input.id,
+    name: input.name,
+    networkMode: input.networkMode,
+    localControllerBaseUrl: trimTrailingSlash(input.localControllerBaseUrl ?? defaultDevice.localControllerBaseUrl),
+    externalControllerBaseUrl: input.externalControllerBaseUrl
+      ? trimTrailingSlash(input.externalControllerBaseUrl)
+      : defaultDevice.externalControllerBaseUrl,
+    localKioskBaseUrl: trimTrailingSlash(input.localKioskBaseUrl ?? defaultDevice.localKioskBaseUrl),
+    externalKioskBaseUrl: input.externalKioskBaseUrl
+      ? trimTrailingSlash(input.externalKioskBaseUrl)
+      : defaultDevice.externalKioskBaseUrl,
+    pollIntervalSeconds: input.pollIntervalSeconds,
+  };
+}
+
+function normalizeDevicePatch(input: z.infer<typeof DevicePatchSchema>): Partial<FrameDevice> {
+  return {
+    ...input,
+    localControllerBaseUrl: input.localControllerBaseUrl
+      ? trimTrailingSlash(input.localControllerBaseUrl)
+      : input.localControllerBaseUrl,
+    externalControllerBaseUrl: input.externalControllerBaseUrl
+      ? trimTrailingSlash(input.externalControllerBaseUrl)
+      : input.externalControllerBaseUrl,
+    localKioskBaseUrl: input.localKioskBaseUrl
+      ? trimTrailingSlash(input.localKioskBaseUrl)
+      : input.localKioskBaseUrl,
+    externalKioskBaseUrl: input.externalKioskBaseUrl
+      ? trimTrailingSlash(input.externalKioskBaseUrl)
+      : input.externalKioskBaseUrl,
+  };
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '');
 }
 
 function validateAlbumIds(albumIds: string[] | undefined, cache: AlbumCache): string | undefined {
