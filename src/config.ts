@@ -4,18 +4,22 @@ import { z } from 'zod';
 import type { FrameDevice, NetworkMode } from './types.js';
 
 const NetworkModeSchema = z.enum(['auto', 'local', 'external']);
+const OptionalUrlSchema = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().url().optional(),
+);
 
 const EnvSchema = z.object({
-  PORT: z.coerce.number().int().positive().default(8082),
+  PORT: z.coerce.number().int().positive().default(8080),
   DATA_DIR: z.string().default('./data'),
-  IMMICH_INTERNAL_URL: z.string().url().optional(),
+  IMMICH_INTERNAL_URL: OptionalUrlSchema,
   IMMICH_API_KEY: z.string().optional(),
-  KIOSK_INTERNAL_URL: z.string().url().optional(),
+  KIOSK_INTERNAL_URL: OptionalUrlSchema,
   KIOSK_PASSWORD: z.string().optional(),
   LOCAL_PUBLIC_CONTROLLER_URL: z.string().url(),
   LOCAL_PUBLIC_KIOSK_URL: z.string().url(),
-  EXTERNAL_PUBLIC_CONTROLLER_URL: z.string().url().optional(),
-  EXTERNAL_PUBLIC_KIOSK_URL: z.string().url().optional(),
+  EXTERNAL_PUBLIC_CONTROLLER_URL: OptionalUrlSchema,
+  EXTERNAL_PUBLIC_KIOSK_URL: OptionalUrlSchema,
   DEFAULT_FRAME_ID: z.string().min(1).default('lenovo'),
   DEFAULT_FRAME_NAME: z.string().min(1).default('Lenovo Smart Frame'),
   DEFAULT_NETWORK_MODE: NetworkModeSchema.default('auto'),

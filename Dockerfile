@@ -19,6 +19,5 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 RUN mkdir -p /data
 VOLUME ["/data"]
-EXPOSE 8082
+EXPOSE 8080
 CMD ["node", "dist/src/index.js"]
-

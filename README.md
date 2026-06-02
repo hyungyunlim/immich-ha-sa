@@ -5,7 +5,7 @@ This project controls a Lenovo Smart Frame running Fully Kiosk Browser from Home
 The frame keeps one fixed URL:
 
 ```text
-http://<rpi-lan-ip>:8082/frame/lenovo
+http://<rpi-lan-ip>:<controller-host-port>/frame/lenovo
 ```
 
 For remote frames, the same route can be exposed through Cloudflare Tunnel:
@@ -51,14 +51,18 @@ IMMICH_INTERNAL_URL=http://127.0.0.1:2283
 IMMICH_API_KEY=...
 KIOSK_INTERNAL_URL=http://127.0.0.1:3000
 KIOSK_PASSWORD=...
-LOCAL_PUBLIC_CONTROLLER_URL=http://192.168.1.251:8082
-LOCAL_PUBLIC_KIOSK_URL=http://192.168.1.251:3000
+PORT=8080
+CONTROLLER_HOST_PORT=8082
+LOCAL_PUBLIC_CONTROLLER_URL=http://<rpi-lan-ip>:<controller-host-port>
+LOCAL_PUBLIC_KIOSK_URL=http://<rpi-lan-ip>:3000
 EXTERNAL_PUBLIC_CONTROLLER_URL=https://frame.example.com
 EXTERNAL_PUBLIC_KIOSK_URL=https://frame.example.com/kiosk
 CONTROLLER_API_TOKEN=...
 ```
 
-3. Run locally:
+`PORT` is the internal app port. `CONTROLLER_HOST_PORT` is the Docker host port exposed on the RPi or server. If `8082` is already in use, choose another host port and update `LOCAL_PUBLIC_CONTROLLER_URL`, the Home Assistant controller URL, and the Lenovo/Fully Kiosk fixed URL to match.
+
+3. Run locally without Docker:
 
 ```bash
 npm install
@@ -68,8 +72,8 @@ npm run dev
 4. Open:
 
 ```text
-http://localhost:8082/api/health
-http://localhost:8082/frame/lenovo
+http://localhost:8080/api/health
+http://localhost:8080/frame/lenovo
 ```
 
 ## Docker
@@ -82,6 +86,8 @@ docker compose --env-file .env -f docker-compose.example.yml up -d --build
 
 If the controller joins the Immich Docker network, `IMMICH_INTERNAL_URL` and `KIOSK_INTERNAL_URL` can use container names. Browser-facing URLs must still be reachable from the frame.
 
+The Docker example exposes `${CONTROLLER_HOST_PORT:-8082}` on the host and forwards it to `${PORT:-8080}` in the container. `8082` is only a default example; use any free host port.
+
 ## Cloudflare Tunnel
 
 For remote frames, prefer a single public domain:
@@ -91,7 +97,7 @@ https://frame.example.com/frame/lenovo
 https://frame.example.com/kiosk/...
 ```
 
-`cloudflared.example.yml` routes `/kiosk/*` to `immich-kiosk` and everything else to the controller. Remote mode should use polling fallback if SSE is unreliable through the tunnel.
+`cloudflared.example.yml` routes `/kiosk/*` to `immich-kiosk` and everything else to the controller. Point the controller service at the host port you chose, for example `http://localhost:8082`. Remote mode should use polling fallback if SSE is unreliable through the tunnel.
 
 ## Home Assistant
 
@@ -110,7 +116,7 @@ https://github.com/hyungyunlim/immich-ha-sa
 6. Restart Home Assistant.
 7. Go to Settings -> Devices & services -> Add integration -> `Immich Frame Controller`.
 8. Enter:
-   - Controller URL: `http://192.168.1.251:8082`
+   - Controller URL: `http://<rpi-lan-ip>:<controller-host-port>`
    - Controller API token: the value of `CONTROLLER_API_TOKEN`
    - Device ID: `lenovo`
 
@@ -120,7 +126,7 @@ YAML import remains supported for controlled deployments:
 
 ```yaml
 immich_frame:
-  controller_url: http://192.168.1.251:8082
+  controller_url: http://<rpi-lan-ip>:<controller-host-port>
   api_token: !secret immich_frame_controller_token
   device_id: lenovo
 ```
@@ -153,13 +159,13 @@ action:
 Read state:
 
 ```bash
-curl http://localhost:8082/api/frame/lenovo/state
+curl http://localhost:8080/api/frame/lenovo/state
 ```
 
 Update state:
 
 ```bash
-curl -X PUT http://localhost:8082/api/frame/lenovo/state \
+curl -X PUT http://localhost:8080/api/frame/lenovo/state \
   -H "Authorization: Bearer $CONTROLLER_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"activeAlbumIds":["album-id"],"networkMode":"local"}'
@@ -168,7 +174,7 @@ curl -X PUT http://localhost:8082/api/frame/lenovo/state \
 Refresh albums:
 
 ```bash
-curl -X POST http://localhost:8082/api/immich/albums/refresh \
+curl -X POST http://localhost:8080/api/immich/albums/refresh \
   -H "Authorization: Bearer $CONTROLLER_API_TOKEN"
 ```
 

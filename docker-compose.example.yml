@@ -4,9 +4,9 @@ services:
     container_name: immich-frame-controller
     restart: unless-stopped
     ports:
-      - "8082:8082"
+      - "${CONTROLLER_HOST_PORT:-8082}:${PORT:-8080}"
     environment:
-      PORT: "8082"
+      PORT: "${PORT:-8080}"
       DATA_DIR: /data
 
       IMMICH_INTERNAL_URL: "http://immich_server:2283"
@@ -14,10 +14,10 @@ services:
       KIOSK_INTERNAL_URL: "http://immich-kiosk:3000"
       KIOSK_PASSWORD: "${KIOSK_PASSWORD}"
 
-      LOCAL_PUBLIC_CONTROLLER_URL: "http://192.168.1.251:8082"
-      LOCAL_PUBLIC_KIOSK_URL: "http://192.168.1.251:3000"
-      EXTERNAL_PUBLIC_CONTROLLER_URL: "https://frame.example.com"
-      EXTERNAL_PUBLIC_KIOSK_URL: "https://frame.example.com/kiosk"
+      LOCAL_PUBLIC_CONTROLLER_URL: "${LOCAL_PUBLIC_CONTROLLER_URL}"
+      LOCAL_PUBLIC_KIOSK_URL: "${LOCAL_PUBLIC_KIOSK_URL}"
+      EXTERNAL_PUBLIC_CONTROLLER_URL: "${EXTERNAL_PUBLIC_CONTROLLER_URL:-}"
+      EXTERNAL_PUBLIC_KIOSK_URL: "${EXTERNAL_PUBLIC_KIOSK_URL:-}"
 
       DEFAULT_FRAME_ID: lenovo
       DEFAULT_FRAME_NAME: "Lenovo Smart Frame"

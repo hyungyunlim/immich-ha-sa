@@ -6,6 +6,6 @@ ingress:
     path: /kiosk/*
     service: http://localhost:3000
   - hostname: frame.example.com
+    # Match the Docker host port configured as CONTROLLER_HOST_PORT.
     service: http://localhost:8082
   - service: http_status:404
-

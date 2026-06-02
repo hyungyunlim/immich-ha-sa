@@ -470,9 +470,9 @@ Frame device model:
   "id": "lenovo",
   "name": "Lenovo Smart Frame",
   "networkMode": "auto",
-  "localControllerBaseUrl": "http://192.168.1.251:8082",
+  "localControllerBaseUrl": "http://<rpi-lan-ip>:<controller-host-port>",
   "externalControllerBaseUrl": "https://frame.example.com",
-  "localKioskBaseUrl": "http://192.168.1.251:3000",
+  "localKioskBaseUrl": "http://<rpi-lan-ip>:3000",
   "externalKioskBaseUrl": "https://kiosk.example.com",
   "pollIntervalSeconds": 20
 }
@@ -696,12 +696,13 @@ services:
   immich-frame-controller:
     image: local/immich-frame-controller:latest
     ports:
-      - "8082:8082"
+      - "${CONTROLLER_HOST_PORT:-8082}:${PORT:-8080}"
     environment:
+      PORT: "${PORT:-8080}"
       IMMICH_INTERNAL_URL: "http://immich_server:2283"
       IMMICH_API_KEY: "${IMMICH_API_KEY}"
       KIOSK_INTERNAL_URL: "http://immich-kiosk:3000"
-      LOCAL_PUBLIC_CONTROLLER_URL: "http://<rpi-lan-ip>:8082"
+      LOCAL_PUBLIC_CONTROLLER_URL: "http://<rpi-lan-ip>:<controller-host-port>"
       LOCAL_PUBLIC_KIOSK_URL: "http://<rpi-lan-ip>:3000"
       EXTERNAL_PUBLIC_CONTROLLER_URL: "https://frame.example.com"
       EXTERNAL_PUBLIC_KIOSK_URL: "https://frame.example.com/kiosk"
@@ -713,6 +714,7 @@ services:
 Networking note:
 
 - If the controller runs in Docker, it can talk to Immich via Docker network name.
+- The host-facing controller port must be configurable because `8082` may already be in use.
 - The generated renderer URL must be reachable from the Lenovo frame, so it should use the LAN host/IP, not an internal Docker hostname.
 - For remote frames, generated URLs should use the public Cloudflare Tunnel domain.
 - A single-domain external setup should proxy `/kiosk` to `immich-kiosk` so the public frame page and renderer are same-origin where possible.

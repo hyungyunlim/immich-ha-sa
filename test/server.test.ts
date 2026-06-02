@@ -14,14 +14,14 @@ function buildConfig(dir: string): AppConfig {
     id: 'lenovo',
     name: 'Lenovo',
     networkMode: 'auto',
-    localControllerBaseUrl: 'http://192.168.1.251:8082',
+    localControllerBaseUrl: 'http://10.0.0.10:18082',
     externalControllerBaseUrl: 'https://frame.example.com',
-    localKioskBaseUrl: 'http://192.168.1.251:3000',
+    localKioskBaseUrl: 'http://10.0.0.10:3000',
     externalKioskBaseUrl: 'https://frame.example.com/kiosk',
     pollIntervalSeconds: 20,
   };
   return {
-    port: 8082,
+    port: 18082,
     dataDir: dir,
     storePath: join(dir, 'state.json'),
     defaultDevice,

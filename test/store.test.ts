@@ -11,8 +11,8 @@ const device: FrameDevice = {
   id: 'lenovo',
   name: 'Lenovo',
   networkMode: 'auto',
-  localControllerBaseUrl: 'http://192.168.1.251:8082',
-  localKioskBaseUrl: 'http://192.168.1.251:3000',
+  localControllerBaseUrl: 'http://10.0.0.10:18082',
+  localKioskBaseUrl: 'http://10.0.0.10:3000',
   pollIntervalSeconds: 20,
 };
 
