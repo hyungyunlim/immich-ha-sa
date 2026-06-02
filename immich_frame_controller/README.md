@@ -19,3 +19,5 @@ http://<home-assistant-host>:8082
 ```
 
 Album, renderer, network mode, sleep cycle, layout, transition, image effect, frame UI, progress bar, and burn-in changes are controlled through the Home Assistant integration entities and services. Each configured frame device gets its own Home Assistant device page, and multi-album selection is available through the frame Albums text entity or the `album_ids` / `album_names` service fields.
+
+For frames running FreeKiosk, set the device remote-control type to `freekiosk` and enter the FreeKiosk REST API URL, for example `http://192.168.1.160:8080`. The Home Assistant device page then exposes next, previous, play/pause, reload, screen on, and screen off buttons.

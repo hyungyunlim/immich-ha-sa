@@ -9,7 +9,7 @@ import { ImmichClient } from './immichClient.js';
 import { buildRendererUrl } from './rendererUrl.js';
 import { renderSetupBlockedPage, renderSetupPage } from './setupPage.js';
 import { JsonStore } from './store.js';
-import type { AlbumCache, FrameDevice, FrameState } from './types.js';
+import type { AlbumCache, FrameCommand, FrameDevice, FrameState } from './types.js';
 
 const FrameStatePatchSchema = z.object({
   activeAlbumIds: z.array(z.string().min(1)).optional(),
@@ -99,6 +99,11 @@ const OptionalUrlSchema = z.preprocess(
   z.string().url().optional(),
 );
 
+const OptionalSecretSchema = z.preprocess(
+  (value) => (value === '' || value === null ? undefined : value),
+  z.string().optional(),
+);
+
 const RequiredUrlSchema = z.preprocess(
   (value) => (typeof value === 'string' ? value.trim() : value),
   z.string().url(),
@@ -113,6 +118,9 @@ const DeviceCreateSchema = z.object({
   localKioskBaseUrl: OptionalUrlSchema,
   externalKioskBaseUrl: OptionalUrlSchema,
   pollIntervalSeconds: z.number().int().min(5).max(300).default(20),
+  remoteControlType: z.enum(['none', 'freekiosk']).default('none'),
+  remoteApiUrl: OptionalUrlSchema,
+  remoteApiKey: OptionalSecretSchema,
 });
 
 const DevicePatchSchema = z.object({
@@ -123,6 +131,13 @@ const DevicePatchSchema = z.object({
   localKioskBaseUrl: RequiredUrlSchema.optional(),
   externalKioskBaseUrl: OptionalUrlSchema,
   pollIntervalSeconds: z.number().int().min(5).max(300).optional(),
+  remoteControlType: z.enum(['none', 'freekiosk']).optional(),
+  remoteApiUrl: OptionalUrlSchema,
+  remoteApiKey: OptionalSecretSchema,
+});
+
+const FrameCommandSchema = z.object({
+  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'screen-on', 'screen-off']),
 });
 
 export interface ServerDeps {
@@ -172,6 +187,8 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         externalControllerBaseUrl: device.externalControllerBaseUrl,
         localKioskBaseUrl: device.localKioskBaseUrl,
         externalKioskBaseUrl: device.externalKioskBaseUrl,
+        remoteControlType: device.remoteControlType ?? 'none',
+        remoteApiConfigured: Boolean(device.remoteApiUrl),
       }])),
       auth: auth.status(),
     });
@@ -204,6 +221,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           externalKioskBaseUrl: candidate.externalKioskBaseUrl,
           deviceNetworkMode: candidate.networkMode,
           pollIntervalSeconds: candidate.pollIntervalSeconds,
+          remoteControlType: candidate.remoteControlType ?? 'none',
+          remoteApiUrl: candidate.remoteApiUrl,
+          remoteApiKeyConfigured: Boolean(candidate.remoteApiKey),
           isDefault: candidate.id === deps.config.defaultDevice.id,
           frameUrl: `${candidate.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${candidate.id}`,
           rendererUrl: resolved?.rendererUrl,
@@ -258,7 +278,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     const data = store.getData();
     return ok({
       items: Object.values(data.devices).map((device) => ({
-        ...device,
+        ...publicDevice(device),
         frameUrl: `${device.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${device.id}`,
         hasState: Boolean(data.frames[device.id]),
         isDefault: device.id === deps.config.defaultDevice.id,
@@ -280,7 +300,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       return;
     }
     return ok({
-      device: created,
+      device: publicDevice(created),
       state: store.getFrameState(created.id),
       frameUrl: `${created.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${created.id}`,
     });
@@ -309,7 +329,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       events.emitState(updated.id, state, updated);
     }
     return ok({
-      device: updated,
+      device: publicDevice(updated),
       state,
       frameUrl: `${updated.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${updated.id}`,
     });
@@ -388,6 +408,30 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     }));
     events.emitState(deviceId, store.getFrameState(deviceId) ?? updated);
     return ok(resolved, { version: resolved.version, updatedAt: resolved.updatedAt });
+  });
+
+  app.post('/api/frames/:deviceId/command', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const { deviceId } = request.params as { deviceId: string };
+    const parsed = FrameCommandSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid frame command.'));
+      return;
+    }
+    const device = store.getDevice(deviceId);
+    if (!device) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
+    try {
+      const result = await sendRemoteCommand(device, parsed.data.command);
+      return ok(result);
+    } catch (error) {
+      const remoteError = error instanceof RemoteCommandError
+        ? error
+        : new RemoteCommandError('REMOTE_COMMAND_FAILED', error instanceof Error ? error.message : String(error));
+      reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
+    }
   });
 
   app.get('/api/frame/:deviceId/events', async (request, reply) => {
@@ -545,6 +589,103 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   return app;
 }
 
+class RemoteCommandError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+    public readonly statusCode = 502,
+  ) {
+    super(message);
+  }
+}
+
+async function sendRemoteCommand(
+  device: FrameDevice,
+  command: FrameCommand,
+): Promise<{
+  provider: 'freekiosk';
+  command: FrameCommand;
+  endpoint: string;
+  statusCode: number;
+  result: unknown;
+}> {
+  if ((device.remoteControlType ?? 'none') !== 'freekiosk') {
+    throw new RemoteCommandError('REMOTE_NOT_CONFIGURED', `Frame ${device.id} is not configured for FreeKiosk remote control.`, 400);
+  }
+  if (!device.remoteApiUrl) {
+    throw new RemoteCommandError('REMOTE_NOT_CONFIGURED', `Frame ${device.id} is missing remoteApiUrl.`, 400);
+  }
+
+  const endpoint = freeKioskEndpoint(command);
+  const url = `${trimTrailingSlash(device.remoteApiUrl)}${endpoint}`;
+  const headers: Record<string, string> = {};
+  if (device.remoteApiKey) {
+    headers['X-Api-Key'] = device.remoteApiKey;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    signal: AbortSignal.timeout(7000),
+  });
+  const text = await response.text();
+  const payload = parseJsonOrText(text);
+
+  if (!response.ok || (isRecord(payload) && payload.success === false)) {
+    const message = isRecord(payload) && isRecord(payload.error)
+      ? String(payload.error.message ?? 'FreeKiosk command failed.')
+      : `FreeKiosk command failed with HTTP ${response.status}.`;
+    throw new RemoteCommandError('REMOTE_COMMAND_FAILED', message, 502);
+  }
+
+  return {
+    provider: 'freekiosk',
+    command,
+    endpoint,
+    statusCode: response.status,
+    result: isRecord(payload) && 'data' in payload ? payload.data : payload,
+  };
+}
+
+function freeKioskEndpoint(command: FrameCommand): string {
+  switch (command) {
+    case 'next':
+      return '/api/remote/right';
+    case 'previous':
+      return '/api/remote/left';
+    case 'play-pause':
+      return '/api/remote/playpause';
+    case 'reload':
+      return '/api/reload';
+    case 'screen-on':
+      return '/api/screen/on';
+    case 'screen-off':
+      return '/api/screen/off';
+  }
+}
+
+function parseJsonOrText(value: string): unknown {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object';
+}
+
+function publicDevice(device: FrameDevice): Omit<FrameDevice, 'remoteApiKey'> & { remoteApiKeyConfigured: boolean } {
+  const { remoteApiKey: _remoteApiKey, ...publicFields } = device;
+  return {
+    ...publicFields,
+    remoteControlType: publicFields.remoteControlType ?? 'none',
+    remoteApiKeyConfigured: Boolean(_remoteApiKey),
+  };
+}
+
 function controllerUrlForRequest(request: Parameters<typeof requestContext>[0], fallback: string): string {
   const context = requestContext(request);
   if (!context.host) return fallback;
@@ -601,11 +742,14 @@ function createDeviceFromInput(
       ? trimTrailingSlash(input.externalKioskBaseUrl)
       : defaultDevice.externalKioskBaseUrl,
     pollIntervalSeconds: input.pollIntervalSeconds,
+    remoteControlType: input.remoteControlType,
+    remoteApiUrl: input.remoteApiUrl ? trimTrailingSlash(input.remoteApiUrl) : undefined,
+    remoteApiKey: input.remoteApiKey,
   };
 }
 
 function normalizeDevicePatch(input: z.infer<typeof DevicePatchSchema>): Partial<FrameDevice> {
-  return {
+  const patch: Partial<FrameDevice> = {
     ...input,
     localControllerBaseUrl: input.localControllerBaseUrl
       ? trimTrailingSlash(input.localControllerBaseUrl)
@@ -619,7 +763,12 @@ function normalizeDevicePatch(input: z.infer<typeof DevicePatchSchema>): Partial
     externalKioskBaseUrl: input.externalKioskBaseUrl
       ? trimTrailingSlash(input.externalKioskBaseUrl)
       : input.externalKioskBaseUrl,
+    remoteApiUrl: input.remoteApiUrl ? trimTrailingSlash(input.remoteApiUrl) : input.remoteApiUrl,
   };
+  if (input.remoteApiKey === undefined) {
+    delete patch.remoteApiKey;
+  }
+  return patch;
 }
 
 function trimTrailingSlash(value: string): string {

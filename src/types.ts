@@ -6,6 +6,8 @@ export type KioskTransition = 'none' | 'fade' | 'cross-fade';
 export type KioskLayout = 'single' | 'portrait' | 'landscape' | 'splitview' | 'splitview-landscape';
 export type ImageEffect = 'none' | 'zoom' | 'smart-zoom';
 export type ProgressBarPosition = 'top' | 'bottom';
+export type RemoteControlType = 'none' | 'freekiosk';
+export type FrameCommand = 'next' | 'previous' | 'play-pause' | 'reload' | 'screen-on' | 'screen-off';
 
 export interface FrameDevice {
   id: string;
@@ -16,6 +18,9 @@ export interface FrameDevice {
   localKioskBaseUrl: string;
   externalKioskBaseUrl?: string;
   pollIntervalSeconds: number;
+  remoteControlType?: RemoteControlType;
+  remoteApiUrl?: string;
+  remoteApiKey?: string;
 }
 
 export interface FrameState {

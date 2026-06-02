@@ -41,8 +41,19 @@ Device management is only available from the local console. For each new device,
 - A fixed URL at `/frame/<device_id>`.
 - A separate frame state record for album, renderer, sleep, and display settings.
 - Optional local and external controller/kiosk URL overrides.
+- Optional FreeKiosk REST remote-control settings.
 
 Add the Home Assistant integration once per frame device ID. Home Assistant entities for the same device ID are grouped under one Home Assistant device page, so `lenovo`, `kitchen`, and `office` can each be adjusted independently.
+
+## FreeKiosk Remote Control
+
+If the frame runs FreeKiosk, open the device settings in the add-on console and set:
+
+- Remote Control: `freekiosk`
+- Remote API URL: the FreeKiosk REST API base URL, for example `http://192.168.1.160:8080`
+- Remote API Key: optional, only if enabled in FreeKiosk
+
+The Home Assistant device page exposes buttons for next, previous, play/pause, reload, screen on, and screen off. These buttons call the controller, and the controller calls FreeKiosk REST endpoints such as `/api/remote/right`, `/api/remote/left`, and `/api/remote/playpause`.
 
 Use Home Assistant entities and services for actual control. Sleep settings are exposed as `sleepStart`, `sleepEnd`, `sleepIcon`, `sleepDimScreen`, and `disableSleep`, and are applied to immich-kiosk as URL query overrides.
 

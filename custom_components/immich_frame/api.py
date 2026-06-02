@@ -63,6 +63,14 @@ class ImmichFrameClient:
             auth=True,
         )
 
+    async def send_command(self, command: str) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            f"/api/frames/{self.device_id}/command",
+            json={"command": command},
+            auth=True,
+        )
+
     async def _request(
         self,
         method: str,

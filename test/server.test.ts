@@ -1,4 +1,6 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -252,6 +254,67 @@ describe('controller API', () => {
 
     expect(response.statusCode).toBe(403);
     expect(response.json().error.code).toBe('CONSOLE_FORBIDDEN');
+    await server.close();
+  });
+
+  it('sends FreeKiosk remote commands for configured frames', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const requests: Array<{ method?: string; url?: string; apiKey?: string | string[] }> = [];
+    const remote = createHttpServer((request, response) => {
+      requests.push({
+        method: request.method,
+        url: request.url,
+        apiKey: request.headers['x-api-key'],
+      });
+      response.setHeader('content-type', 'application/json');
+      response.end(JSON.stringify({ success: true, data: { executed: true, command: 'remoteKey' } }));
+    });
+    await new Promise<void>((resolve) => remote.listen(0, '127.0.0.1', resolve));
+
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    const remotePort = (remote.address() as AddressInfo).port;
+    store.updateDevice('lenovo', {
+      remoteControlType: 'freekiosk',
+      remoteApiUrl: `http://127.0.0.1:${remotePort}`,
+      remoteApiKey: 'test-key',
+    });
+    const server = createServer({ config, store });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'next' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data.endpoint).toBe('/api/remote/right');
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      method: 'POST',
+      url: '/api/remote/right',
+      apiKey: 'test-key',
+    });
+
+    await server.close();
+    await new Promise<void>((resolve) => remote.close(() => resolve()));
+  });
+
+  it('rejects remote commands when no remote backend is configured', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createServer({ config });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'next' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('REMOTE_NOT_CONFIGURED');
     await server.close();
   });
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.5
+
+- Add FreeKiosk REST remote-control support per frame device.
+- Add Home Assistant buttons for next, previous, play/pause, reload, screen on, and screen off.
+- Add remote-control settings to the add-on console device editor.
+
 ## 0.1.4
 
 - Add local-console device management for multiple frame endpoints.

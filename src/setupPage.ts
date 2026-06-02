@@ -17,6 +17,9 @@ interface SetupPageDevice {
   externalKioskBaseUrl?: string;
   deviceNetworkMode: string;
   pollIntervalSeconds: number;
+  remoteControlType?: string;
+  remoteApiUrl?: string;
+  remoteApiKeyConfigured?: boolean;
   isDefault: boolean;
   frameUrl: string;
   rendererUrl?: string;
@@ -453,6 +456,13 @@ export function renderSetupPage(params: SetupPageParams): string {
           <span class="label">Poll Interval</span>
           <input name="pollIntervalSeconds" type="number" min="5" max="300" step="1" value="20">
         </label>
+        <label class="field">
+          <span class="label">Remote Control</span>
+          <select name="remoteControlType">
+            <option value="none">none</option>
+            <option value="freekiosk">freekiosk</option>
+          </select>
+        </label>
         <label class="field full">
           <span class="label">Local Controller URL</span>
           <input name="localControllerBaseUrl" type="url" placeholder="${escapeAttribute(params.controllerUrl)}">
@@ -468,6 +478,14 @@ export function renderSetupPage(params: SetupPageParams): string {
         <label class="field full">
           <span class="label">External Kiosk URL</span>
           <input name="externalKioskBaseUrl" type="url" placeholder="https://frame.example.com/kiosk">
+        </label>
+        <label class="field full">
+          <span class="label">Remote API URL</span>
+          <input name="remoteApiUrl" type="url" placeholder="http://192.168.1.160:8080">
+        </label>
+        <label class="field full">
+          <span class="label">Remote API Key</span>
+          <input name="remoteApiKey" type="password" autocomplete="new-password" placeholder="optional">
         </label>
         <div class="form-actions">
           <span class="form-status" data-form-status></span>
@@ -544,7 +562,13 @@ export function renderSetupPage(params: SetupPageParams): string {
         externalControllerBaseUrl: optionalValue(formData, 'externalControllerBaseUrl') ?? null,
         localKioskBaseUrl: optionalValue(formData, 'localKioskBaseUrl'),
         externalKioskBaseUrl: optionalValue(formData, 'externalKioskBaseUrl') ?? null,
+        remoteControlType: String(formData.get('remoteControlType') || 'none'),
+        remoteApiUrl: optionalValue(formData, 'remoteApiUrl'),
       };
+      const remoteApiKey = optionalValue(formData, 'remoteApiKey');
+      if (remoteApiKey) {
+        payload.remoteApiKey = remoteApiKey;
+      }
       if (includeId) {
         payload.id = String(formData.get('id') || '').trim().toLowerCase();
       }
@@ -702,6 +726,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Progress Bar', `${boolLabel(device.showProgressBar)} / ${device.progressBarPosition ?? 'top'}`)}
         ${renderKeyValue('Burn-in', `${device.burnInInterval ?? 0}m / ${device.burnInDuration ?? 30}s / ${device.burnInOpacity ?? 30}%`)}
         ${renderKeyValue('Sleep', sleepWindow)}
+        ${renderKeyValue('Remote', `${device.remoteControlType ?? 'none'}${device.remoteApiUrl ? ' / configured' : ''}`)}
       </dl>
       <details>
         <summary>Device Settings</summary>
@@ -736,6 +761,20 @@ function renderDeviceCard(device: SetupPageDevice): string {
             <span class="label">Poll Interval</span>
             <input name="pollIntervalSeconds" type="number" min="5" max="300" step="1" value="${device.pollIntervalSeconds}">
           </label>
+          <label class="field">
+            <span class="label">Remote Control</span>
+            <select name="remoteControlType">
+              ${renderRemoteControlOptions(device.remoteControlType ?? 'none')}
+            </select>
+          </label>
+          <label class="field full">
+            <span class="label">Remote API URL</span>
+            <input name="remoteApiUrl" type="url" value="${escapeAttribute(device.remoteApiUrl ?? '')}" placeholder="http://192.168.1.160:8080">
+          </label>
+          <label class="field full">
+            <span class="label">Remote API Key</span>
+            <input name="remoteApiKey" type="password" autocomplete="new-password" placeholder="${device.remoteApiKeyConfigured ? 'configured; leave blank to keep' : 'optional'}">
+          </label>
           <div class="form-actions">
             <span class="form-status" data-form-status></span>
             ${device.isDefault ? '' : `<button type="button" class="danger" data-delete-device="${escapeAttribute(device.id)}">Delete</button>`}
@@ -758,6 +797,12 @@ function renderStatusPill(value: string): string {
 
 function renderNetworkModeOptions(value: string): string {
   return ['auto', 'local', 'external']
+    .map((option) => `<option value="${option}"${option === value ? ' selected' : ''}>${option}</option>`)
+    .join('');
+}
+
+function renderRemoteControlOptions(value: string): string {
+  return ['none', 'freekiosk']
     .map((option) => `<option value="${option}"${option === value ? ' selected' : ''}>${option}</option>`)
     .join('');
 }
