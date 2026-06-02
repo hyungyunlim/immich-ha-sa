@@ -62,7 +62,7 @@ const ProfileSchema = z.object({
   imageEffectAmount: z.number().int().min(100).max(1000).default(120),
   backgroundBlur: z.boolean().default(true),
   frameless: z.boolean().default(false),
-  disableNavigation: z.boolean().default(true),
+  disableNavigation: z.boolean().default(false),
   hideCursor: z.boolean().default(true),
   showProgressBar: z.boolean().default(false),
   progressBarPosition: z.enum(['top', 'bottom']).default('top'),

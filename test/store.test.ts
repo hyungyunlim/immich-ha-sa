@@ -29,6 +29,7 @@ describe('JsonStore', () => {
     const path = join(dir, 'state.json');
 
     const first = new JsonStore(path, device);
+    expect(first.getFrameState('lenovo')?.disableNavigation).toBe(false);
     first.updateFrameState('lenovo', (state) => ({
       ...state,
       activeAlbumIds: ['album-1'],

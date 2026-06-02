@@ -21,7 +21,7 @@ permissions:
 
 env:
   IMAGE_NAME: ghcr.io/hyungyunlim/immich-ha-sa
-  IMAGE_VERSION: 0.1.7
+  IMAGE_VERSION: 0.1.8
 
 jobs:
   build:

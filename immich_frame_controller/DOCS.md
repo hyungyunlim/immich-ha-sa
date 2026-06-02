@@ -55,6 +55,8 @@ If the frame runs FreeKiosk, open the device settings in the add-on console and 
 
 The Home Assistant device page exposes buttons for next, previous, play/pause, reload, screen on, and screen off. These buttons call the controller, and the controller calls FreeKiosk REST endpoints such as `/api/remote/right`, `/api/remote/left`, and `/api/remote/playpause`.
 
+Keep the frame's `disableNavigation` setting off when using next/previous remote buttons. immich-kiosk's `disable_navigation` option blocks touch/click, keyboard, and menu navigation, so FreeKiosk key events will be accepted by FreeKiosk but ignored by immich-kiosk if this is enabled.
+
 Use Home Assistant entities and services for actual control. Sleep settings are exposed as `sleepStart`, `sleepEnd`, `sleepIcon`, `sleepDimScreen`, and `disableSleep`, and are applied to immich-kiosk as URL query overrides.
 
 For album control:

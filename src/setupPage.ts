@@ -509,7 +509,7 @@ export function renderSetupPage(params: SetupPageParams): string {
     <section class="recommendations">
       <article>
         <h3>Frame UX</h3>
-        <p><code>disable_navigation</code> and <code>hide_cursor</code> are controlled per frame to reduce accidental UI on touch panels and kiosk browsers.</p>
+        <p>Keep <code>disable_navigation</code> off when using FreeKiosk next/previous buttons because immich-kiosk treats it as a full navigation input lock.</p>
       </article>
       <article>
         <h3>Motion</h3>
