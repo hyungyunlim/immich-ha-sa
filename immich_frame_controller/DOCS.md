@@ -33,9 +33,18 @@ The Web UI is an operational console. It shows:
 - Pairing code and controller URL for Home Assistant.
 - Device IDs and fixed frame URLs.
 - Resolved immich-kiosk renderer URLs with sensitive query values redacted.
-- Current sleep override state.
+- Current sleep, display, motion, UI, progress, and burn-in override state.
 
 Use Home Assistant entities and services for actual control. Sleep settings are exposed as `sleepStart`, `sleepEnd`, `sleepIcon`, `sleepDimScreen`, and `disableSleep`, and are applied to immich-kiosk as URL query overrides.
+
+The controller also exposes common immich-kiosk URL override settings for frame-specific behavior:
+
+- Motion: `transition`, `fadeTransitionDuration`, `crossFadeTransitionDuration`, `imageEffect`, `imageEffectAmount`.
+- Layout and display: `layout`, `imageFit`, `backgroundBlur`, `frameless`.
+- Kiosk UI: `disableNavigation`, `hideCursor`, `showProgressBar`, `progressBarPosition`.
+- Display care: `burnInInterval`, `burnInDuration`, `burnInOpacity`.
+
+Offline mode is not exposed as a frame profile toggle because it requires persistent offline assets and many URL overrides are intentionally unavailable while using offline mode.
 
 ## Remote Frames
 

@@ -18,6 +18,34 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ImmichFrameAlbumSelect(coordinator),
             ImmichFrameProfileSelect(coordinator),
             ImmichFrameNetworkModeSelect(coordinator),
+            ImmichFrameStateSelect(
+                coordinator,
+                "transition",
+                "Transition",
+                "transition",
+                ["none", "fade", "cross-fade"],
+            ),
+            ImmichFrameStateSelect(
+                coordinator,
+                "layout",
+                "Layout",
+                "layout",
+                ["single", "portrait", "landscape", "splitview", "splitview-landscape"],
+            ),
+            ImmichFrameStateSelect(
+                coordinator,
+                "image_effect",
+                "Image Effect",
+                "imageEffect",
+                ["none", "zoom", "smart-zoom"],
+            ),
+            ImmichFrameStateSelect(
+                coordinator,
+                "progress_bar_position",
+                "Progress Bar Position",
+                "progressBarPosition",
+                ["top", "bottom"],
+            ),
         ]
     )
 
@@ -95,4 +123,29 @@ class ImmichFrameNetworkModeSelect(CoordinatorEntity[ImmichFrameCoordinator], Se
 
     async def async_select_option(self, option: str) -> None:
         await self.coordinator.client.update_frame_state({"networkMode": option})
+        await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameStateSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEntity):
+    def __init__(
+        self,
+        coordinator: ImmichFrameCoordinator,
+        key: str,
+        label: str,
+        patch_key: str,
+        options: list[str],
+    ) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._patch_key = patch_key
+        self._attr_name = f"{frame_label(device_id)} Frame {label}"
+        self._attr_unique_id = frame_unique_id(device_id, key)
+        self._attr_options = options
+
+    @property
+    def current_option(self) -> str | None:
+        return self.coordinator.data.get("state", {}).get(self._patch_key)
+
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.client.update_frame_state({self._patch_key: option})
         await self.coordinator.async_request_refresh()

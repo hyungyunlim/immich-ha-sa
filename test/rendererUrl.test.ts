@@ -24,6 +24,21 @@ const state: FrameState = {
   showWeather: true,
   albumOrder: 'random',
   networkMode: 'auto',
+  transition: 'none',
+  fadeTransitionDuration: 1,
+  crossFadeTransitionDuration: 1,
+  layout: 'single',
+  imageEffect: 'none',
+  imageEffectAmount: 120,
+  backgroundBlur: true,
+  frameless: false,
+  disableNavigation: true,
+  hideCursor: true,
+  showProgressBar: false,
+  progressBarPosition: 'top',
+  burnInInterval: 0,
+  burnInDuration: 30,
+  burnInOpacity: 30,
   sleepStart: '',
   sleepEnd: '',
   sleepIcon: true,
@@ -75,5 +90,39 @@ describe('renderer URL generation', () => {
     expect(resolved.rendererUrl).toContain('sleep_icon=false');
     expect(resolved.rendererUrl).toContain('sleep_dim_screen=true');
     expect(resolved.rendererUrl).toContain('disable_sleep=true');
+  });
+
+  it('adds display and kiosk UX URL overrides', () => {
+    const resolved = buildRendererUrl(device, {
+      ...state,
+      transition: 'fade',
+      fadeTransitionDuration: 1.5,
+      layout: 'splitview',
+      imageEffect: 'smart-zoom',
+      imageEffectAmount: 240,
+      backgroundBlur: false,
+      frameless: true,
+      disableNavigation: true,
+      hideCursor: true,
+      showProgressBar: true,
+      progressBarPosition: 'bottom',
+      burnInInterval: 30,
+      burnInDuration: 20,
+      burnInOpacity: 60,
+    });
+    expect(resolved.rendererUrl).toContain('transition=fade');
+    expect(resolved.rendererUrl).toContain('fade_transition_duration=1.5');
+    expect(resolved.rendererUrl).toContain('layout=splitview');
+    expect(resolved.rendererUrl).toContain('image_effect=smart-zoom');
+    expect(resolved.rendererUrl).toContain('image_effect_amount=240');
+    expect(resolved.rendererUrl).toContain('background_blur=false');
+    expect(resolved.rendererUrl).toContain('frameless=true');
+    expect(resolved.rendererUrl).toContain('disable_navigation=true');
+    expect(resolved.rendererUrl).toContain('hide_cursor=true');
+    expect(resolved.rendererUrl).toContain('show_progress_bar=true');
+    expect(resolved.rendererUrl).toContain('progress_bar_position=bottom');
+    expect(resolved.rendererUrl).toContain('burn_in_interval=30');
+    expect(resolved.rendererUrl).toContain('burn_in_duration=20');
+    expect(resolved.rendererUrl).toContain('burn_in_opacity=60');
   });
 });

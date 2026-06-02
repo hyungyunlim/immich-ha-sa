@@ -10,7 +10,7 @@ After the add-on starts, open the Web UI or visit:
 http://<home-assistant-host>:8082/
 ```
 
-The Web UI shows the pairing code, configured devices, fixed frame URLs, resolved renderer URLs, and sleep override state.
+The Web UI shows the pairing code, configured devices, fixed frame URLs, resolved renderer URLs, and active immich-kiosk URL override state.
 
 Then add the `Immich Frame Controller` integration and use the same controller URL:
 
@@ -18,4 +18,4 @@ Then add the `Immich Frame Controller` integration and use the same controller U
 http://<home-assistant-host>:8082
 ```
 
-Album, renderer, network mode, and sleep cycle changes are controlled through the Home Assistant integration entities and services.
+Album, renderer, network mode, sleep cycle, layout, transition, image effect, frame UI, progress bar, and burn-in changes are controlled through the Home Assistant integration entities and services.

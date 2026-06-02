@@ -100,7 +100,7 @@ describe('controller API', () => {
       url: '/setup',
       headers: { host: '10.0.0.10:18082' },
     });
-    const pairingCode = setup.body.match(/<code class="code">([^<]+)<\/code>/)?.[1];
+    const pairingCode = setup.body.match(/<div class="value large">([^<]+)<\/div>/)?.[1];
     expect(pairingCode).toBeTruthy();
 
     const paired = await server.inject({

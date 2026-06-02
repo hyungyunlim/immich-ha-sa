@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+- Redesign the add-on Web UI into a denser operations console.
+- Add Home Assistant controls and URL overrides for immich-kiosk transitions, layouts, image effects, frame UI, progress bar, and burn-in protection.
+- Keep offline mode out of frame profiles because it requires persistent assets and has URL override limitations.
+
 ## 0.1.2
 
 - Handle the Home Assistant ingress root path when it is forwarded as `//`.

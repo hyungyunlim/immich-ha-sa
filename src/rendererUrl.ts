@@ -64,6 +64,21 @@ export function buildRendererUrl(
   url.searchParams.set('show_time', String(state.showTime));
   url.searchParams.set('show_date', String(state.showDate));
   url.searchParams.set('show_weather', String(state.showWeather));
+  url.searchParams.set('transition', state.transition);
+  url.searchParams.set('fade_transition_duration', String(state.fadeTransitionDuration));
+  url.searchParams.set('cross_fade_transition_duration', String(state.crossFadeTransitionDuration));
+  url.searchParams.set('layout', state.layout);
+  url.searchParams.set('image_effect', state.imageEffect);
+  url.searchParams.set('image_effect_amount', String(state.imageEffectAmount));
+  url.searchParams.set('background_blur', String(state.backgroundBlur));
+  url.searchParams.set('frameless', String(state.frameless));
+  url.searchParams.set('disable_navigation', String(state.disableNavigation));
+  url.searchParams.set('hide_cursor', String(state.hideCursor));
+  url.searchParams.set('show_progress_bar', String(state.showProgressBar));
+  url.searchParams.set('progress_bar_position', state.progressBarPosition);
+  url.searchParams.set('burn_in_interval', String(state.burnInInterval));
+  url.searchParams.set('burn_in_duration', String(state.burnInDuration));
+  url.searchParams.set('burn_in_opacity', String(state.burnInOpacity));
   if (state.sleepStart) {
     url.searchParams.set('sleep_start', state.sleepStart);
   }

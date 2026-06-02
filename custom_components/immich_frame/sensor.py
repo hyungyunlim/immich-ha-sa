@@ -11,6 +11,7 @@ from .coordinator import ImmichFrameCoordinator
 from .entity_helpers import frame_label, frame_unique_id
 
 SENSITIVE_QUERY_PARAMS = {"api_key", "apikey", "key", "password", "secret", "token"}
+MAX_STATE_LENGTH = 255
 
 
 async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
@@ -50,6 +51,22 @@ class ImmichFrameRendererUrlSensor(CoordinatorEntity[ImmichFrameCoordinator], Se
 
     @property
     def native_value(self) -> str | None:
+        redacted_url = self._redacted_renderer_url
+        if not redacted_url:
+            return None
+        if len(redacted_url) >= MAX_STATE_LENGTH:
+            return "available"
+        return redacted_url
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        redacted_url = self._redacted_renderer_url
+        if not redacted_url:
+            return None
+        return {"url": redacted_url}
+
+    @property
+    def _redacted_renderer_url(self) -> str | None:
         renderer_url = self.coordinator.data.get("state", {}).get("rendererUrl")
         if not renderer_url:
             return None

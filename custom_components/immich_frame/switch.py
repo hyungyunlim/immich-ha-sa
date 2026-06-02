@@ -34,6 +34,41 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 "sleepDimScreen",
                 False,
             ),
+            ImmichFrameSleepSwitch(
+                coordinator,
+                "background_blur",
+                "Background Blur",
+                "backgroundBlur",
+                True,
+            ),
+            ImmichFrameSleepSwitch(
+                coordinator,
+                "frameless",
+                "Frameless",
+                "frameless",
+                False,
+            ),
+            ImmichFrameSleepSwitch(
+                coordinator,
+                "disable_navigation",
+                "Disable Navigation",
+                "disableNavigation",
+                True,
+            ),
+            ImmichFrameSleepSwitch(
+                coordinator,
+                "hide_cursor",
+                "Hide Cursor",
+                "hideCursor",
+                True,
+            ),
+            ImmichFrameSleepSwitch(
+                coordinator,
+                "show_progress_bar",
+                "Show Progress Bar",
+                "showProgressBar",
+                False,
+            ),
         ]
     )
 
