@@ -6,7 +6,7 @@ import { FrameEventHub } from './events.js';
 import { renderFramePage } from './framePage.js';
 import { fail, ok, requestContext } from './http.js';
 import { ImmichClient } from './immichClient.js';
-import { buildRendererUrl } from './rendererUrl.js';
+import { buildProxiedRendererUrl, buildRendererUrl, controllerBaseUrlForContext } from './rendererUrl.js';
 import { renderSetupBlockedPage, renderSetupPage } from './setupPage.js';
 import { JsonStore } from './store.js';
 import type { AlbumCache, FrameCommand, FrameDevice, FrameState } from './types.js';
@@ -162,6 +162,10 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   });
   const events = deps.events ?? new FrameEventHub();
   const auth = deps.auth ?? new ControllerAuthManager(store, deps.config.controllerApiToken);
+
+  app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'buffer' }, (_request, body, done) => {
+    done(null, body);
+  });
 
   setInterval(() => events.heartbeat(), 25000).unref();
 
@@ -364,6 +368,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     reply.type('text/html; charset=utf-8').send(renderFramePage(device));
   });
 
+  app.all('/kiosk-proxy/:deviceId', proxyKioskRequest);
+  app.all('/kiosk-proxy/:deviceId/*', proxyKioskRequest);
+
   app.get('/api/frame/:deviceId/state', async (request, reply) => {
     const { deviceId } = request.params as { deviceId: string };
     const resolved = resolveFrameForRequest(deviceId, request);
@@ -399,14 +406,19 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       ...state,
       ...stripNullProfile(parsed.data),
     }));
-    const resolved = buildRendererUrl(device, updated, requestContext(request), {
+    const direct = buildRendererUrl(device, { ...updated, networkMode: 'local' }, undefined, {
       kioskPassword: deps.config.kioskPassword,
     });
     store.updateFrameState(deviceId, (state) => ({
       ...state,
-      lastKnownGoodRendererUrl: resolved.rendererUrl,
+      lastKnownGoodRendererUrl: direct.rendererUrl,
     }));
     events.emitState(deviceId, store.getFrameState(deviceId) ?? updated);
+    const resolved = resolveFrameForRequest(deviceId, request);
+    if (!resolved) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
     return ok(resolved, { version: resolved.version, updatedAt: resolved.updatedAt });
   });
 
@@ -422,6 +434,18 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     if (!device) {
       reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
       return;
+    }
+    if (commandUsesFrameEvents(parsed.data.command)) {
+      const delivered = events.emitCommand(deviceId, {
+        command: parsed.data.command,
+        issuedAt: new Date().toISOString(),
+      });
+      return ok({
+        command: parsed.data.command,
+        frameEvent: {
+          delivered,
+        },
+      });
     }
     try {
       const result = await sendRemoteCommand(device, parsed.data.command);
@@ -550,14 +574,19 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       sleepDimScreen: profile.sleepDimScreen,
       disableSleep: profile.disableSleep,
     }));
-    const resolved = buildRendererUrl(device, updated, requestContext(request), {
+    const direct = buildRendererUrl(device, { ...updated, networkMode: 'local' }, undefined, {
       kioskPassword: deps.config.kioskPassword,
     });
     store.updateFrameState(deviceId, (state) => ({
       ...state,
-      lastKnownGoodRendererUrl: resolved.rendererUrl,
+      lastKnownGoodRendererUrl: direct.rendererUrl,
     }));
     events.emitState(deviceId, store.getFrameState(deviceId) ?? updated);
+    const resolved = resolveFrameForRequest(deviceId, request);
+    if (!resolved) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
     return ok(resolved, { version: resolved.version, updatedAt: resolved.updatedAt });
   });
 
@@ -573,16 +602,56 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     const state = store.getFrameState(deviceId);
     if (!device || !state) return null;
     try {
-      return buildRendererUrl(device, state, requestContext(request), {
+      const context = requestContext(request);
+      return buildProxiedRendererUrl(device, state, context, {
         kioskPassword: deps.config.kioskPassword,
+        controllerBaseUrl: controllerBaseUrlForContext(context, device.localControllerBaseUrl),
       });
     } catch (error) {
       if (!state.lastKnownGoodRendererUrl) throw error;
       return {
         ...state,
         resolvedNetworkMode: 'local' as const,
-        rendererUrl: state.lastKnownGoodRendererUrl,
+        rendererUrl: toControllerProxyUrl(device, state.lastKnownGoodRendererUrl, request),
       };
+    }
+  }
+
+  async function proxyKioskRequest(request: FastifyRequest, reply: FastifyReply) {
+    const { deviceId } = request.params as { deviceId: string };
+    const device = store.getDevice(deviceId);
+    if (!device) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
+
+    const incomingUrl = new URL(request.url, 'http://controller.local');
+    const proxyPrefix = `/kiosk-proxy/${encodeURIComponent(device.id)}`;
+    const targetPath = incomingUrl.pathname.startsWith(proxyPrefix)
+      ? incomingUrl.pathname.slice(proxyPrefix.length) || '/'
+      : '/';
+    const targetUrl = new URL(`${targetPath}${incomingUrl.search}`, `${device.localKioskBaseUrl.replace(/\/+$/, '')}/`);
+
+    try {
+      const response = await fetch(targetUrl, {
+        method: request.method,
+        headers: proxyRequestHeaders(request),
+        body: proxyRequestBody(request),
+        signal: AbortSignal.timeout(15000),
+      });
+      const contentType = response.headers.get('content-type') ?? '';
+      const body = Buffer.from(await response.arrayBuffer());
+
+      reply.status(response.status);
+      forwardProxyHeaders(response, reply);
+      if (isTextResponse(contentType)) {
+        reply.type(contentType || 'text/plain; charset=utf-8').send(rewriteProxyText(body.toString('utf8'), proxyPrefix));
+        return;
+      }
+      if (contentType) reply.type(contentType);
+      reply.send(body);
+    } catch (error) {
+      reply.status(502).send(fail('KIOSK_PROXY_FAILED', error instanceof Error ? error.message : String(error)));
     }
   }
 
@@ -664,6 +733,10 @@ function freeKioskEndpoint(command: FrameCommand): string {
   }
 }
 
+function commandUsesFrameEvents(command: FrameCommand): boolean {
+  return command === 'next' || command === 'previous' || command === 'play-pause' || command === 'reload';
+}
+
 function parseJsonOrText(value: string): unknown {
   if (!value) return undefined;
   try {
@@ -675,6 +748,63 @@ function parseJsonOrText(value: string): unknown {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object';
+}
+
+function proxyRequestHeaders(request: FastifyRequest): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const [key, value] of Object.entries(request.headers)) {
+    if (!value || shouldSkipProxyRequestHeader(key)) continue;
+    headers[key] = Array.isArray(value) ? value.join(', ') : String(value);
+  }
+  return headers;
+}
+
+function shouldSkipProxyRequestHeader(header: string): boolean {
+  return ['host', 'connection', 'content-length', 'accept-encoding'].includes(header.toLowerCase());
+}
+
+function proxyRequestBody(request: FastifyRequest): BodyInit | undefined {
+  if (request.method === 'GET' || request.method === 'HEAD') return undefined;
+  const body = request.body;
+  if (Buffer.isBuffer(body)) return body.toString('utf8');
+  if (typeof body === 'string') return body;
+  if (body === undefined || body === null) return undefined;
+  return JSON.stringify(body);
+}
+
+function forwardProxyHeaders(response: Response, reply: FastifyReply): void {
+  for (const header of ['cache-control', 'etag', 'expires', 'last-modified', 'set-cookie']) {
+    const value = response.headers.get(header);
+    if (value) reply.header(header, value);
+  }
+}
+
+function isTextResponse(contentType: string): boolean {
+  const normalized = contentType.toLowerCase();
+  return normalized.startsWith('text/')
+    || normalized.includes('application/javascript')
+    || normalized.includes('application/json')
+    || normalized.includes('application/xhtml+xml')
+    || normalized.includes('image/svg+xml');
+}
+
+function rewriteProxyText(value: string, proxyPrefix: string): string {
+  const normalizedPrefix = proxyPrefix.replace(/\/+$/, '');
+  return value.replace(/(["'=(:])\/(?!\/|kiosk-proxy\/)/g, `$1${normalizedPrefix}/`);
+}
+
+function toControllerProxyUrl(
+  device: FrameDevice,
+  rendererUrl: string,
+  request: Parameters<typeof requestContext>[0],
+): string {
+  const source = new URL(rendererUrl);
+  const context = requestContext(request);
+  const controllerBaseUrl = controllerBaseUrlForContext(context, device.localControllerBaseUrl);
+  const proxy = new URL(`/kiosk-proxy/${encodeURIComponent(device.id)}${source.pathname}`, `${controllerBaseUrl}/`);
+  proxy.search = source.search;
+  proxy.hash = source.hash;
+  return proxy.toString();
 }
 
 function publicDevice(device: FrameDevice): Omit<FrameDevice, 'remoteApiKey'> & { remoteApiKeyConfigured: boolean } {

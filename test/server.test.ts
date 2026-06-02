@@ -53,7 +53,7 @@ describe('controller API', () => {
     const body = response.json();
     expect(body.success).toBe(true);
     expect(body.data.resolvedNetworkMode).toBe('external');
-    expect(body.data.rendererUrl).toContain('https://frame.example.com/kiosk');
+    expect(body.data.rendererUrl).toContain('https://frame.example.com/kiosk-proxy/lenovo/');
     await server.close();
   });
 
@@ -266,7 +266,7 @@ describe('controller API', () => {
       headers: { host: '10.0.0.10:18082' },
     });
     expect(state.statusCode).toBe(200);
-    expect(state.json().data.rendererUrl).toContain('http://10.0.0.10:3000/');
+    expect(state.json().data.rendererUrl).toContain('http://10.0.0.10:18082/kiosk-proxy/lenovo/');
 
     await server.close();
   });
@@ -289,7 +289,7 @@ describe('controller API', () => {
     await server.close();
   });
 
-  it('sends FreeKiosk remote commands for configured frames', async () => {
+  it('sends FreeKiosk screen commands for configured frames', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const requests: Array<{ method?: string; url?: string; apiKey?: string | string[] }> = [];
@@ -317,15 +317,15 @@ describe('controller API', () => {
     const response = await server.inject({
       method: 'POST',
       url: '/api/frames/lenovo/command',
-      payload: { command: 'next' },
+      payload: { command: 'screen-on' },
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().data.endpoint).toBe('/api/remote/right');
+    expect(response.json().data.endpoint).toBe('/api/screen/on');
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({
       method: 'POST',
-      url: '/api/remote/right',
+      url: '/api/screen/on',
       apiKey: 'test-key',
     });
 
@@ -333,7 +333,7 @@ describe('controller API', () => {
     await new Promise<void>((resolve) => remote.close(() => resolve()));
   });
 
-  it('rejects remote commands when no remote backend is configured', async () => {
+  it('emits frame commands without requiring a remote backend', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
@@ -345,9 +345,83 @@ describe('controller API', () => {
       payload: { command: 'next' },
     });
 
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data.command).toBe('next');
+    expect(response.json().data.frameEvent.delivered).toBe(0);
+    await server.close();
+  });
+
+  it('rejects screen commands when no remote backend is configured', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createServer({ config });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'screen-off' },
+    });
+
     expect(response.statusCode).toBe(400);
     expect(response.json().error.code).toBe('REMOTE_NOT_CONFIGURED');
     await server.close();
+  });
+
+  it('proxies immich-kiosk through the controller origin', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const kioskRequests: string[] = [];
+    const kiosk = createHttpServer((request, response) => {
+      kioskRequests.push(request.url ?? '');
+      if (request.url?.startsWith('/style.css')) {
+        response.setHeader('content-type', 'text/css');
+        response.end('body{background-image:url("/image")}');
+        return;
+      }
+      response.setHeader('content-type', 'text/html; charset=utf-8');
+      response.end('<link href="/style.css"><main hx-post="/asset/new"><img src="/image"></main>');
+    });
+    await new Promise<void>((resolve) => kiosk.listen(0, '127.0.0.1', resolve));
+
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    const kioskPort = (kiosk.address() as AddressInfo).port;
+    store.updateDevice('lenovo', {
+      localKioskBaseUrl: `http://127.0.0.1:${kioskPort}`,
+    });
+    const server = createServer({ config, store });
+
+    const state = await server.inject({
+      method: 'GET',
+      url: '/api/frame/lenovo/state',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(state.statusCode).toBe(200);
+    expect(state.json().data.rendererUrl).toContain('http://10.0.0.10:18082/kiosk-proxy/lenovo/');
+
+    const html = await server.inject({
+      method: 'GET',
+      url: '/kiosk-proxy/lenovo/?duration=60',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(html.statusCode).toBe(200);
+    expect(html.body).toContain('href="/kiosk-proxy/lenovo/style.css"');
+    expect(html.body).toContain('hx-post="/kiosk-proxy/lenovo/asset/new"');
+    expect(html.body).toContain('src="/kiosk-proxy/lenovo/image"');
+
+    const css = await server.inject({
+      method: 'GET',
+      url: '/kiosk-proxy/lenovo/style.css',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(css.statusCode).toBe(200);
+    expect(css.body).toContain('url("/kiosk-proxy/lenovo/image")');
+    expect(kioskRequests).toContain('/?duration=60');
+    expect(kioskRequests).toContain('/style.css');
+
+    await server.close();
+    await new Promise<void>((resolve) => kiosk.close(() => resolve()));
   });
 
   it('serves the add-on console from root and double-slash setup paths', async () => {

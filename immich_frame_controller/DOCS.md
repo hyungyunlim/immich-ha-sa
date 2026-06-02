@@ -12,7 +12,7 @@ The add-on is the runtime. The Home Assistant integration remains the control su
 - `immich_api_key`: Immich API key.
 - `kiosk_internal_url`: immich-kiosk URL reachable from this add-on container.
 - `local_public_controller_url`: URL that Home Assistant and the frame can reach on the LAN.
-- `local_public_kiosk_url`: Browser-facing immich-kiosk URL for local frames.
+- `local_public_kiosk_url`: immich-kiosk URL used by the controller's same-origin frame proxy.
 
 The default controller port is `8082`. If you change the add-on network port, update `local_public_controller_url` and the Home Assistant integration controller URL to match.
 
@@ -53,9 +53,9 @@ If the frame runs FreeKiosk, open the device settings in the add-on console and 
 - Remote API URL: the FreeKiosk REST API base URL, for example `http://192.168.1.160:8080`
 - Remote API Key: optional, only if enabled in FreeKiosk
 
-The Home Assistant device page exposes buttons for next, previous, play/pause, reload, screen on, and screen off. These buttons call the controller, and the controller calls FreeKiosk REST endpoints such as `/api/remote/right`, `/api/remote/left`, and `/api/remote/playpause`.
+The Home Assistant device page exposes buttons for next, previous, play/pause, reload, screen on, and screen off. Next, previous, play/pause, and reload are sent to the fixed frame page over the controller event stream, then bridged into the same-origin immich-kiosk iframe. Screen on and screen off still require FreeKiosk REST endpoints such as `/api/screen/on` and `/api/screen/off`.
 
-Keep the frame's `disableNavigation` setting off when using next/previous remote buttons. immich-kiosk's `disable_navigation` option blocks touch/click, keyboard, and menu navigation, so FreeKiosk key events will be accepted by FreeKiosk but ignored by immich-kiosk if this is enabled.
+Keep the frame's `disableNavigation` setting off when using next/previous buttons. immich-kiosk's `disable_navigation` option blocks touch/click, keyboard, and menu navigation, so bridged commands and physical key events will be ignored by immich-kiosk if this is enabled.
 
 Use Home Assistant entities and services for actual control. Sleep settings are exposed as `sleepStart`, `sleepEnd`, `sleepIcon`, `sleepDimScreen`, and `disableSleep`, and are applied to immich-kiosk as URL query overrides.
 
@@ -82,4 +82,4 @@ For frames outside the LAN, expose the fixed frame URL with a tunnel such as Clo
 https://frame.example.com/frame/lenovo
 ```
 
-Set `external_public_controller_url` and `external_public_kiosk_url` only after local pairing works. The setup page is intended for LAN or authenticated add-on access, not public unauthenticated setup.
+Set `external_public_controller_url` after local pairing works. With the controller proxy, the public frame only needs the controller domain; a separate public immich-kiosk URL is optional. The setup page is intended for LAN or authenticated add-on access, not public unauthenticated setup.

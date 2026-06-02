@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.9
+
+- Proxy immich-kiosk through the controller origin for frame pages.
+- Bridge Home Assistant next, previous, play/pause, and reload commands into the renderer iframe instead of relying on FreeKiosk key events.
+- Keep FreeKiosk REST control for screen on and screen off.
+
 ## 0.1.5
 
 - Add FreeKiosk REST remote-control support per frame device.

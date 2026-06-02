@@ -55,6 +55,11 @@ export function renderFramePage(device: FrameDevice): string {
       var lastRendererUrl = '';
       var pollTimer = null;
       var pollIntervalMs = ${Math.max(5, device.pollIntervalSeconds) * 1000};
+      var keyMap = {
+        next: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
+        previous: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
+        'play-pause': { key: ' ', code: 'Space', keyCode: 32 }
+      };
 
       function applyState(state) {
         if (!state || !state.rendererUrl) return;
@@ -68,6 +73,60 @@ export function renderFramePage(device: FrameDevice): string {
         iframe.src = state.rendererUrl;
         document.body.className = '';
       }
+
+      function iframeDocument() {
+        try {
+          return iframe.contentWindow && iframe.contentWindow.document;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function dispatchKioskKey(command) {
+        var target = keyMap[command];
+        var doc = iframeDocument();
+        if (!target || !doc || !iframe.contentWindow) return false;
+        var eventInit = {
+          key: target.key,
+          code: target.code,
+          keyCode: target.keyCode,
+          which: target.keyCode,
+          bubbles: true,
+          cancelable: true
+        };
+        var nodes = [doc.body, doc.documentElement, doc, iframe.contentWindow].filter(Boolean);
+        nodes.forEach(function (node) {
+          node.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+        });
+        return true;
+      }
+
+      function triggerKioskCommand(command) {
+        if (command === 'reload') {
+          try {
+            if (iframe.contentWindow) iframe.contentWindow.location.reload();
+            return true;
+          } catch (error) {
+            if (lastRendererUrl) iframe.src = lastRendererUrl;
+            return false;
+          }
+        }
+        return dispatchKioskKey(command);
+      }
+
+      iframe.addEventListener('load', function () {
+        try { iframe.contentWindow && iframe.contentWindow.focus(); } catch (error) {}
+      });
+
+      document.addEventListener('keyup', function (event) {
+        if (event.key === 'ArrowRight') {
+          if (triggerKioskCommand('next')) event.preventDefault();
+        } else if (event.key === 'ArrowLeft') {
+          if (triggerKioskCommand('previous')) event.preventDefault();
+        } else if (event.key === ' ' || event.key === 'Spacebar') {
+          if (triggerKioskCommand('play-pause')) event.preventDefault();
+        }
+      });
 
       function loadState() {
         return fetch(stateUrl, { cache: 'no-store' })
@@ -92,6 +151,12 @@ export function renderFramePage(device: FrameDevice): string {
           var source = new EventSource(eventsUrl);
           source.addEventListener('state', function (event) {
             try { applyState(JSON.parse(event.data)); } catch (error) {}
+          });
+          source.addEventListener('command', function (event) {
+            try {
+              var payload = JSON.parse(event.data);
+              if (payload && payload.command) triggerKioskCommand(payload.command);
+            } catch (error) {}
           });
           source.onerror = function () {
             startPolling();
@@ -118,4 +183,3 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
-

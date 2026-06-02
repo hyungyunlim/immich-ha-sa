@@ -230,7 +230,7 @@ curl -X POST http://localhost:8080/api/immich/albums/refresh \
 - `GET /api/immich/albums` returns cached album data.
 - `PUT /api/frame/lenovo/state` rejects unknown albums when album cache exists.
 - `/frame/lenovo` fills the viewport and keeps the last renderer visible.
-- Local mode emits LAN URLs.
-- External mode emits Cloudflare domain URLs.
+- Local mode emits LAN controller proxy URLs.
+- External mode emits Cloudflare controller proxy URLs.
 - Lenovo/Fully Kiosk renders the page.
 - Polling fallback works when SSE is unavailable.

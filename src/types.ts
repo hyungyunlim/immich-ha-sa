@@ -9,6 +9,11 @@ export type ProgressBarPosition = 'top' | 'bottom';
 export type RemoteControlType = 'none' | 'freekiosk';
 export type FrameCommand = 'next' | 'previous' | 'play-pause' | 'reload' | 'screen-on' | 'screen-off';
 
+export interface FrameCommandEvent {
+  command: FrameCommand;
+  issuedAt: string;
+}
+
 export interface FrameDevice {
   id: string;
   name: string;

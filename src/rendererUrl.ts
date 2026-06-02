@@ -14,6 +14,10 @@ export interface RendererUrlOptions {
   kioskPassword?: string;
 }
 
+export interface ProxiedRendererUrlOptions extends RendererUrlOptions {
+  controllerBaseUrl: string;
+}
+
 export function resolveNetworkMode(
   device: FrameDevice,
   state: Pick<FrameState, 'networkMode'>,
@@ -97,6 +101,23 @@ export function buildRendererUrl(
   };
 }
 
+export function buildProxiedRendererUrl(
+  device: FrameDevice,
+  state: FrameState,
+  request: RequestContext | undefined,
+  options: ProxiedRendererUrlOptions,
+): ResolvedFrameState {
+  const localTarget = buildRendererUrl(device, { ...state, networkMode: 'local' }, undefined, options);
+  const rendererUrl = toKioskProxyUrl(device.id, localTarget.rendererUrl, options.controllerBaseUrl);
+
+  return {
+    ...state,
+    resolvedNetworkMode: resolveNetworkMode(device, state, request),
+    rendererUrl,
+    lastKnownGoodRendererUrl: rendererUrl,
+  };
+}
+
 export function selectKioskBaseUrl(device: FrameDevice, mode: ResolvedNetworkMode): string {
   if (mode === 'external') {
     if (!device.externalKioskBaseUrl) {
@@ -105,6 +126,19 @@ export function selectKioskBaseUrl(device: FrameDevice, mode: ResolvedNetworkMod
     return device.externalKioskBaseUrl;
   }
   return device.localKioskBaseUrl;
+}
+
+export function controllerBaseUrlForContext(context: RequestContext | undefined, fallback: string): string {
+  if (!context?.host) return fallback.replace(/\/+$/, '');
+  return `${context.protocol ?? 'http'}://${context.host}`.replace(/\/+$/, '');
+}
+
+function toKioskProxyUrl(deviceId: string, rendererUrl: string, controllerBaseUrl: string): string {
+  const source = new URL(rendererUrl);
+  const proxy = new URL(`/kiosk-proxy/${encodeURIComponent(deviceId)}${source.pathname}`, `${controllerBaseUrl.replace(/\/+$/, '')}/`);
+  proxy.search = source.search;
+  proxy.hash = source.hash;
+  return proxy.toString();
 }
 
 function normalizeHost(host: string | undefined): string | undefined {
