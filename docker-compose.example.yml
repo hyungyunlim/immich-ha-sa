@@ -26,9 +26,13 @@ services:
     volumes:
       - ./data:/data
     networks:
-      - immich
+      - immich_default
+      - immich_kiosk_default
 
 networks:
-  immich:
+  immich_default:
+    name: immich_default
     external: true
-
+  immich_kiosk_default:
+    name: immich-kiosk_default
+    external: true
