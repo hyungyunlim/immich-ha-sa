@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.10
+
+- Fix kiosk proxy rewriting so JavaScript regular expressions are not modified.
+
 ## 0.1.9
 
 - Proxy immich-kiosk through the controller origin for frame pages.

@@ -379,8 +379,13 @@ describe('controller API', () => {
         response.end('body{background-image:url("/image")}');
         return;
       }
+      if (request.url?.startsWith('/kiosk.js')) {
+        response.setHeader('content-type', 'application/javascript');
+        response.end('const dataAttr = /^data-[\\w]+$/; navigator.serviceWorker.register("/assets/js/sw.js");');
+        return;
+      }
       response.setHeader('content-type', 'text/html; charset=utf-8');
-      response.end('<link href="/style.css"><main hx-post="/asset/new"><img src="/image"></main>');
+      response.end('<link href="/style.css"><script src="/kiosk.js"></script><main hx-post="/asset/new"><img src="/image"></main>');
     });
     await new Promise<void>((resolve) => kiosk.listen(0, '127.0.0.1', resolve));
 
@@ -407,6 +412,7 @@ describe('controller API', () => {
     });
     expect(html.statusCode).toBe(200);
     expect(html.body).toContain('href="/kiosk-proxy/lenovo/style.css"');
+    expect(html.body).toContain('src="/kiosk-proxy/lenovo/kiosk.js"');
     expect(html.body).toContain('hx-post="/kiosk-proxy/lenovo/asset/new"');
     expect(html.body).toContain('src="/kiosk-proxy/lenovo/image"');
 
@@ -417,8 +423,20 @@ describe('controller API', () => {
     });
     expect(css.statusCode).toBe(200);
     expect(css.body).toContain('url("/kiosk-proxy/lenovo/image")');
+
+    const javascript = await server.inject({
+      method: 'GET',
+      url: '/kiosk-proxy/lenovo/kiosk.js',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(javascript.statusCode).toBe(200);
+    expect(javascript.body).toContain('const dataAttr = /^data-[\\w]+$/;');
+    expect(javascript.body).toContain('register("/kiosk-proxy/lenovo/assets/js/sw.js")');
+    expect(javascript.body).not.toContain('/kiosk-proxy/lenovo/^data');
+
     expect(kioskRequests).toContain('/?duration=60');
     expect(kioskRequests).toContain('/style.css');
+    expect(kioskRequests).toContain('/kiosk.js');
 
     await server.close();
     await new Promise<void>((resolve) => kiosk.close(() => resolve()));

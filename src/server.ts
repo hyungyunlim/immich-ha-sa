@@ -645,7 +645,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       reply.status(response.status);
       forwardProxyHeaders(response, reply);
       if (isTextResponse(contentType)) {
-        reply.type(contentType || 'text/plain; charset=utf-8').send(rewriteProxyText(body.toString('utf8'), proxyPrefix));
+        reply.type(contentType || 'text/plain; charset=utf-8').send(rewriteProxyText(body.toString('utf8'), proxyPrefix, contentType));
         return;
       }
       if (contentType) reply.type(contentType);
@@ -788,9 +788,18 @@ function isTextResponse(contentType: string): boolean {
     || normalized.includes('image/svg+xml');
 }
 
-function rewriteProxyText(value: string, proxyPrefix: string): string {
+function rewriteProxyText(value: string, proxyPrefix: string, contentType: string): string {
   const normalizedPrefix = proxyPrefix.replace(/\/+$/, '');
-  return value.replace(/(["'=(:])\/(?!\/|kiosk-proxy\/)/g, `$1${normalizedPrefix}/`);
+  const normalizedContentType = contentType.toLowerCase();
+  if (normalizedContentType.includes('application/javascript')) {
+    return value.replace(/(["'`])\/(assets)(?=[/"'`?])/g, `$1${normalizedPrefix}/$2`);
+  }
+  if (normalizedContentType.startsWith('text/css')) {
+    return value.replace(/url\((["']?)\/(?!\/|kiosk-proxy\/)/g, `url($1${normalizedPrefix}/`);
+  }
+  return value
+    .replace(/\b(href|src|action|poster|manifest|hx-get|hx-post|hx-put|hx-patch|hx-delete)=("|')\/(?!\/|kiosk-proxy\/)/g, `$1=$2${normalizedPrefix}/`)
+    .replace(/url\((["']?)\/(?!\/|kiosk-proxy\/)/g, `url($1${normalizedPrefix}/`);
 }
 
 function toControllerProxyUrl(
