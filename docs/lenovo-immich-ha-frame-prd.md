@@ -349,6 +349,7 @@ Responsibilities:
 - Install from a GitHub repository through HACS custom repositories.
 - Provide a Home Assistant config flow for GUI setup.
 - Support a pairing flow so users can enter a short setup code instead of manually copying controller API tokens from the server.
+- Show a setup-page shortcut inside the pairing step after the user enters the controller URL.
 - Discover/connect to Frame Controller.
 - Expose album list as HA select entity.
 - Expose frame profile as HA select entity.

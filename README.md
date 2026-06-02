@@ -118,17 +118,16 @@ https://github.com/hyungyunlim/immich-ha-sa
 5. Download `Immich Frame Controller`.
 6. Restart Home Assistant.
 7. Go to Settings -> Devices & services -> Add integration -> `Immich Frame Controller`.
-8. Open the controller setup page on the LAN:
+8. Enter:
+   - Controller URL: `http://<rpi-lan-ip>:<controller-host-port>`
+   - Device ID: `lenovo`
+9. On the pairing step, open the setup page link shown by Home Assistant and enter the short code displayed there.
 
 ```text
 http://<rpi-lan-ip>:<controller-host-port>/setup
 ```
 
-9. Enter:
-   - Controller URL: `http://<rpi-lan-ip>:<controller-host-port>`
-   - Pairing code: the short code shown on `/setup`
-   - Device ID: `lenovo`
-   - Controller API token: leave blank unless you configured `CONTROLLER_API_TOKEN`
+The Controller API token field is an optional fallback. Leave it blank unless you configured `CONTROLLER_API_TOKEN`.
 
 HACS custom repositories are intended for public GitHub repositories. If this repository stays private, HACS may not be able to add it from the Home Assistant UI unless the HACS GitHub connection has access to the private repository.
 
