@@ -166,11 +166,17 @@ export class JsonStore {
 
   private mergeWithDefaults(data: StoreData): StoreData {
     const defaults = createDefaultStore(this.defaultDevice);
+    const deviceIds = new Set([
+      ...Object.keys(defaults.devices),
+      ...Object.keys(data.devices ?? {}),
+    ]);
     return {
-      devices: {
-        ...defaults.devices,
-        ...(data.devices ?? {}),
-      },
+      devices: Object.fromEntries(
+        [...deviceIds].map((deviceId) => [
+          deviceId,
+          this.mergeDeviceWithDefaults(deviceId, data.devices?.[deviceId], defaults),
+        ]),
+      ),
       frames: {
         ...defaults.frames,
         ...Object.fromEntries(
@@ -211,7 +217,34 @@ export class JsonStore {
   }
 
   private dataDeviceOrDefault(deviceId: string, data: StoreData): FrameDevice {
-    return data.devices?.[deviceId] ?? this.defaultDevice;
+    return this.mergeDeviceWithDefaults(deviceId, data.devices?.[deviceId], createDefaultStore(this.defaultDevice));
+  }
+
+  private mergeDeviceWithDefaults(
+    deviceId: string,
+    device: FrameDevice | undefined,
+    defaults: StoreData,
+  ): FrameDevice {
+    const fallback = defaults.devices[deviceId] ?? {
+      ...this.defaultDevice,
+      id: deviceId,
+      name: device?.name ?? deviceId,
+    };
+    const merged = {
+      ...fallback,
+      ...(device ?? {}),
+      id: device?.id ?? fallback.id,
+      name: device?.name ?? fallback.name,
+      remoteControlType: device?.remoteControlType ?? fallback.remoteControlType ?? 'none',
+    };
+
+    return {
+      ...merged,
+      networkMode: merged.networkMode ?? fallback.networkMode,
+      localControllerBaseUrl: merged.localControllerBaseUrl ?? fallback.localControllerBaseUrl,
+      localKioskBaseUrl: merged.localKioskBaseUrl ?? fallback.localKioskBaseUrl,
+      pollIntervalSeconds: merged.pollIntervalSeconds ?? fallback.pollIntervalSeconds,
+    };
   }
 
   private write(data: StoreData): void {

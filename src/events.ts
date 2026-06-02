@@ -13,6 +13,9 @@ export class FrameEventHub {
   private readonly clients = new Map<string, Set<SseClient>>();
 
   subscribe(deviceId: string, client: SseClient, state: FrameState): void {
+    const initialState = buildRendererUrl(client.device, state, client.context, {
+      kioskPassword: client.kioskPassword,
+    });
     const clients = this.clients.get(deviceId) ?? new Set<SseClient>();
     clients.add(client);
     this.clients.set(deviceId, clients);
@@ -24,9 +27,7 @@ export class FrameEventHub {
       'X-Accel-Buffering': 'no',
     });
     client.reply.raw.write('\n');
-    this.send(client, 'state', buildRendererUrl(client.device, state, client.context, {
-      kioskPassword: client.kioskPassword,
-    }));
+    this.send(client, 'state', initialState);
 
     const cleanup = (): void => {
       clients.delete(client);
@@ -42,9 +43,13 @@ export class FrameEventHub {
       if (device) {
         client.device = device;
       }
-      this.send(client, 'state', buildRendererUrl(device ?? client.device, state, client.context, {
-        kioskPassword: client.kioskPassword,
-      }));
+      try {
+        this.send(client, 'state', buildRendererUrl(device ?? client.device, state, client.context, {
+          kioskPassword: client.kioskPassword,
+        }));
+      } catch {
+        clients.delete(client);
+      }
     }
   }
 
