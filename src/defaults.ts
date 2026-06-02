@@ -11,6 +11,11 @@ export function createDefaultFrameState(device: FrameDevice): FrameState {
     showWeather: true,
     albumOrder: 'random',
     networkMode: device.networkMode,
+    sleepStart: '',
+    sleepEnd: '',
+    sleepIcon: true,
+    sleepDimScreen: false,
+    disableSleep: false,
     version: 1,
     updatedAt: new Date().toISOString(),
   };
@@ -29,6 +34,11 @@ export function createDefaultProfiles(): Record<string, FrameProfile> {
       showWeather: true,
       albumOrder: 'random',
       preferredNetworkMode: 'auto',
+      sleepStart: '',
+      sleepEnd: '',
+      sleepIcon: true,
+      sleepDimScreen: false,
+      disableSleep: false,
     },
   };
 }

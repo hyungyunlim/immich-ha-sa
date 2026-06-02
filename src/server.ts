@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { ControllerAuthManager } from './auth.js';
 import type { AppConfig } from './config.js';
@@ -21,6 +21,11 @@ const FrameStatePatchSchema = z.object({
   showWeather: z.boolean().optional(),
   albumOrder: z.enum(['random', 'newest', 'oldest']).optional(),
   networkMode: z.enum(['auto', 'local', 'external']).optional(),
+  sleepStart: z.string().max(4).optional(),
+  sleepEnd: z.string().max(4).optional(),
+  sleepIcon: z.boolean().optional(),
+  sleepDimScreen: z.boolean().optional(),
+  disableSleep: z.boolean().optional(),
 });
 
 const ProfileSchema = z.object({
@@ -34,6 +39,11 @@ const ProfileSchema = z.object({
   showWeather: z.boolean(),
   albumOrder: z.enum(['random', 'newest', 'oldest']),
   preferredNetworkMode: z.enum(['auto', 'local', 'external']),
+  sleepStart: z.string().max(4).default(''),
+  sleepEnd: z.string().max(4).default(''),
+  sleepIcon: z.boolean().default(true),
+  sleepDimScreen: z.boolean().default(false),
+  disableSleep: z.boolean().default(false),
 });
 
 const PairingTokenSchema = z.object({
@@ -93,20 +103,43 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     });
   });
 
-  app.get('/setup', async (request, reply) => {
+  const setupHandler = async (request: FastifyRequest, reply: FastifyReply) => {
     const device = store.getDevice(deps.config.defaultDevice.id) ?? deps.config.defaultDevice;
     if (isExternalSetupRequest(device.externalControllerBaseUrl, request)) {
       reply.status(403).type('text/html; charset=utf-8').send(renderSetupBlockedPage());
       return;
     }
     const pairing = auth.ensurePairingCode();
+    const data = store.getData();
     reply.type('text/html; charset=utf-8').send(renderSetupPage({
-      controllerUrl: controllerUrlForRequest(request, device.localControllerBaseUrl),
+      controllerUrl: device.localControllerBaseUrl,
       deviceId: device.id,
       pairingCode: pairing.code,
       expiresAt: pairing.expiresAt,
+      albumCount: data.albumCache.items.length,
+      albumRefreshedAt: data.albumCache.refreshedAt,
+      devices: Object.values(data.devices).map((candidate) => {
+        const frameState = store.getFrameState(candidate.id);
+        const resolved = frameState ? resolveFrameForRequest(candidate.id, request) : null;
+        return {
+          id: candidate.id,
+          name: candidate.name,
+          frameUrl: `${candidate.localControllerBaseUrl.replace(/\/+$/, '')}/frame/${candidate.id}`,
+          rendererUrl: resolved?.rendererUrl,
+          networkMode: frameState?.networkMode ?? candidate.networkMode,
+          resolvedNetworkMode: resolved?.resolvedNetworkMode,
+          durationSeconds: frameState?.durationSeconds,
+          sleepStart: frameState?.sleepStart ?? '',
+          sleepEnd: frameState?.sleepEnd ?? '',
+          disableSleep: frameState?.disableSleep ?? false,
+        };
+      }),
     }));
-  });
+  };
+
+  app.get('/', setupHandler);
+  app.get('/setup', setupHandler);
+  app.get('//setup', setupHandler);
 
   app.get('/api/pairing/status', async () => ok(auth.status()));
 
@@ -275,6 +308,11 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       showWeather: profile.showWeather,
       albumOrder: profile.albumOrder,
       networkMode: profile.preferredNetworkMode,
+      sleepStart: profile.sleepStart,
+      sleepEnd: profile.sleepEnd,
+      sleepIcon: profile.sleepIcon,
+      sleepDimScreen: profile.sleepDimScreen,
+      disableSleep: profile.disableSleep,
     }));
     const resolved = buildRendererUrl(device, updated, requestContext(request), {
       kioskPassword: deps.config.kioskPassword,

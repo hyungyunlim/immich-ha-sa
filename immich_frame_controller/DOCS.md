@@ -4,7 +4,7 @@
 
 This add-on runs the controller service that sits between Home Assistant, Immich, immich-kiosk, and the fixed URL loaded by the Lenovo Smart Frame.
 
-The add-on is the runtime. The Home Assistant integration remains the control surface for entities, services, album selection, profiles, and automations.
+The add-on is the runtime. The Home Assistant integration remains the control surface for entities, services, album selection, profiles, sleep cycles, and automations.
 
 ## Required Configuration
 
@@ -19,12 +19,23 @@ The default controller port is `8082`. If you change the add-on network port, up
 ## Pairing With Home Assistant
 
 1. Start the add-on.
-2. Open the add-on Web UI or `http://<home-assistant-host>:8082/setup`.
+2. Open the add-on Web UI or `http://<home-assistant-host>:8082/`.
 3. Add the `Immich Frame Controller` integration.
 4. Enter the controller URL, usually `http://<home-assistant-host>:8082`.
-5. Enter the pairing code shown on the setup page.
+5. Enter the pairing code shown on the add-on console.
 
 The integration stores the issued controller API token. You usually do not need to configure `controller_api_token`.
+
+## Add-on Web UI
+
+The Web UI is an operational console. It shows:
+
+- Pairing code and controller URL for Home Assistant.
+- Device IDs and fixed frame URLs.
+- Resolved immich-kiosk renderer URLs with sensitive query values redacted.
+- Current sleep override state.
+
+Use Home Assistant entities and services for actual control. Sleep settings are exposed as `sleepStart`, `sleepEnd`, `sleepIcon`, `sleepDimScreen`, and `disableSleep`, and are applied to immich-kiosk as URL query overrides.
 
 ## Remote Frames
 

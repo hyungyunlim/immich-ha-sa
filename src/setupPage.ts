@@ -3,10 +3,29 @@ interface SetupPageParams {
   deviceId: string;
   pairingCode: string;
   expiresAt: string;
+  albumCount: number;
+  albumRefreshedAt?: string;
+  devices: SetupPageDevice[];
+}
+
+interface SetupPageDevice {
+  id: string;
+  name: string;
+  frameUrl: string;
+  rendererUrl?: string;
+  networkMode?: string;
+  resolvedNetworkMode?: string;
+  durationSeconds?: number;
+  sleepStart: string;
+  sleepEnd: string;
+  disableSleep: boolean;
 }
 
 export function renderSetupPage(params: SetupPageParams): string {
   const expires = new Date(params.expiresAt).toLocaleString();
+  const refreshedAt = params.albumRefreshedAt
+    ? new Date(params.albumRefreshedAt).toLocaleString()
+    : 'Not refreshed yet';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -23,12 +42,11 @@ export function renderSetupPage(params: SetupPageParams): string {
     body {
       margin: 0;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
       padding: 32px;
     }
     main {
-      width: min(720px, 100%);
+      width: min(1040px, 100%);
+      margin: 0 auto;
       background: #111827;
       border: 1px solid #334155;
       border-radius: 8px;
@@ -41,6 +59,7 @@ export function renderSetupPage(params: SetupPageParams): string {
     }
     dl {
       display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 14px;
       margin: 22px 0;
     }
@@ -71,12 +90,49 @@ export function renderSetupPage(params: SetupPageParams): string {
       color: #b8c4d3;
       line-height: 1.55;
     }
+    section {
+      border-top: 1px solid #334155;
+      margin-top: 28px;
+      padding-top: 24px;
+    }
+    h2 {
+      font-size: 18px;
+      margin: 0 0 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow-wrap: anywhere;
+    }
+    th,
+    td {
+      border-bottom: 1px solid #273449;
+      padding: 12px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: #93a4b8;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .muted {
+      color: #93a4b8;
+    }
+    .pill {
+      display: inline-block;
+      border: 1px solid #475569;
+      border-radius: 999px;
+      padding: 3px 8px;
+      color: #dbeafe;
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
   <main>
-    <h1>Immich Frame Controller Setup</h1>
-    <p>Open Home Assistant, add the Immich Frame Controller integration, then enter these values.</p>
+    <h1>Immich Frame Controller</h1>
+    <p>Use this add-on console for pairing, fixed frame URLs, and runtime diagnostics. Manage albums, timing, and sleep controls through Home Assistant entities and services.</p>
     <dl>
       <div>
         <dt>Controller URL</dt>
@@ -94,8 +150,28 @@ export function renderSetupPage(params: SetupPageParams): string {
         <dt>Expires</dt>
         <dd>${escapeHtml(expires)}</dd>
       </div>
+      <div>
+        <dt>Album Cache</dt>
+        <dd>${params.albumCount} albums<br><span class="muted">${escapeHtml(refreshedAt)}</span></dd>
+      </div>
     </dl>
     <p>The pairing code is short-lived and is replaced after a successful pairing.</p>
+    <section>
+      <h2>Frames</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Device</th>
+            <th>Frame URL</th>
+            <th>Renderer</th>
+            <th>Sleep</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${params.devices.map(renderDeviceRow).join('')}
+        </tbody>
+      </table>
+    </section>
   </main>
 </body>
 </html>`;
@@ -148,4 +224,33 @@ function escapeHtml(value: string): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function renderDeviceRow(device: SetupPageDevice): string {
+  const rendererUrl = device.rendererUrl
+    ? redactSensitiveQueryParams(device.rendererUrl)
+    : 'Not resolved yet';
+  const sleepWindow = device.disableSleep
+    ? 'Disabled by URL'
+    : `${device.sleepStart || 'config'} -> ${device.sleepEnd || 'config'}`;
+  return `<tr>
+    <td><strong>${escapeHtml(device.name)}</strong><br><span class="muted">${escapeHtml(device.id)}</span></td>
+    <td><code>${escapeHtml(device.frameUrl)}</code></td>
+    <td><span class="pill">${escapeHtml(device.resolvedNetworkMode ?? device.networkMode ?? 'unknown')}</span><br><code>${escapeHtml(rendererUrl)}</code></td>
+    <td>${escapeHtml(sleepWindow)}<br><span class="muted">Duration ${escapeHtml(String(device.durationSeconds ?? 'unknown'))}s</span></td>
+  </tr>`;
+}
+
+function redactSensitiveQueryParams(url: string): string {
+  try {
+    const parsed = new URL(url);
+    for (const key of parsed.searchParams.keys()) {
+      if (['api_key', 'apikey', 'key', 'password', 'secret', 'token'].includes(key.toLowerCase())) {
+        parsed.searchParams.set(key, '[redacted]');
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
 }

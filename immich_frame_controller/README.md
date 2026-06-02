@@ -7,11 +7,15 @@ Use this add-on when Home Assistant OS or Home Assistant Supervised should manag
 After the add-on starts, open the Web UI or visit:
 
 ```text
-http://<home-assistant-host>:8082/setup
+http://<home-assistant-host>:8082/
 ```
+
+The Web UI shows the pairing code, configured devices, fixed frame URLs, resolved renderer URLs, and sleep override state.
 
 Then add the `Immich Frame Controller` integration and use the same controller URL:
 
 ```text
 http://<home-assistant-host>:8082
 ```
+
+Album, renderer, network mode, and sleep cycle changes are controlled through the Home Assistant integration entities and services.

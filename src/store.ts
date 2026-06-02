@@ -136,11 +136,27 @@ export class JsonStore {
       },
       frames: {
         ...defaults.frames,
-        ...(data.frames ?? {}),
+        ...Object.fromEntries(
+          Object.entries(data.frames ?? {}).map(([deviceId, state]) => [
+            deviceId,
+            {
+              ...createDefaultFrameState(this.dataDeviceOrDefault(deviceId, data)),
+              ...state,
+            },
+          ]),
+        ),
       },
       profiles: {
         ...defaults.profiles,
-        ...(data.profiles ?? {}),
+        ...Object.fromEntries(
+          Object.entries(data.profiles ?? {}).map(([profileId, profile]) => [
+            profileId,
+            {
+              ...defaults.profiles.default,
+              ...profile,
+            },
+          ]),
+        ),
       },
       albumCache: data.albumCache ?? defaults.albumCache,
       auth: {
@@ -155,6 +171,10 @@ export class JsonStore {
 
   private save(): void {
     this.write(this.data);
+  }
+
+  private dataDeviceOrDefault(deviceId: string, data: StoreData): FrameDevice {
+    return data.devices?.[deviceId] ?? this.defaultDevice;
   }
 
   private write(data: StoreData): void {

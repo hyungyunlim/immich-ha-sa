@@ -72,6 +72,26 @@ set_renderer_options:
             - random
             - newest
             - oldest
+    sleepStart:
+      required: false
+      selector:
+        text:
+    sleepEnd:
+      required: false
+      selector:
+        text:
+    sleepIcon:
+      required: false
+      selector:
+        boolean:
+    sleepDimScreen:
+      required: false
+      selector:
+        boolean:
+    disableSleep:
+      required: false
+      selector:
+        boolean:
 
 set_network_mode:
   fields:

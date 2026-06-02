@@ -25,6 +25,11 @@ export interface FrameState {
   showWeather: boolean;
   albumOrder: AlbumOrder;
   networkMode: NetworkMode;
+  sleepStart: string;
+  sleepEnd: string;
+  sleepIcon: boolean;
+  sleepDimScreen: boolean;
+  disableSleep: boolean;
   version: number;
   updatedAt: string;
   lastKnownGoodRendererUrl?: string;
@@ -46,6 +51,11 @@ export interface FrameProfile {
   showWeather: boolean;
   albumOrder: AlbumOrder;
   preferredNetworkMode: NetworkMode;
+  sleepStart: string;
+  sleepEnd: string;
+  sleepIcon: boolean;
+  sleepDimScreen: boolean;
+  disableSleep: boolean;
 }
 
 export interface AlbumCacheEntry {

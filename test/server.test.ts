@@ -139,4 +139,28 @@ describe('controller API', () => {
     expect(response.statusCode).toBe(403);
     await server.close();
   });
+
+  it('serves the add-on console from root and double-slash setup paths', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createServer({ config });
+
+    const root = await server.inject({
+      method: 'GET',
+      url: '/',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    const doubleSlash = await server.inject({
+      method: 'GET',
+      url: '//setup',
+      headers: { host: '10.0.0.10:18082' },
+    });
+
+    expect(root.statusCode).toBe(200);
+    expect(root.body).toContain('Immich Frame Controller');
+    expect(doubleSlash.statusCode).toBe(200);
+    expect(doubleSlash.body).toContain('Pairing Code');
+    await server.close();
+  });
 });

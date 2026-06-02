@@ -64,6 +64,15 @@ export function buildRendererUrl(
   url.searchParams.set('show_time', String(state.showTime));
   url.searchParams.set('show_date', String(state.showDate));
   url.searchParams.set('show_weather', String(state.showWeather));
+  if (state.sleepStart) {
+    url.searchParams.set('sleep_start', state.sleepStart);
+  }
+  if (state.sleepEnd) {
+    url.searchParams.set('sleep_end', state.sleepEnd);
+  }
+  url.searchParams.set('sleep_icon', String(state.sleepIcon));
+  url.searchParams.set('sleep_dim_screen', String(state.sleepDimScreen));
+  url.searchParams.set('disable_sleep', String(state.disableSleep));
 
   return {
     ...state,

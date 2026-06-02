@@ -24,6 +24,11 @@ const state: FrameState = {
   showWeather: true,
   albumOrder: 'random',
   networkMode: 'auto',
+  sleepStart: '',
+  sleepEnd: '',
+  sleepIcon: true,
+  sleepDimScreen: false,
+  disableSleep: false,
   version: 3,
   updatedAt: '2026-06-02T00:00:00.000Z',
 };
@@ -54,5 +59,21 @@ describe('renderer URL generation', () => {
   it('adds kiosk password when configured', () => {
     const resolved = buildRendererUrl(device, state, { host: '10.0.0.10:18082' }, { kioskPassword: 'secret' });
     expect(resolved.rendererUrl).toContain('password=secret');
+  });
+
+  it('adds sleep mode URL overrides', () => {
+    const resolved = buildRendererUrl(device, {
+      ...state,
+      sleepStart: '23',
+      sleepEnd: '630',
+      sleepIcon: false,
+      sleepDimScreen: true,
+      disableSleep: true,
+    });
+    expect(resolved.rendererUrl).toContain('sleep_start=23');
+    expect(resolved.rendererUrl).toContain('sleep_end=630');
+    expect(resolved.rendererUrl).toContain('sleep_icon=false');
+    expect(resolved.rendererUrl).toContain('sleep_dim_screen=true');
+    expect(resolved.rendererUrl).toContain('disable_sleep=true');
   });
 });

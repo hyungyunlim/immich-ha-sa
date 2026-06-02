@@ -1,5 +1,5 @@
 name: Immich Frame Controller
-version: "0.1.0"
+version: "0.1.1"
 slug: immich_frame_controller
 description: Home Assistant managed controller for Immich, immich-kiosk, and a fixed-URL digital frame.
 url: https://github.com/hyungyunlim/immich-ha-sa
@@ -12,14 +12,14 @@ init: false
 image: ghcr.io/hyungyunlim/immich-ha-sa
 ingress: true
 ingress_port: 8080
-ingress_entry: /setup
+ingress_entry: /
 panel_icon: mdi:image-frame
 panel_title: Immich Frame
 ports:
   8080/tcp: 8082
 ports_description:
   8080/tcp: Controller frame URL, setup page, and API
-webui: http://[HOST]:[PORT:8080]/setup
+webui: http://[HOST]:[PORT:8080]/
 watchdog: http://[HOST]:[PORT:8080]/api/health
 options:
   immich_internal_url: null

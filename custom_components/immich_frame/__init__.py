@@ -27,7 +27,14 @@ from .const import (
 )
 from .coordinator import ImmichFrameCoordinator
 
-PLATFORMS = [Platform.SELECT, Platform.NUMBER, Platform.BUTTON, Platform.SENSOR]
+PLATFORMS = [
+    Platform.SELECT,
+    Platform.NUMBER,
+    Platform.BUTTON,
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.TEXT,
+]
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -174,6 +181,11 @@ def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional("showDate"): cv.boolean,
                 vol.Optional("showWeather"): cv.boolean,
                 vol.Optional("albumOrder"): vol.In(["random", "newest", "oldest"]),
+                vol.Optional("sleepStart"): cv.string,
+                vol.Optional("sleepEnd"): cv.string,
+                vol.Optional("sleepIcon"): cv.boolean,
+                vol.Optional("sleepDimScreen"): cv.boolean,
+                vol.Optional("disableSleep"): cv.boolean,
             }
         ),
     )
