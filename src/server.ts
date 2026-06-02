@@ -138,6 +138,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   };
 
   app.get('/', setupHandler);
+  app.get('//', setupHandler);
   app.get('/setup', setupHandler);
   app.get('//setup', setupHandler);
 

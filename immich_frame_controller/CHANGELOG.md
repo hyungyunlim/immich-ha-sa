@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- Handle the Home Assistant ingress root path when it is forwarded as `//`.
+
 ## 0.1.1
 
 - Fix add-on Web UI routing for `/`, `/setup`, and `//setup`.

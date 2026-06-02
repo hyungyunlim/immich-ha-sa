@@ -156,11 +156,18 @@ describe('controller API', () => {
       url: '//setup',
       headers: { host: '10.0.0.10:18082' },
     });
+    const doubleSlashRoot = await server.inject({
+      method: 'GET',
+      url: '//',
+      headers: { host: '10.0.0.10:18082' },
+    });
 
     expect(root.statusCode).toBe(200);
     expect(root.body).toContain('Immich Frame Controller');
     expect(doubleSlash.statusCode).toBe(200);
     expect(doubleSlash.body).toContain('Pairing Code');
+    expect(doubleSlashRoot.statusCode).toBe(200);
+    expect(doubleSlashRoot.body).toContain('Immich Frame Controller');
     await server.close();
   });
 });
