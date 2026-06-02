@@ -239,6 +239,38 @@ describe('controller API', () => {
     await server.close();
   });
 
+  it('preserves device URLs when patching remote settings only', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createServer({ config });
+
+    const updated = await server.inject({
+      method: 'PATCH',
+      url: '/api/devices/lenovo',
+      headers: { host: '10.0.0.10:18082' },
+      payload: {
+        remoteControlType: 'freekiosk',
+        remoteApiUrl: 'http://10.0.0.50:8080/',
+      },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().data.device.localControllerBaseUrl).toBe('http://10.0.0.10:18082');
+    expect(updated.json().data.device.localKioskBaseUrl).toBe('http://10.0.0.10:3000');
+    expect(updated.json().data.device.remoteApiUrl).toBe('http://10.0.0.50:8080');
+    expect(updated.json().data.frameUrl).toBe('http://10.0.0.10:18082/frame/lenovo');
+
+    const state = await server.inject({
+      method: 'GET',
+      url: '/api/frame/lenovo/state',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(state.statusCode).toBe(200);
+    expect(state.json().data.rendererUrl).toContain('http://10.0.0.10:3000/');
+
+    await server.close();
+  });
+
   it('blocks device management from the external controller host', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);

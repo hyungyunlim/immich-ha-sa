@@ -749,26 +749,42 @@ function createDeviceFromInput(
 }
 
 function normalizeDevicePatch(input: z.infer<typeof DevicePatchSchema>): Partial<FrameDevice> {
-  const patch: Partial<FrameDevice> = {
-    ...input,
-    localControllerBaseUrl: input.localControllerBaseUrl
+  const patch: Partial<FrameDevice> = {};
+
+  if (hasPatchKey(input, 'name')) patch.name = input.name;
+  if (hasPatchKey(input, 'networkMode')) patch.networkMode = input.networkMode;
+  if (hasPatchKey(input, 'localControllerBaseUrl')) {
+    patch.localControllerBaseUrl = input.localControllerBaseUrl
       ? trimTrailingSlash(input.localControllerBaseUrl)
-      : input.localControllerBaseUrl,
-    externalControllerBaseUrl: input.externalControllerBaseUrl
-      ? trimTrailingSlash(input.externalControllerBaseUrl)
-      : input.externalControllerBaseUrl,
-    localKioskBaseUrl: input.localKioskBaseUrl
-      ? trimTrailingSlash(input.localKioskBaseUrl)
-      : input.localKioskBaseUrl,
-    externalKioskBaseUrl: input.externalKioskBaseUrl
-      ? trimTrailingSlash(input.externalKioskBaseUrl)
-      : input.externalKioskBaseUrl,
-    remoteApiUrl: input.remoteApiUrl ? trimTrailingSlash(input.remoteApiUrl) : input.remoteApiUrl,
-  };
-  if (input.remoteApiKey === undefined) {
-    delete patch.remoteApiKey;
+      : input.localControllerBaseUrl;
   }
+  if (hasPatchKey(input, 'externalControllerBaseUrl')) {
+    patch.externalControllerBaseUrl = input.externalControllerBaseUrl
+      ? trimTrailingSlash(input.externalControllerBaseUrl)
+      : input.externalControllerBaseUrl;
+  }
+  if (hasPatchKey(input, 'localKioskBaseUrl')) {
+    patch.localKioskBaseUrl = input.localKioskBaseUrl
+      ? trimTrailingSlash(input.localKioskBaseUrl)
+      : input.localKioskBaseUrl;
+  }
+  if (hasPatchKey(input, 'externalKioskBaseUrl')) {
+    patch.externalKioskBaseUrl = input.externalKioskBaseUrl
+      ? trimTrailingSlash(input.externalKioskBaseUrl)
+      : input.externalKioskBaseUrl;
+  }
+  if (hasPatchKey(input, 'pollIntervalSeconds')) patch.pollIntervalSeconds = input.pollIntervalSeconds;
+  if (hasPatchKey(input, 'remoteControlType')) patch.remoteControlType = input.remoteControlType;
+  if (hasPatchKey(input, 'remoteApiUrl')) {
+    patch.remoteApiUrl = input.remoteApiUrl ? trimTrailingSlash(input.remoteApiUrl) : input.remoteApiUrl;
+  }
+  if (hasPatchKey(input, 'remoteApiKey')) patch.remoteApiKey = input.remoteApiKey;
+
   return patch;
+}
+
+function hasPatchKey(input: z.infer<typeof DevicePatchSchema>, key: keyof z.infer<typeof DevicePatchSchema>): boolean {
+  return Object.prototype.hasOwnProperty.call(input, key);
 }
 
 function trimTrailingSlash(value: string): string {
