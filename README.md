@@ -21,6 +21,8 @@ Home Assistant HACS integration
         |
         v
 Frame Controller
+  - Home Assistant add-on, or
+  - standalone Docker container
         |
         v
 Lenovo frame /frame/lenovo
@@ -102,7 +104,37 @@ https://frame.example.com/kiosk/...
 
 `cloudflared.example.yml` routes `/kiosk/*` to `immich-kiosk` and everything else to the controller. Point the controller service at the host port you chose, for example `http://localhost:8082`. The setup page blocks requests that arrive on the configured external controller host. Remote mode should use polling fallback if SSE is unreliable through the tunnel.
 
-## Home Assistant
+## Home Assistant Add-on
+
+Home Assistant OS and Home Assistant Supervised users can run the controller as an add-on. This is the preferred installation path when Home Assistant should manage the controller container, logs, startup, port mapping, and setup UI.
+
+1. Open Settings -> Add-ons -> Add-on Store.
+2. Open repositories from the top-right menu.
+3. Add this repository URL:
+
+```text
+https://github.com/hyungyunlim/immich-ha-sa
+```
+
+4. Install `Immich Frame Controller`.
+5. Configure the add-on:
+   - `immich_internal_url`: Immich API URL reachable from the add-on
+   - `immich_api_key`: Immich API key
+   - `kiosk_internal_url`: immich-kiosk URL reachable from the add-on
+   - `local_public_controller_url`: usually `http://<home-assistant-host>:8082`
+   - `local_public_kiosk_url`: browser-facing immich-kiosk URL
+6. Start the add-on.
+7. Open the add-on Web UI or:
+
+```text
+http://<home-assistant-host>:8082/setup
+```
+
+The add-on exposes container port `8080` as host port `8082` by default. If you change the add-on network port, update `local_public_controller_url`, the Home Assistant integration controller URL, and the Lenovo/Fully Kiosk fixed URL to match.
+
+The add-on does not replace the Home Assistant integration. Use the integration for entities, album selection, profiles, services, and automations.
+
+## Home Assistant Integration
 
 Install with HACS as a custom repository:
 
@@ -119,7 +151,7 @@ https://github.com/hyungyunlim/immich-ha-sa
 6. Restart Home Assistant.
 7. Go to Settings -> Devices & services -> Add integration -> `Immich Frame Controller`.
 8. Enter:
-   - Controller URL: `http://<rpi-lan-ip>:<controller-host-port>`
+   - Controller URL: keep the prefilled `http://homeassistant.local:8082` for the add-on, or change it to `http://<rpi-lan-ip>:<controller-host-port>` for standalone Docker
    - Device ID: `lenovo`
 9. On the pairing step, open the setup page link shown by Home Assistant, or copy the prefilled Setup URL, and enter the short code displayed there.
 

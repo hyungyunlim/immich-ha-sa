@@ -1,0 +1,48 @@
+name: Immich Frame Controller
+version: "0.1.0"
+slug: immich_frame_controller
+description: Home Assistant managed controller for Immich, immich-kiosk, and a fixed-URL digital frame.
+url: https://github.com/hyungyunlim/immich-ha-sa
+arch:
+  - aarch64
+  - amd64
+startup: application
+boot: auto
+init: false
+image: ghcr.io/hyungyunlim/immich-ha-sa
+ingress: true
+ingress_port: 8080
+ingress_entry: /setup
+panel_icon: mdi:image-frame
+panel_title: Immich Frame
+ports:
+  8080/tcp: 8082
+ports_description:
+  8080/tcp: Controller frame URL, setup page, and API
+webui: http://[HOST]:[PORT:8080]/setup
+watchdog: http://[HOST]:[PORT:8080]/api/health
+options:
+  immich_internal_url: null
+  immich_api_key: null
+  kiosk_internal_url: null
+  kiosk_password: ""
+  local_public_controller_url: http://homeassistant.local:8082
+  local_public_kiosk_url: http://homeassistant.local:3000
+  default_frame_id: lenovo
+  default_frame_name: Lenovo Smart Frame
+  default_network_mode: auto
+  poll_interval_seconds: 20
+schema:
+  immich_internal_url: url
+  immich_api_key: password
+  kiosk_internal_url: url
+  kiosk_password: password?
+  local_public_controller_url: url
+  local_public_kiosk_url: url
+  external_public_controller_url: url?
+  external_public_kiosk_url: url?
+  default_frame_id: str
+  default_frame_name: str
+  default_network_mode: list(auto|local|external)
+  poll_interval_seconds: int(5,300)
+  controller_api_token: password?

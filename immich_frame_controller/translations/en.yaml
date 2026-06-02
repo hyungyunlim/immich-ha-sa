@@ -1,0 +1,42 @@
+configuration:
+  immich_internal_url:
+    name: Immich internal URL
+    description: URL the controller uses to call the Immich API from inside the add-on container.
+  immich_api_key:
+    name: Immich API key
+    description: Immich API key used server-side by the controller.
+  kiosk_internal_url:
+    name: immich-kiosk internal URL
+    description: URL the controller uses to reach immich-kiosk from inside the add-on container.
+  kiosk_password:
+    name: immich-kiosk password
+    description: Optional kiosk password. Leave blank if immich-kiosk does not require one.
+  local_public_controller_url:
+    name: Local public controller URL
+    description: URL that the Lenovo frame and Home Assistant can reach on the local network.
+  local_public_kiosk_url:
+    name: Local public kiosk URL
+    description: Browser-facing immich-kiosk URL for frames on the local network.
+  external_public_controller_url:
+    name: External public controller URL
+    description: Optional Cloudflare Tunnel or public domain for remote frames.
+  external_public_kiosk_url:
+    name: External public kiosk URL
+    description: Optional public immich-kiosk URL, usually under the same Cloudflare Tunnel domain.
+  default_frame_id:
+    name: Default frame ID
+    description: Device ID used in the fixed frame URL and Home Assistant integration.
+  default_frame_name:
+    name: Default frame name
+    description: Human-readable frame name.
+  default_network_mode:
+    name: Default network mode
+    description: Initial URL mode used by the controller when the frame has no saved state.
+  poll_interval_seconds:
+    name: Poll interval
+    description: Seconds between frame polling requests when real-time events are unavailable.
+  controller_api_token:
+    name: Static controller API token
+    description: Optional fallback token. Most users should leave this blank and use Home Assistant pairing.
+network:
+  8080/TCP: Controller frame URL, setup page, and API

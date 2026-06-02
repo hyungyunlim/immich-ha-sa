@@ -32,11 +32,12 @@ class InvalidPairingCode(Exception):
     """Raised when the pairing code is invalid or expired."""
 
 
+DEFAULT_ADDON_CONTROLLER_URL = "http://homeassistant.local:8082"
 CONF_SETUP_URL = "setup_url"
 
 CONNECT_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_CONTROLLER_URL): str,
+        vol.Required(CONF_CONTROLLER_URL, default=DEFAULT_ADDON_CONTROLLER_URL): str,
         vol.Optional(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): str,
     }
 )

@@ -90,7 +90,9 @@ Home Assistant HACS integration
         |
         | REST API
         v
-Frame Controller on RPi
+Frame Controller
+  - Home Assistant add-on, or
+  - standalone Docker on RPi/server
         |
         | Generates active renderer URL
         v
@@ -355,6 +357,17 @@ Responsibilities:
 - Expose frame profile as HA select entity.
 - Expose key renderer options as HA entities.
 - Provide services for automations.
+
+### 7.5 Home Assistant Add-on Packaging
+
+Responsibilities:
+
+- Package the existing Frame Controller Docker image as a Home Assistant add-on for HA OS and HA Supervised users.
+- Provide Add-on Store configuration UI for Immich, immich-kiosk, local URL, external URL, default frame, polling, and optional static token settings.
+- Expose the controller setup page through the add-on Web UI and Ingress.
+- Expose the fixed frame URL/API on a configurable host port, defaulting to 8082.
+- Keep the Home Assistant integration as the entity/service/control surface; the add-on is the runtime packaging layer.
+- Keep standalone Docker Compose supported for users who do not run a Supervisor-based Home Assistant install.
 
 Initial entities:
 
@@ -799,6 +812,7 @@ Acceptance:
 - Add services for automations.
 - Add unavailable/stale states.
 - Add network mode control where feasible.
+- Add Home Assistant add-on packaging for Supervisor-managed controller runtime.
 
 Acceptance:
 

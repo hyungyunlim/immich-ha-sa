@@ -1,0 +1,42 @@
+configuration:
+  immich_internal_url:
+    name: Immich internal URL
+    description: Add-on 컨테이너 안에서 controller가 Immich API를 호출할 때 쓰는 URL입니다.
+  immich_api_key:
+    name: Immich API key
+    description: Controller가 서버 내부에서 사용하는 Immich API key입니다.
+  kiosk_internal_url:
+    name: immich-kiosk internal URL
+    description: Add-on 컨테이너 안에서 controller가 immich-kiosk에 접근할 때 쓰는 URL입니다.
+  kiosk_password:
+    name: immich-kiosk password
+    description: immich-kiosk password가 있으면 입력하세요. 필요 없으면 비워둡니다.
+  local_public_controller_url:
+    name: Local public controller URL
+    description: 로컬 네트워크에서 Lenovo frame과 Home Assistant가 접근할 수 있는 controller URL입니다.
+  local_public_kiosk_url:
+    name: Local public kiosk URL
+    description: 로컬 네트워크의 프레임 브라우저가 접근할 수 있는 immich-kiosk URL입니다.
+  external_public_controller_url:
+    name: External public controller URL
+    description: 원격 프레임용 Cloudflare Tunnel 또는 public domain입니다.
+  external_public_kiosk_url:
+    name: External public kiosk URL
+    description: 원격 프레임용 public immich-kiosk URL입니다. 보통 같은 Cloudflare Tunnel domain 아래에 둡니다.
+  default_frame_id:
+    name: Default frame ID
+    description: 고정 frame URL과 Home Assistant integration에서 사용할 device ID입니다.
+  default_frame_name:
+    name: Default frame name
+    description: 사람이 읽기 쉬운 프레임 이름입니다.
+  default_network_mode:
+    name: Default network mode
+    description: 저장된 상태가 없을 때 controller가 사용할 초기 URL 모드입니다.
+  poll_interval_seconds:
+    name: Poll interval
+    description: 실시간 이벤트를 사용할 수 없을 때 프레임이 상태를 다시 확인하는 간격입니다.
+  controller_api_token:
+    name: Static controller API token
+    description: 선택 fallback token입니다. 대부분의 사용자는 비워두고 Home Assistant pairing을 쓰면 됩니다.
+network:
+  8080/TCP: Controller frame URL, setup page, API
