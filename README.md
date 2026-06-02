@@ -17,7 +17,7 @@ https://frame.example.com/frame/lenovo
 ## Architecture
 
 ```text
-Home Assistant custom component
+Home Assistant HACS integration
         |
         v
 Frame Controller
@@ -95,19 +95,28 @@ https://frame.example.com/kiosk/...
 
 ## Home Assistant
 
-Copy the integration:
+Install with HACS as a custom repository:
+
+1. Open HACS in Home Assistant.
+2. Go to custom repositories.
+3. Add this repository URL:
 
 ```text
-home_assistant/custom_components/immich_frame
+https://github.com/hyungyunlim/immich-ha-sa
 ```
 
-to:
+4. Select category `Integration`.
+5. Download `Immich Frame Controller`.
+6. Restart Home Assistant.
+7. Go to Settings -> Devices & services -> Add integration -> `Immich Frame Controller`.
+8. Enter:
+   - Controller URL: `http://192.168.1.251:8082`
+   - Controller API token: the value of `CONTROLLER_API_TOKEN`
+   - Device ID: `lenovo`
 
-```text
-<home-assistant-config>/custom_components/immich_frame
-```
+HACS custom repositories are intended for public GitHub repositories. If this repository stays private, HACS may not be able to add it from the Home Assistant UI unless the HACS GitHub connection has access to the private repository.
 
-Add YAML config:
+YAML import remains supported for controlled deployments:
 
 ```yaml
 immich_frame:

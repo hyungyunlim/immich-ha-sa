@@ -1,5 +1,9 @@
 set_album:
   fields:
+    device_id:
+      required: false
+      selector:
+        text:
     album_id:
       required: false
       selector:
@@ -11,16 +15,28 @@ set_album:
 
 set_profile:
   fields:
+    device_id:
+      required: false
+      selector:
+        text:
     profile_id:
       required: true
       selector:
         text:
 
 refresh_albums:
-  fields: {}
+  fields:
+    device_id:
+      required: false
+      selector:
+        text:
 
 set_renderer_options:
   fields:
+    device_id:
+      required: false
+      selector:
+        text:
     durationSeconds:
       required: false
       selector:
@@ -59,6 +75,10 @@ set_renderer_options:
 
 set_network_mode:
   fields:
+    device_id:
+      required: false
+      selector:
+        text:
     network_mode:
       required: true
       selector:
@@ -67,4 +87,3 @@ set_network_mode:
             - auto
             - local
             - external
-

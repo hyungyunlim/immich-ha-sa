@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Immich Frame Controller",
+        "description": "Connect Home Assistant to the frame controller service.",
+        "data": {
+          "controller_url": "Controller URL",
+          "api_token": "Controller API token",
+          "device_id": "Device ID"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the frame controller.",
+      "invalid_auth": "The controller API token is invalid.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This frame controller is already configured."
+    }
+  }
+}

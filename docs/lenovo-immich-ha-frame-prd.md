@@ -86,7 +86,7 @@ Use cases:
 ## 6. Proposed Architecture
 
 ```text
-Home Assistant custom component
+Home Assistant HACS integration
         |
         | REST API
         v
@@ -114,7 +114,7 @@ http://<rpi-host>:<controller-port>/frame/lenovo
 The controller page should internally load a generated `immich-kiosk` URL, for example:
 
 ```text
-http://<rpi-host>:3000/?albums=<album-id>&duration=60&show_time=false&image_fit=contain
+http://<rpi-host>:3000/?album=<album-id>&duration=60&show_time=false&image_fit=contain
 ```
 
 Exact query parameter names must be verified against the installed `immich-kiosk` version before implementation.
@@ -342,10 +342,12 @@ Example error envelope:
 }
 ```
 
-### 7.4 Home Assistant Custom Component
+### 7.4 Home Assistant HACS Integration
 
 Responsibilities:
 
+- Install from a GitHub repository through HACS custom repositories.
+- Provide a Home Assistant config flow for GUI setup.
 - Discover/connect to Frame Controller.
 - Expose album list as HA select entity.
 - Expose frame profile as HA select entity.
@@ -720,7 +722,7 @@ Deployment quality requirements:
 - Provide `.env.example`.
 - Provide Docker Compose example.
 - Provide Cloudflare Tunnel example config.
-- Provide a README with setup, HA installation, frame URL instructions, and local/external mode guidance.
+- Provide a README with setup, HACS installation, frame URL instructions, and local/external mode guidance.
 - Do not log API keys.
 - Use `restart: unless-stopped` or equivalent.
 - Include a simple upgrade path that preserves `/data`.
@@ -786,8 +788,8 @@ Acceptance:
 
 ### Milestone 5: Home Assistant Integration
 
-- Add custom component.
-- Add config flow or YAML config.
+- Add HACS-compatible custom integration structure.
+- Add config flow and YAML import compatibility.
 - Add select entities for album/profile.
 - Add services for automations.
 - Add unavailable/stale states.

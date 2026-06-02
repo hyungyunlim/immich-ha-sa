@@ -3,24 +3,31 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.select import SelectEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DATA_COORDINATOR, DOMAIN
 from .coordinator import ImmichFrameCoordinator
+from .entity_helpers import frame_label, frame_unique_id
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    coordinator: ImmichFrameCoordinator = hass.data[DOMAIN][DATA_COORDINATOR]
-    async_add_entities([
-        ImmichFrameAlbumSelect(coordinator),
-        ImmichFrameProfileSelect(coordinator),
-        ImmichFrameNetworkModeSelect(coordinator),
-    ])
+async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
+    coordinator: ImmichFrameCoordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
+    async_add_entities(
+        [
+            ImmichFrameAlbumSelect(coordinator),
+            ImmichFrameProfileSelect(coordinator),
+            ImmichFrameNetworkModeSelect(coordinator),
+        ]
+    )
 
 
 class ImmichFrameAlbumSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEntity):
-    _attr_name = "Lenovo Frame Album"
-    _attr_unique_id = "immich_frame_lenovo_album"
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Album"
+        self._attr_unique_id = frame_unique_id(device_id, "album")
 
     @property
     def options(self) -> list[str]:
@@ -45,8 +52,11 @@ class ImmichFrameAlbumSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEn
 
 
 class ImmichFrameProfileSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEntity):
-    _attr_name = "Lenovo Frame Profile"
-    _attr_unique_id = "immich_frame_lenovo_profile"
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Profile"
+        self._attr_unique_id = frame_unique_id(device_id, "profile")
 
     @property
     def options(self) -> list[str]:
@@ -71,9 +81,13 @@ class ImmichFrameProfileSelect(CoordinatorEntity[ImmichFrameCoordinator], Select
 
 
 class ImmichFrameNetworkModeSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEntity):
-    _attr_name = "Lenovo Frame Network Mode"
-    _attr_unique_id = "immich_frame_lenovo_network_mode"
     _attr_options = ["auto", "local", "external"]
+
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Network Mode"
+        self._attr_unique_id = frame_unique_id(device_id, "network_mode")
 
     @property
     def current_option(self) -> str | None:
@@ -82,4 +96,3 @@ class ImmichFrameNetworkModeSelect(CoordinatorEntity[ImmichFrameCoordinator], Se
     async def async_select_option(self, option: str) -> None:
         await self.coordinator.client.update_frame_state({"networkMode": option})
         await self.coordinator.async_request_refresh()
-
