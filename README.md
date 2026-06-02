@@ -121,7 +121,7 @@ https://github.com/hyungyunlim/immich-ha-sa
 8. Enter:
    - Controller URL: `http://<rpi-lan-ip>:<controller-host-port>`
    - Device ID: `lenovo`
-9. On the pairing step, open the setup page link shown by Home Assistant and enter the short code displayed there.
+9. On the pairing step, open the setup page link shown by Home Assistant, or copy the prefilled Setup URL, and enter the short code displayed there.
 
 ```text
 http://<rpi-lan-ip>:<controller-host-port>/setup

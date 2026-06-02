@@ -13,6 +13,7 @@
         "title": "Pair Controller",
         "description": "Open [the controller setup page]({setup_url}) and enter the pairing code shown for `{device_id}`. If you already have a controller API token, you can enter it instead.",
         "data": {
+          "setup_url": "Setup URL",
           "pairing_code": "Pairing code",
           "api_token": "Controller API token (optional fallback)"
         }

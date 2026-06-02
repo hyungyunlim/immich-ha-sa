@@ -32,17 +32,12 @@ class InvalidPairingCode(Exception):
     """Raised when the pairing code is invalid or expired."""
 
 
+CONF_SETUP_URL = "setup_url"
+
 CONNECT_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_CONTROLLER_URL): str,
         vol.Optional(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): str,
-    }
-)
-
-PAIR_SCHEMA = vol.Schema(
-    {
-        vol.Optional(CONF_PAIRING_CODE): str,
-        vol.Optional(CONF_API_TOKEN): str,
     }
 )
 
@@ -59,6 +54,16 @@ def normalize_connection_data(data: dict[str, Any]) -> dict[str, str]:
 
 def setup_url(controller_url: str) -> str:
     return f"{controller_url.rstrip('/')}/setup"
+
+
+def pair_schema(controller_url: str) -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Optional(CONF_SETUP_URL, default=setup_url(controller_url)): str,
+            vol.Optional(CONF_PAIRING_CODE): str,
+            vol.Optional(CONF_API_TOKEN): str,
+        }
+    )
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, str | None]:
@@ -165,7 +170,7 @@ class ImmichFrameConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="pair",
-            data_schema=PAIR_SCHEMA,
+            data_schema=pair_schema(self._connection_data[CONF_CONTROLLER_URL]),
             errors=errors,
             description_placeholders={
                 "setup_url": setup_url(self._connection_data[CONF_CONTROLLER_URL]),
