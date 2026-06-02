@@ -50,6 +50,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          provenance: false
           build-args: |
             BUILD_VERSION=${{ env.IMAGE_VERSION }}
           tags: |
