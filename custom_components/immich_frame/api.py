@@ -73,6 +73,8 @@ class ImmichFrameClient:
         headers: dict[str, str] = {}
         if auth and self._api_token:
             headers["Authorization"] = f"Bearer {self._api_token}"
+        if method in {"POST", "PUT", "PATCH"} and json is None:
+            json = {}
 
         async with self._session.request(
             method,

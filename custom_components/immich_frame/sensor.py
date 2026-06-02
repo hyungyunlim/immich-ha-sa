@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -7,6 +9,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DATA_COORDINATOR, DOMAIN
 from .coordinator import ImmichFrameCoordinator
 from .entity_helpers import frame_label, frame_unique_id
+
+SENSITIVE_QUERY_PARAMS = {"api_key", "apikey", "key", "password", "secret", "token"}
 
 
 async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
@@ -46,7 +50,10 @@ class ImmichFrameRendererUrlSensor(CoordinatorEntity[ImmichFrameCoordinator], Se
 
     @property
     def native_value(self) -> str | None:
-        return self.coordinator.data.get("state", {}).get("rendererUrl")
+        renderer_url = self.coordinator.data.get("state", {}).get("rendererUrl")
+        if not renderer_url:
+            return None
+        return redact_sensitive_query_params(renderer_url)
 
 
 class ImmichFrameResolvedNetworkModeSensor(CoordinatorEntity[ImmichFrameCoordinator], SensorEntity):
@@ -59,3 +66,15 @@ class ImmichFrameResolvedNetworkModeSensor(CoordinatorEntity[ImmichFrameCoordina
     @property
     def native_value(self) -> str | None:
         return self.coordinator.data.get("state", {}).get("resolvedNetworkMode")
+
+
+def redact_sensitive_query_params(url: str) -> str:
+    parts = urlsplit(url)
+    if not parts.query:
+        return url
+
+    query = [
+        (key, "[redacted]" if key.lower() in SENSITIVE_QUERY_PARAMS else value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+    ]
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
