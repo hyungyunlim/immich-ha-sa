@@ -21,7 +21,6 @@ permissions:
 
 env:
   IMAGE_NAME: ghcr.io/hyungyunlim/immich-ha-sa
-  IMAGE_VERSION: 0.1.8
 
 jobs:
   build:
@@ -29,6 +28,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+
+      - name: Read package version
+        id: package-version
+        run: echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -52,7 +55,7 @@ jobs:
           push: true
           provenance: false
           build-args: |
-            BUILD_VERSION=${{ env.IMAGE_VERSION }}
+            BUILD_VERSION=${{ steps.package-version.outputs.version }}
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_VERSION }}
+            ${{ env.IMAGE_NAME }}:${{ steps.package-version.outputs.version }}
             ${{ env.IMAGE_NAME }}:latest
