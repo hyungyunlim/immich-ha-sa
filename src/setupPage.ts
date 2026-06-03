@@ -50,6 +50,8 @@ interface SetupPageDevice {
   hideCursor?: boolean;
   showProgressBar?: boolean;
   showVideos?: boolean;
+  filterDate?: string;
+  filterNewest?: number;
   upArrowAction?: string;
   downArrowAction?: string;
   progressBarPosition?: string;
@@ -795,6 +797,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Cursor', device.hideCursor ? 'Hidden' : 'Visible')}
         ${renderKeyValue('Progress Bar', `${boolLabel(device.showProgressBar)} / ${device.progressBarPosition ?? 'top'}`)}
         ${renderKeyValue('Videos', boolLabel(device.showVideos))}
+        ${renderKeyValue('Asset Filters', renderAssetFilters(device))}
         ${renderKeyValue('Arrow Actions', `${device.upArrowAction ?? 'none'} / ${device.downArrowAction ?? 'none'}`)}
         ${renderKeyValue('Burn-in', `${device.burnInInterval ?? 0}m / ${device.burnInDuration ?? 30}s / ${device.burnInOpacity ?? 30}%`)}
         ${renderKeyValue('Sleep', sleepWindow)}
@@ -865,6 +868,14 @@ function renderDeviceCard(device: SetupPageDevice): string {
       </details>
     </div>
   </article>`;
+}
+
+function renderAssetFilters(device: SetupPageDevice): string {
+  const filters = [
+    device.filterDate ? `date ${device.filterDate}` : '',
+    device.filterNewest && device.filterNewest > 0 ? `newest ${device.filterNewest}` : '',
+  ].filter(Boolean);
+  return filters.length > 0 ? filters.join(' / ') : 'Off';
 }
 
 function renderKeyValue(label: string, value: string): string {

@@ -76,6 +76,17 @@ set_renderer_options:
       required: false
       selector:
         boolean:
+    filterDate:
+      required: false
+      selector:
+        text:
+    filterNewest:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 50000
+          step: 1
     albumOrder:
       required: false
       selector:

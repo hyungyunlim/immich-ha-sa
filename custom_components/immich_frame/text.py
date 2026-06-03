@@ -17,8 +17,9 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
     async_add_entities(
         [
             ImmichFrameAlbumsText(coordinator),
-            ImmichFrameSleepTimeText(coordinator, "sleep_start", "Sleep Start", "sleepStart"),
-            ImmichFrameSleepTimeText(coordinator, "sleep_end", "Sleep End", "sleepEnd"),
+            ImmichFrameStateText(coordinator, "filter_date", "Date Filter", "filterDate", 128),
+            ImmichFrameStateText(coordinator, "sleep_start", "Sleep Start", "sleepStart", 4),
+            ImmichFrameStateText(coordinator, "sleep_end", "Sleep End", "sleepEnd", 4),
         ]
     )
 
@@ -86,15 +87,14 @@ class ImmichFrameAlbumsText(CoordinatorEntity[ImmichFrameCoordinator], TextEntit
         )
 
 
-class ImmichFrameSleepTimeText(CoordinatorEntity[ImmichFrameCoordinator], TextEntity):
-    _attr_native_max = 4
-
+class ImmichFrameStateText(CoordinatorEntity[ImmichFrameCoordinator], TextEntity):
     def __init__(
         self,
         coordinator: ImmichFrameCoordinator,
         key: str,
         label: str,
         patch_key: str,
+        native_max: int,
     ) -> None:
         super().__init__(coordinator)
         device_id = coordinator.client.device_id
@@ -102,6 +102,7 @@ class ImmichFrameSleepTimeText(CoordinatorEntity[ImmichFrameCoordinator], TextEn
         self._attr_name = f"{frame_label(device_id)} Frame {label}"
         self._attr_unique_id = frame_unique_id(device_id, key)
         self._attr_device_info = frame_device_info(device_id)
+        self._attr_native_max = native_max
 
     @property
     def native_value(self) -> str | None:

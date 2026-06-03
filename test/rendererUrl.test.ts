@@ -23,6 +23,8 @@ const state: FrameState = {
   showDate: false,
   showWeather: true,
   showVideos: false,
+  filterDate: '',
+  filterNewest: 0,
   upArrowAction: 'mute',
   downArrowAction: 'none',
   albumOrder: 'random',
@@ -139,5 +141,25 @@ describe('renderer URL generation', () => {
     expect(resolved.rendererUrl).toContain('burn_in_interval=30');
     expect(resolved.rendererUrl).toContain('burn_in_duration=20');
     expect(resolved.rendererUrl).toContain('burn_in_opacity=60');
+  });
+
+  it('adds kiosk asset filter URL overrides', () => {
+    const resolved = buildRendererUrl(device, {
+      ...state,
+      filterDate: '2021-01-01_to_today',
+      filterNewest: 200,
+    });
+    expect(resolved.rendererUrl).toContain('filter_date=2021-01-01_to_today');
+    expect(resolved.rendererUrl).toContain('filter_newest=200');
+  });
+
+  it('omits disabled kiosk asset filters', () => {
+    const resolved = buildRendererUrl(device, {
+      ...state,
+      filterDate: '   ',
+      filterNewest: 0,
+    });
+    expect(resolved.rendererUrl).not.toContain('filter_date=');
+    expect(resolved.rendererUrl).not.toContain('filter_newest=');
   });
 });

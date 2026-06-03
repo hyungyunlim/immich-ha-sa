@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.21
+
+- Add Home Assistant controls for immich-kiosk `filter_date` and `filter_newest` renderer filters.
+- Include date/newest filters in frame state, renderer URL generation, profiles, services, and the add-on console diagnostics.
+
 ## 0.1.20
 
 - Add a one-time Home Assistant entity registry migration that disables existing legacy Kiosk Mute Toggle entities after the diagnostic demotion.

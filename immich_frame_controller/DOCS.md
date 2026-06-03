@@ -81,6 +81,12 @@ For album control:
 - Use the Albums text entity for multiple albums, separated by commas. Values may be Immich album names or album IDs.
 - Use the `set_album` service with `album_ids` or `album_names` for automations.
 
+For asset filters:
+
+- Use the Date Filter text entity to apply immich-kiosk `filter_date` to the selected album/source. Examples: `last-30-days`, `2021-01-01_to_today`, or an empty value to clear the filter.
+- Use the Newest Filter number entity to apply immich-kiosk `filter_newest`. Set it to `0` to disable the newest-assets filter.
+- Use `set_renderer_options` with `filterDate` and `filterNewest` for automations and scripts.
+
 The controller also exposes common immich-kiosk URL override settings for frame-specific behavior:
 
 - Motion: `transition`, `fadeTransitionDuration`, `crossFadeTransitionDuration`, `imageEffect`, `imageEffectAmount`.

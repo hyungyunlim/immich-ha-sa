@@ -55,6 +55,16 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ),
             ImmichFrameNumber(
                 coordinator,
+                "filter_newest",
+                "Newest Filter",
+                "filterNewest",
+                0,
+                50000,
+                1,
+                None,
+            ),
+            ImmichFrameNumber(
+                coordinator,
                 "burn_in_interval",
                 "Burn-in Interval",
                 "burnInInterval",

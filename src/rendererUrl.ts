@@ -69,6 +69,14 @@ export function buildRendererUrl(
   url.searchParams.set('show_date', String(state.showDate));
   url.searchParams.set('show_weather', String(state.showWeather));
   url.searchParams.set('show_videos', String(state.showVideos));
+  url.searchParams.delete('filter_date');
+  if (state.filterDate.trim()) {
+    url.searchParams.set('filter_date', state.filterDate.trim());
+  }
+  url.searchParams.delete('filter_newest');
+  if (state.filterNewest > 0) {
+    url.searchParams.set('filter_newest', String(state.filterNewest));
+  }
   if (state.upArrowAction !== 'none') {
     url.searchParams.set('up_arrow_action', state.upArrowAction);
   }

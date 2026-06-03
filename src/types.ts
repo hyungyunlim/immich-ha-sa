@@ -40,6 +40,8 @@ export interface FrameState {
   showDate: boolean;
   showWeather: boolean;
   showVideos: boolean;
+  filterDate: string;
+  filterNewest: number;
   upArrowAction: KioskArrowAction;
   downArrowAction: KioskArrowAction;
   albumOrder: AlbumOrder;
@@ -84,6 +86,8 @@ export interface FrameProfile {
   showDate: boolean;
   showWeather: boolean;
   showVideos: boolean;
+  filterDate: string;
+  filterNewest: number;
   albumOrder: AlbumOrder;
   preferredNetworkMode: NetworkMode;
   transition: KioskTransition;

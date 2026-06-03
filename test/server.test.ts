@@ -93,6 +93,30 @@ describe('controller API', () => {
     await server.close();
   });
 
+  it('updates kiosk asset filters in frame state and renderer URL', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createTestServer({ config });
+
+    const response = await server.inject({
+      method: 'PUT',
+      url: '/api/frame/lenovo/state',
+      payload: {
+        filterDate: 'last-30-days',
+        filterNewest: 200,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.data.filterDate).toBe('last-30-days');
+    expect(body.data.filterNewest).toBe(200);
+    expect(body.data.rendererUrl).toContain('filter_date=last-30-days');
+    expect(body.data.rendererUrl).toContain('filter_newest=200');
+    await server.close();
+  });
+
   it('issues paired API tokens for authenticated controllers', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);

@@ -186,6 +186,8 @@ immich_frame.set_network_mode
 
 For frame audio, use the `Device Mute Toggle`, `Volume Up`, and `Volume Down` entities when FreeKiosk Remote API is configured. The immich-kiosk video mute control is exposed only as a disabled-by-default diagnostic entity because WebView video unmute can be blocked without a real user gesture.
 
+For date-based photo selection, use the `Date Filter` text entity with immich-kiosk values such as `last-30-days` or `2021-01-01_to_today`. Use `Newest Filter` to limit the current album/source to the newest N assets; `0` disables it.
+
 Example automation:
 
 ```yaml

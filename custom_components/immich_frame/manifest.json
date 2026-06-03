@@ -1,7 +1,7 @@
 {
   "domain": "immich_frame",
   "name": "Immich Frame Controller",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "config_flow": true,
   "documentation": "https://github.com/hyungyunlim/immich-ha-sa",
   "issue_tracker": "https://github.com/hyungyunlim/immich-ha-sa/issues",
