@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.16
+
+- Show live frame event connection counts in the add-on console and health/device APIs.
+- Fall back to the configured FreeKiosk REST remote endpoint when iframe event commands, including Kiosk Mute Toggle, have no connected frame browser.
+
 ## 0.1.15
 
 - Add kiosk password diagnostics and optional per-device kiosk password overrides in the add-on console.

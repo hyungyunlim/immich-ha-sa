@@ -55,13 +55,13 @@ If the frame runs FreeKiosk, open the device settings in the add-on console and 
 - Remote API URL: the FreeKiosk REST API base URL, for example `http://192.168.1.160:8080`
 - Remote API Key: optional, only if enabled in FreeKiosk
 
-The Home Assistant device page exposes buttons for next, previous, play/pause, reload, screen on, screen off, volume up, and volume down. Next, previous, play/pause, and reload are sent to the fixed frame page over the controller event stream, then bridged into the same-origin immich-kiosk iframe. Screen and volume controls require FreeKiosk REST endpoints such as `/api/screen/on`, `/api/screen/off`, `/api/remote/keyboard/volumeup`, and `/api/remote/keyboard/volumedown`.
+The Home Assistant device page exposes buttons for next, previous, play/pause, reload, kiosk mute toggle, screen on, screen off, volume up, and volume down. Next, previous, play/pause, reload, and kiosk mute toggle are sent to the fixed frame page over the controller event stream, then bridged into the same-origin immich-kiosk iframe. If no frame browser is connected, these iframe commands fall back to FreeKiosk REST when the device has a FreeKiosk Remote API URL configured. Screen and volume controls always require FreeKiosk REST endpoints such as `/api/screen/on`, `/api/screen/off`, `/api/remote/keyboard/volumeup`, and `/api/remote/keyboard/volumedown`.
 
 Keep the frame's `disableNavigation` setting off when using next/previous buttons. immich-kiosk's `disable_navigation` option blocks touch/click, keyboard, and menu navigation, so bridged commands and physical key events will be ignored by immich-kiosk if this is enabled.
 
 ## Kiosk Audio
 
-The Home Assistant Kiosk Mute Toggle button controls immich-kiosk mute state, not Android device volume. The controller sets `up_arrow_action=mute` by default and sends an Arrow Up action into the proxied kiosk frame. Use the Up Arrow Action and Down Arrow Action select entities if you want those key actions to do something else.
+The Home Assistant Kiosk Mute Toggle button controls immich-kiosk mute state, not Android device volume. The controller sets `up_arrow_action=mute` by default and sends an Arrow Up action into the proxied kiosk frame. When the add-on console shows `Frame Connection: 0 live`, the controller falls back to FreeKiosk `/api/remote/up` if the frame has a Remote API URL. Use the Up Arrow Action and Down Arrow Action select entities if you want those key actions to do something else.
 
 The Volume Up and Volume Down buttons are FreeKiosk/Android device volume controls.
 

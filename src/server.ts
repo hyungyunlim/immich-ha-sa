@@ -194,6 +194,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         version: state.version,
         updatedAt: state.updatedAt,
         networkMode: state.networkMode,
+        frameEventClients: events.connectedClientCount(id),
       }])),
       publicUrls: Object.fromEntries(Object.entries(data.devices).map(([id, device]) => [id, {
         localControllerBaseUrl: device.localControllerBaseUrl,
@@ -242,6 +243,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           kioskPasswordConfigured: Boolean(candidate.kioskPassword),
           kioskPasswordSource: kioskPasswordSource(candidate, deps.config.kioskPassword),
           kioskConnection: kioskDiagnosticsByDevice[candidate.id],
+          frameEventClients: events.connectedClientCount(candidate.id),
           deviceNetworkMode: candidate.networkMode,
           pollIntervalSeconds: candidate.pollIntervalSeconds,
           remoteControlType: candidate.remoteControlType ?? 'none',
@@ -314,6 +316,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         externalFrameUrl: device.externalControllerBaseUrl
           ? buildFrameUrl(device.externalControllerBaseUrl, device.id)
           : undefined,
+        frameEventClients: events.connectedClientCount(device.id),
         hasState: Boolean(data.frames[device.id]),
         isDefault: device.id === deps.config.defaultDevice.id,
       })),
@@ -478,11 +481,30 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         command: parsed.data.command,
         issuedAt: new Date().toISOString(),
       });
+      const frameEvent = {
+        connectedClients: events.connectedClientCount(deviceId),
+        delivered,
+      };
+      if (delivered === 0 && remoteFallbackAvailable(device, parsed.data.command)) {
+        try {
+          const remoteFallback = await sendRemoteCommand(device, parsed.data.command);
+          return ok({
+            command: parsed.data.command,
+            frameEvent,
+            remoteFallback,
+          });
+        } catch (error) {
+          const remoteError = error instanceof RemoteCommandError
+            ? error
+            : new RemoteCommandError('REMOTE_COMMAND_FAILED', error instanceof Error ? error.message : String(error));
+          reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
+          return;
+        }
+      }
       return ok({
         command: parsed.data.command,
-        frameEvent: {
-          delivered,
-        },
+        frameEvent,
+        remoteFallback: null,
       });
     }
     try {
@@ -784,6 +806,12 @@ function commandUsesFrameEvents(command: FrameCommand): boolean {
     || command === 'play-pause'
     || command === 'reload'
     || command === 'mute-toggle';
+}
+
+function remoteFallbackAvailable(device: FrameDevice, command: FrameCommand): boolean {
+  return commandUsesFrameEvents(command)
+    && (device.remoteControlType ?? 'none') === 'freekiosk'
+    && Boolean(device.remoteApiUrl);
 }
 
 function parseJsonOrText(value: string): unknown {

@@ -1,6 +1,6 @@
 {
   "name": "immich-ha-sa",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "private": true,
   "type": "module",
   "description": "Home Assistant controlled Lenovo Smart Frame controller for Immich and immich-kiosk",

@@ -12,6 +12,10 @@ interface SseClient {
 export class FrameEventHub {
   private readonly clients = new Map<string, Set<SseClient>>();
 
+  connectedClientCount(deviceId: string): number {
+    return this.clients.get(deviceId)?.size ?? 0;
+  }
+
   subscribe(deviceId: string, client: SseClient, state: FrameState): void {
     const initialState = buildProxiedRendererUrl(client.device, state, client.context, {
       kioskPassword: kioskPasswordForDevice(client.device, client.globalKioskPassword),

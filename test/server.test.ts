@@ -410,6 +410,22 @@ describe('controller API', () => {
       apiKey: 'test-key',
     });
 
+    const mute = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'mute-toggle' },
+    });
+
+    expect(mute.statusCode).toBe(200);
+    expect(mute.json().data.frameEvent).toMatchObject({ connectedClients: 0, delivered: 0 });
+    expect(mute.json().data.remoteFallback.endpoint).toBe('/api/remote/up');
+    expect(requests).toHaveLength(3);
+    expect(requests[2]).toMatchObject({
+      method: 'POST',
+      url: '/api/remote/up',
+      apiKey: 'test-key',
+    });
+
     await server.close();
     await new Promise<void>((resolve) => remote.close(() => resolve()));
   });
@@ -428,7 +444,8 @@ describe('controller API', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().data.command).toBe('mute-toggle');
-    expect(response.json().data.frameEvent.delivered).toBe(0);
+    expect(response.json().data.frameEvent).toMatchObject({ connectedClients: 0, delivered: 0 });
+    expect(response.json().data.remoteFallback).toBeNull();
     await server.close();
   });
 

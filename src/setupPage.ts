@@ -26,6 +26,7 @@ interface SetupPageDevice {
   kioskPasswordConfigured: boolean;
   kioskPasswordSource: 'device' | 'global' | 'none';
   kioskConnection?: SetupPageKioskConnection;
+  frameEventClients: number;
   deviceNetworkMode: string;
   pollIntervalSeconds: number;
   remoteControlType?: string;
@@ -784,6 +785,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Fit / Order', `${device.imageFit ?? 'config'} / ${device.albumOrder ?? 'config'}`)}
         ${renderKeyValue('Kiosk Password', renderKioskPasswordSource(device.kioskPasswordSource))}
         ${renderKeyValue('Kiosk Connection', renderKioskConnection(device.kioskConnection))}
+        ${renderKeyValue('Frame Connection', `${device.frameEventClients} live`)}
         ${renderKeyValue('Transition', device.transition ?? 'config')}
         ${renderKeyValue('Layout', device.layout ?? 'config')}
         ${renderKeyValue('Image Effect', device.imageEffect ?? 'config')}
