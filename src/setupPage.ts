@@ -41,15 +41,44 @@ interface SetupPageDevice {
   durationSeconds?: number;
   imageFit?: string;
   albumOrder?: string;
+  showTime?: boolean;
+  timeFormat?: string;
+  showAmPm?: boolean;
+  showSeconds?: boolean;
+  showDate?: boolean;
+  dateFormat?: string;
+  clockSource?: string;
+  showWeather?: boolean;
+  weatherLocation?: string;
+  weatherRotationInterval?: number;
   transition?: string;
   layout?: string;
   imageEffect?: string;
   backgroundBlur?: boolean;
+  backgroundBlurAmount?: number;
+  fontSize?: number;
   frameless?: boolean;
   disableNavigation?: boolean;
   hideCursor?: boolean;
   showProgressBar?: boolean;
   showVideos?: boolean;
+  showImageRating?: boolean;
+  showOwner?: boolean;
+  showAlbumName?: boolean;
+  showPersonName?: boolean;
+  showPersonAge?: boolean;
+  showImageTime?: boolean;
+  imageTimeFormat?: string;
+  showImageDate?: boolean;
+  imageDateFormat?: string;
+  showImageDescription?: boolean;
+  showImageCamera?: boolean;
+  showImageExif?: boolean;
+  showImageLocation?: boolean;
+  showImageQr?: boolean;
+  showImageId?: boolean;
+  showUser?: boolean;
+  showMoreInfo?: boolean;
   filterDate?: string;
   filterNewest?: number;
   upArrowAction?: string;
@@ -785,18 +814,21 @@ function renderDeviceCard(device: SetupPageDevice): string {
       <dl class="kv">
         ${renderKeyValue('Duration', `${device.durationSeconds ?? 'unknown'}s`)}
         ${renderKeyValue('Fit / Order', `${device.imageFit ?? 'config'} / ${device.albumOrder ?? 'config'}`)}
+        ${renderKeyValue('Clock', renderClockSummary(device))}
+        ${renderKeyValue('Weather', renderWeatherSummary(device))}
         ${renderKeyValue('Kiosk Password', renderKioskPasswordSource(device.kioskPasswordSource))}
         ${renderKeyValue('Kiosk Connection', renderKioskConnection(device.kioskConnection))}
         ${renderKeyValue('Frame Connection', `${device.frameEventClients} live`)}
         ${renderKeyValue('Transition', device.transition ?? 'config')}
         ${renderKeyValue('Layout', device.layout ?? 'config')}
         ${renderKeyValue('Image Effect', device.imageEffect ?? 'config')}
-        ${renderKeyValue('Background', boolLabel(device.backgroundBlur))}
+        ${renderKeyValue('Background', `${boolLabel(device.backgroundBlur)} / blur ${device.backgroundBlurAmount ?? 10} / font ${device.fontSize ?? 100}%`)}
         ${renderKeyValue('Frameless', boolLabel(device.frameless))}
         ${renderKeyValue('Navigation', device.disableNavigation ? 'Disabled' : 'Enabled')}
         ${renderKeyValue('Cursor', device.hideCursor ? 'Hidden' : 'Visible')}
         ${renderKeyValue('Progress Bar', `${boolLabel(device.showProgressBar)} / ${device.progressBarPosition ?? 'top'}`)}
         ${renderKeyValue('Videos', boolLabel(device.showVideos))}
+        ${renderKeyValue('Metadata', renderMetadataSummary(device))}
         ${renderKeyValue('Asset Filters', renderAssetFilters(device))}
         ${renderKeyValue('Arrow Actions', `${device.upArrowAction ?? 'none'} / ${device.downArrowAction ?? 'none'}`)}
         ${renderKeyValue('Burn-in', `${device.burnInInterval ?? 0}m / ${device.burnInDuration ?? 30}s / ${device.burnInOpacity ?? 30}%`)}
@@ -876,6 +908,40 @@ function renderAssetFilters(device: SetupPageDevice): string {
     device.filterNewest && device.filterNewest > 0 ? `newest ${device.filterNewest}` : '',
   ].filter(Boolean);
   return filters.length > 0 ? filters.join(' / ') : 'Off';
+}
+
+function renderClockSummary(device: SetupPageDevice): string {
+  const pieces = [
+    device.showTime ? `time ${device.timeFormat ?? '24'}h` : '',
+    device.showDate ? `date ${device.dateFormat ?? 'default'}` : '',
+    device.showSeconds ? 'seconds' : '',
+    device.clockSource && device.clockSource !== 'client' ? device.clockSource : '',
+  ].filter(Boolean);
+  return pieces.length > 0 ? pieces.join(' / ') : 'Off';
+}
+
+function renderWeatherSummary(device: SetupPageDevice): string {
+  if (device.showWeather === false) return 'Off';
+  const location = device.weatherLocation?.trim() || 'default';
+  const rotation = location === 'rotate' ? ` / ${device.weatherRotationInterval ?? 60}s` : '';
+  return `${location}${rotation}`;
+}
+
+function renderMetadataSummary(device: SetupPageDevice): string {
+  const fields = [
+    device.showImageDate ? 'date' : '',
+    device.showImageTime ? 'time' : '',
+    device.showAlbumName ? 'album' : '',
+    device.showPersonName ? 'person' : '',
+    device.showImageLocation ? 'location' : '',
+    device.showImageCamera ? 'camera' : '',
+    device.showImageExif ? 'exif' : '',
+    device.showImageDescription ? 'description' : '',
+    device.showOwner ? 'owner' : '',
+    device.showImageRating ? 'rating' : '',
+    device.showUser ? 'user' : '',
+  ].filter(Boolean);
+  return fields.length > 0 ? fields.join(', ') : 'Off';
 }
 
 function renderKeyValue(label: string, value: string): string {

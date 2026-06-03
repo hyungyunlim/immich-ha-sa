@@ -64,14 +64,52 @@ set_renderer_options:
       required: false
       selector:
         boolean:
+    timeFormat:
+      required: false
+      selector:
+        select:
+          options:
+            - "24"
+            - "12"
+    showAmPm:
+      required: false
+      selector:
+        boolean:
+    showSeconds:
+      required: false
+      selector:
+        boolean:
     showDate:
       required: false
       selector:
         boolean:
+    dateFormat:
+      required: false
+      selector:
+        text:
+    clockSource:
+      required: false
+      selector:
+        select:
+          options:
+            - client
+            - server
     showWeather:
       required: false
       selector:
         boolean:
+    weatherLocation:
+      required: false
+      selector:
+        text:
+    weatherRotationInterval:
+      required: false
+      selector:
+        number:
+          min: 10
+          max: 3600
+          step: 1
+          unit_of_measurement: s
     showVideos:
       required: false
       selector:
@@ -148,6 +186,21 @@ set_renderer_options:
       required: false
       selector:
         boolean:
+    backgroundBlurAmount:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+    fontSize:
+      required: false
+      selector:
+        number:
+          min: 50
+          max: 250
+          step: 1
+          unit_of_measurement: "%"
     frameless:
       required: false
       selector:
@@ -171,6 +224,77 @@ set_renderer_options:
           options:
             - top
             - bottom
+    showImageRating:
+      required: false
+      selector:
+        boolean:
+    showOwner:
+      required: false
+      selector:
+        boolean:
+    showAlbumName:
+      required: false
+      selector:
+        boolean:
+    showPersonName:
+      required: false
+      selector:
+        boolean:
+    showPersonAge:
+      required: false
+      selector:
+        boolean:
+    showImageTime:
+      required: false
+      selector:
+        boolean:
+    imageTimeFormat:
+      required: false
+      selector:
+        select:
+          options:
+            - "24"
+            - "12"
+    showImageDate:
+      required: false
+      selector:
+        boolean:
+    imageDateFormat:
+      required: false
+      selector:
+        text:
+    showImageDescription:
+      required: false
+      selector:
+        boolean:
+    showImageCamera:
+      required: false
+      selector:
+        boolean:
+    showImageExif:
+      required: false
+      selector:
+        boolean:
+    showImageLocation:
+      required: false
+      selector:
+        boolean:
+    showImageQr:
+      required: false
+      selector:
+        boolean:
+    showImageId:
+      required: false
+      selector:
+        boolean:
+    showUser:
+      required: false
+      selector:
+        boolean:
+    showMoreInfo:
+      required: false
+      selector:
+        boolean:
     burnInInterval:
       required: false
       selector:

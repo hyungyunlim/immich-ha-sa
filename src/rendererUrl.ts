@@ -66,8 +66,20 @@ export function buildRendererUrl(
   url.searchParams.set('image_fit', state.imageFit);
   url.searchParams.set('album_order', state.albumOrder);
   url.searchParams.set('show_time', String(state.showTime));
+  url.searchParams.set('time_format', state.timeFormat);
+  url.searchParams.set('show_am_pm', String(state.showAmPm));
+  url.searchParams.set('show_seconds', String(state.showSeconds));
   url.searchParams.set('show_date', String(state.showDate));
+  url.searchParams.set('date_format', state.dateFormat);
+  url.searchParams.set('clock_source', state.clockSource);
   url.searchParams.set('show_weather', String(state.showWeather));
+  url.searchParams.delete('weather');
+  if (!state.showWeather) {
+    url.searchParams.set('weather', 'none');
+  } else if (state.weatherLocation.trim()) {
+    url.searchParams.set('weather', state.weatherLocation.trim());
+  }
+  url.searchParams.set('rotation_interval', String(state.weatherRotationInterval));
   url.searchParams.set('show_videos', String(state.showVideos));
   url.searchParams.delete('filter_date');
   if (state.filterDate.trim()) {
@@ -90,11 +102,30 @@ export function buildRendererUrl(
   url.searchParams.set('image_effect', state.imageEffect);
   url.searchParams.set('image_effect_amount', String(state.imageEffectAmount));
   url.searchParams.set('background_blur', String(state.backgroundBlur));
+  url.searchParams.set('background_blur_amount', String(state.backgroundBlurAmount));
+  url.searchParams.set('font_size', String(state.fontSize));
   url.searchParams.set('frameless', String(state.frameless));
   url.searchParams.set('disable_navigation', String(state.disableNavigation));
   url.searchParams.set('hide_cursor', String(state.hideCursor));
   url.searchParams.set('show_progress_bar', String(state.showProgressBar));
   url.searchParams.set('progress_bar_position', state.progressBarPosition);
+  url.searchParams.set('show_image_rating', String(state.showImageRating));
+  url.searchParams.set('show_owner', String(state.showOwner));
+  url.searchParams.set('show_album_name', String(state.showAlbumName));
+  url.searchParams.set('show_person_name', String(state.showPersonName));
+  url.searchParams.set('show_person_age', String(state.showPersonAge));
+  url.searchParams.set('show_image_time', String(state.showImageTime));
+  url.searchParams.set('image_time_format', state.imageTimeFormat);
+  url.searchParams.set('show_image_date', String(state.showImageDate));
+  url.searchParams.set('image_date_format', state.imageDateFormat);
+  url.searchParams.set('show_image_description', String(state.showImageDescription));
+  url.searchParams.set('show_image_camera', String(state.showImageCamera));
+  url.searchParams.set('show_image_exif', String(state.showImageExif));
+  url.searchParams.set('show_image_location', String(state.showImageLocation));
+  url.searchParams.set('show_image_qr', String(state.showImageQr));
+  url.searchParams.set('show_image_id', String(state.showImageId));
+  url.searchParams.set('show_user', String(state.showUser));
+  url.searchParams.set('show_more_info', String(state.showMoreInfo));
   url.searchParams.set('burn_in_interval', String(state.burnInInterval));
   url.searchParams.set('burn_in_duration', String(state.burnInDuration));
   url.searchParams.set('burn_in_opacity', String(state.burnInOpacity));

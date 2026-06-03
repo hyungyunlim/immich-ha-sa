@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.23
+
+- Add Home Assistant controls for immich-kiosk clock, weather selection, font size, background blur amount, and image metadata URL overrides.
+- Switch weather control to the current immich-kiosk `weather` query behavior while keeping `show_weather` for older kiosk compatibility.
+- Document that weather detail fields such as humidity, wind, visibility, and temperature range are configured per immich-kiosk weather location.
+
 ## 0.1.22
 
 - Add a Home Assistant Date Filter Preset select for common immich-kiosk date filters.

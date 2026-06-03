@@ -188,6 +188,8 @@ For frame audio, use the `Device Mute Toggle`, `Volume Up`, and `Volume Down` en
 
 For date-based photo selection, use `Date Filter Preset` for common ranges, or `Filter Start Date` / `Filter End Date` for a custom date picker range. The raw `Date Filter` text entity remains available for advanced immich-kiosk values such as `last-30-days` or `2021-01-01_to_today`. Use `Newest Filter` to limit the current album/source to the newest N assets; `0` disables it.
 
+For frame display, the integration exposes immich-kiosk URL overrides for clock, date, weather selection, font size, background blur amount, and image metadata such as image date/time, album, person, camera, EXIF, location, rating, owner, and user. Weather API keys and detailed weather fields such as humidity, wind, visibility, and temperature range remain immich-kiosk `config.yaml` location settings.
+
 Example automation:
 
 ```yaml

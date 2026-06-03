@@ -92,9 +92,13 @@ For asset filters:
 The controller also exposes common immich-kiosk URL override settings for frame-specific behavior:
 
 - Motion: `transition`, `fadeTransitionDuration`, `crossFadeTransitionDuration`, `imageEffect`, `imageEffectAmount`.
-- Layout and display: `layout`, `imageFit`, `backgroundBlur`, `frameless`.
+- Layout and display: `layout`, `imageFit`, `backgroundBlur`, `backgroundBlurAmount`, `fontSize`, `frameless`.
+- Clock and weather: `showTime`, `timeFormat`, `showAmPm`, `showSeconds`, `showDate`, `dateFormat`, `clockSource`, `showWeather`, `weatherLocation`, `weatherRotationInterval`.
+- Image metadata: `showImageDate`, `showImageTime`, `showAlbumName`, `showPersonName`, `showPersonAge`, `showImageLocation`, `showImageCamera`, `showImageExif`, `showImageDescription`, `showImageRating`, `showOwner`, `showUser`, `showImageQr`, `showImageId`, `showMoreInfo`.
 - Kiosk UI: `disableNavigation`, `hideCursor`, `showProgressBar`, `progressBarPosition`.
 - Display care: `burnInInterval`, `burnInDuration`, `burnInOpacity`.
+
+Weather locations are still configured in immich-kiosk `config.yaml`. Set the frame's Weather Location text entity to a configured location name, leave it empty to use the kiosk default, or set it to `rotate` to rotate through configured locations. Turning Show Weather off sends `weather=none` so immich-kiosk does not auto-select the default weather location. Per-location weather details such as humidity, wind, visibility, rounded temperature, and temperature range are immich-kiosk `weather.locations[].show` settings, not URL overrides.
 
 Offline mode is not exposed as a frame profile toggle because it requires persistent offline assets and many URL overrides are intentionally unavailable while using offline mode.
 

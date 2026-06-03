@@ -18,6 +18,9 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
         [
             ImmichFrameAlbumsText(coordinator),
             ImmichFrameStateText(coordinator, "filter_date", "Date Filter", "filterDate", 128),
+            ImmichFrameStateText(coordinator, "weather_location", "Weather Location", "weatherLocation", 80),
+            ImmichFrameStateText(coordinator, "date_format", "Date Format", "dateFormat", 64),
+            ImmichFrameStateText(coordinator, "image_date_format", "Image Date Format", "imageDateFormat", 64),
             ImmichFrameStateText(coordinator, "sleep_start", "Sleep Start", "sleepStart", 4),
             ImmichFrameStateText(coordinator, "sleep_end", "Sleep End", "sleepEnd", 4),
         ]

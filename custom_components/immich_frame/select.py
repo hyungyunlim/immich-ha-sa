@@ -27,6 +27,20 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ImmichFrameDateFilterPresetSelect(coordinator),
             ImmichFrameStateSelect(
                 coordinator,
+                "time_format",
+                "Time Format",
+                "timeFormat",
+                ["24", "12"],
+            ),
+            ImmichFrameStateSelect(
+                coordinator,
+                "clock_source",
+                "Clock Source",
+                "clockSource",
+                ["client", "server"],
+            ),
+            ImmichFrameStateSelect(
+                coordinator,
                 "transition",
                 "Transition",
                 "transition",
@@ -52,6 +66,13 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 "Progress Bar Position",
                 "progressBarPosition",
                 ["top", "bottom"],
+            ),
+            ImmichFrameStateSelect(
+                coordinator,
+                "image_time_format",
+                "Image Time Format",
+                "imageTimeFormat",
+                ["24", "12"],
             ),
             ImmichFrameArrowActionSelect(
                 coordinator,

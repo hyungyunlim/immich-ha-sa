@@ -20,8 +20,15 @@ const state: FrameState = {
   durationSeconds: 60,
   imageFit: 'contain',
   showTime: false,
+  timeFormat: '24',
+  showAmPm: true,
+  showSeconds: false,
   showDate: false,
+  dateFormat: 'YYYY/MM/DD',
+  clockSource: 'client',
   showWeather: true,
+  weatherLocation: '',
+  weatherRotationInterval: 60,
   showVideos: false,
   filterDate: '',
   filterNewest: 0,
@@ -36,11 +43,30 @@ const state: FrameState = {
   imageEffect: 'none',
   imageEffectAmount: 120,
   backgroundBlur: true,
+  backgroundBlurAmount: 10,
+  fontSize: 100,
   frameless: false,
   disableNavigation: true,
   hideCursor: true,
   showProgressBar: false,
   progressBarPosition: 'top',
+  showImageRating: false,
+  showOwner: false,
+  showAlbumName: false,
+  showPersonName: false,
+  showPersonAge: false,
+  showImageTime: false,
+  imageTimeFormat: '24',
+  showImageDate: false,
+  imageDateFormat: 'YYYY-MM-DD',
+  showImageDescription: false,
+  showImageCamera: false,
+  showImageExif: false,
+  showImageLocation: false,
+  showImageQr: false,
+  showImageId: false,
+  showUser: false,
+  showMoreInfo: true,
   burnInInterval: 0,
   burnInDuration: 30,
   burnInOpacity: 30,
@@ -111,17 +137,46 @@ describe('renderer URL generation', () => {
     const resolved = buildRendererUrl(device, {
       ...state,
       showVideos: true,
+      showTime: true,
+      timeFormat: '12',
+      showAmPm: false,
+      showSeconds: true,
+      showDate: true,
+      dateFormat: 'YYYY-MM-DD',
+      clockSource: 'server',
+      showWeather: true,
+      weatherLocation: 'rotate',
+      weatherRotationInterval: 120,
       transition: 'fade',
       fadeTransitionDuration: 1.5,
       layout: 'splitview',
       imageEffect: 'smart-zoom',
       imageEffectAmount: 240,
       backgroundBlur: false,
+      backgroundBlurAmount: 18,
+      fontSize: 120,
       frameless: true,
       disableNavigation: true,
       hideCursor: true,
       showProgressBar: true,
       progressBarPosition: 'bottom',
+      showImageRating: true,
+      showOwner: true,
+      showAlbumName: true,
+      showPersonName: true,
+      showPersonAge: true,
+      showImageTime: true,
+      imageTimeFormat: '12',
+      showImageDate: true,
+      imageDateFormat: 'YYYY/MM/DD',
+      showImageDescription: true,
+      showImageCamera: true,
+      showImageExif: true,
+      showImageLocation: true,
+      showImageQr: true,
+      showImageId: true,
+      showUser: true,
+      showMoreInfo: false,
       burnInInterval: 30,
       burnInDuration: 20,
       burnInOpacity: 60,
@@ -131,13 +186,42 @@ describe('renderer URL generation', () => {
     expect(resolved.rendererUrl).toContain('layout=splitview');
     expect(resolved.rendererUrl).toContain('image_effect=smart-zoom');
     expect(resolved.rendererUrl).toContain('image_effect_amount=240');
+    expect(resolved.rendererUrl).toContain('show_time=true');
+    expect(resolved.rendererUrl).toContain('time_format=12');
+    expect(resolved.rendererUrl).toContain('show_am_pm=false');
+    expect(resolved.rendererUrl).toContain('show_seconds=true');
+    expect(resolved.rendererUrl).toContain('show_date=true');
+    expect(resolved.rendererUrl).toContain('date_format=YYYY-MM-DD');
+    expect(resolved.rendererUrl).toContain('clock_source=server');
+    expect(resolved.rendererUrl).toContain('show_weather=true');
+    expect(resolved.rendererUrl).toContain('weather=rotate');
+    expect(resolved.rendererUrl).toContain('rotation_interval=120');
     expect(resolved.rendererUrl).toContain('show_videos=true');
     expect(resolved.rendererUrl).toContain('background_blur=false');
+    expect(resolved.rendererUrl).toContain('background_blur_amount=18');
+    expect(resolved.rendererUrl).toContain('font_size=120');
     expect(resolved.rendererUrl).toContain('frameless=true');
     expect(resolved.rendererUrl).toContain('disable_navigation=true');
     expect(resolved.rendererUrl).toContain('hide_cursor=true');
     expect(resolved.rendererUrl).toContain('show_progress_bar=true');
     expect(resolved.rendererUrl).toContain('progress_bar_position=bottom');
+    expect(resolved.rendererUrl).toContain('show_image_rating=true');
+    expect(resolved.rendererUrl).toContain('show_owner=true');
+    expect(resolved.rendererUrl).toContain('show_album_name=true');
+    expect(resolved.rendererUrl).toContain('show_person_name=true');
+    expect(resolved.rendererUrl).toContain('show_person_age=true');
+    expect(resolved.rendererUrl).toContain('show_image_time=true');
+    expect(resolved.rendererUrl).toContain('image_time_format=12');
+    expect(resolved.rendererUrl).toContain('show_image_date=true');
+    expect(resolved.rendererUrl).toContain('image_date_format=YYYY%2FMM%2FDD');
+    expect(resolved.rendererUrl).toContain('show_image_description=true');
+    expect(resolved.rendererUrl).toContain('show_image_camera=true');
+    expect(resolved.rendererUrl).toContain('show_image_exif=true');
+    expect(resolved.rendererUrl).toContain('show_image_location=true');
+    expect(resolved.rendererUrl).toContain('show_image_qr=true');
+    expect(resolved.rendererUrl).toContain('show_image_id=true');
+    expect(resolved.rendererUrl).toContain('show_user=true');
+    expect(resolved.rendererUrl).toContain('show_more_info=false');
     expect(resolved.rendererUrl).toContain('burn_in_interval=30');
     expect(resolved.rendererUrl).toContain('burn_in_duration=20');
     expect(resolved.rendererUrl).toContain('burn_in_opacity=60');
@@ -161,5 +245,15 @@ describe('renderer URL generation', () => {
     });
     expect(resolved.rendererUrl).not.toContain('filter_date=');
     expect(resolved.rendererUrl).not.toContain('filter_newest=');
+  });
+
+  it('sets weather=none when weather display is disabled', () => {
+    const resolved = buildRendererUrl(device, {
+      ...state,
+      showWeather: false,
+      weatherLocation: 'rotate',
+    });
+    expect(resolved.rendererUrl).toContain('show_weather=false');
+    expect(resolved.rendererUrl).toContain('weather=none');
   });
 });
