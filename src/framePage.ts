@@ -55,6 +55,7 @@ export function renderFramePage(device: FrameDevice): string {
       var lastRendererUrl = '';
       var pollTimer = null;
       var pollIntervalMs = ${Math.max(5, device.pollIntervalSeconds) * 1000};
+      var frameVideoMuted = true;
       var keyMap = {
         next: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
         previous: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
@@ -109,12 +110,56 @@ export function renderFramePage(device: FrameDevice): string {
         var selector = null;
         if (command === 'next') selector = '.navigation--next-asset, [aria-label="Next"], [title="Next"]';
         if (command === 'previous') selector = '.navigation--prev-asset, [aria-label="Previous"], [title="Previous"]';
-        if (command === 'mute-toggle') selector = '[aria-label="Mute"], [aria-label="Unmute"], [title="Mute"], [title="Unmute"], .mute, .unmute';
+        if (command === 'mute-toggle') selector = '.navigation--mute, [aria-label="Mute"], [aria-label="Unmute"], [title="Mute"], [title="Unmute"], .mute, .unmute';
         if (!selector) return false;
         var control = doc.querySelector(selector);
         if (!control || typeof control.click !== 'function') return false;
         control.click();
+        if (command === 'mute-toggle') {
+          setTimeout(syncVideoMutedFromKiosk, 0);
+        }
         return true;
+      }
+
+      function readKioskMutedState() {
+        var doc = iframeDocument();
+        var win = iframeWindow();
+        var control = doc && doc.querySelector('.navigation--mute');
+        if (control) return control.classList.contains('is-muted');
+        try {
+          var stored = win && win.localStorage && win.localStorage.getItem('kioskVideoIsMuted');
+          if (stored === 'true') return true;
+          if (stored === 'false') return false;
+        } catch (error) {}
+        return frameVideoMuted;
+      }
+
+      function applyVideoMutedState(muted) {
+        var doc = iframeDocument();
+        if (!doc) return false;
+        var videos = Array.prototype.slice.call(doc.querySelectorAll('video'));
+        if (videos.length === 0) return false;
+        videos.forEach(function (video) {
+          video.muted = muted;
+          if (!muted) video.volume = 1;
+        });
+        frameVideoMuted = muted;
+        return true;
+      }
+
+      function syncVideoMutedFromKiosk() {
+        return applyVideoMutedState(readKioskMutedState());
+      }
+
+      function toggleVideoMutedDirectly() {
+        var muted = !readKioskMutedState();
+        var win = iframeWindow();
+        try {
+          if (win && win.localStorage) {
+            win.localStorage.setItem('kioskVideoIsMuted', JSON.stringify(muted));
+          }
+        } catch (error) {}
+        return applyVideoMutedState(muted);
       }
 
       function dispatchKioskKey(command) {
@@ -146,6 +191,9 @@ export function renderFramePage(device: FrameDevice): string {
             if (lastRendererUrl) iframe.src = lastRendererUrl;
             return false;
           }
+        }
+        if (command === 'mute-toggle') {
+          return clickKioskControl(command) || toggleVideoMutedDirectly() || dispatchKioskKey(command);
         }
         return triggerKioskApi(command) || clickKioskControl(command) || dispatchKioskKey(command);
       }

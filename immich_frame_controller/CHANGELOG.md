@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.17
+
+- Make Kiosk Mute Toggle click immich-kiosk's real `.navigation--mute` control before falling back to direct video mute state updates.
+- Stop relying on the Up Arrow keyboard shortcut as the primary mute path.
+
 ## 0.1.16
 
 - Show live frame event connection counts in the add-on console and health/device APIs.
