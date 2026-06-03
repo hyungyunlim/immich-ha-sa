@@ -83,7 +83,9 @@ For album control:
 
 For asset filters:
 
-- Use the Date Filter text entity to apply immich-kiosk `filter_date` to the selected album/source. Examples: `last-30-days`, `2021-01-01_to_today`, or an empty value to clear the filter.
+- Use the Date Filter Preset select for common immich-kiosk `filter_date` values: Off, Today, Last 7 days, Last 30 days, Last 90 days, and Last 365 days.
+- Use the Filter Start Date and Filter End Date picker entities for custom date ranges. Setting a start date without an end date writes `YYYY-MM-DD_to_today`; setting an end date writes a fixed `YYYY-MM-DD_to_YYYY-MM-DD` range.
+- Use the Date Filter text entity for advanced/raw immich-kiosk `filter_date` values. Examples: `last-30-days`, `2021-01-01_to_today`, or an empty value to clear the filter.
 - Use the Newest Filter number entity to apply immich-kiosk `filter_newest`. Set it to `0` to disable the newest-assets filter.
 - Use `set_renderer_options` with `filterDate` and `filterNewest` for automations and scripts.
 

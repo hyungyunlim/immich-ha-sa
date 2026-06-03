@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.22
+
+- Add a Home Assistant Date Filter Preset select for common immich-kiosk date filters.
+- Add Filter Start Date and Filter End Date picker entities that write custom `filter_date` ranges.
+
 ## 0.1.21
 
 - Add Home Assistant controls for immich-kiosk `filter_date` and `filter_newest` renderer filters.
