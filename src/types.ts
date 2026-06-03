@@ -8,7 +8,7 @@ export type ImageEffect = 'none' | 'zoom' | 'smart-zoom';
 export type ProgressBarPosition = 'top' | 'bottom';
 export type RemoteControlType = 'none' | 'freekiosk';
 export type KioskArrowAction = 'none' | 'mute' | 'redirects' | 'pause' | 'more-info' | 'fullscreen';
-export type FrameCommand = 'next' | 'previous' | 'play-pause' | 'reload' | 'mute-toggle' | 'screen-on' | 'screen-off' | 'volume-up' | 'volume-down';
+export type FrameCommand = 'next' | 'previous' | 'play-pause' | 'reload' | 'mute-toggle' | 'screen-on' | 'screen-off' | 'volume-up' | 'volume-down' | 'device-mute-toggle';
 
 export interface FrameCommandEvent {
   command: FrameCommand;

@@ -145,7 +145,7 @@ const DevicePatchSchema = z.object({
 });
 
 const FrameCommandSchema = z.object({
-  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'mute-toggle', 'screen-on', 'screen-off', 'volume-up', 'volume-down']),
+  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'mute-toggle', 'screen-on', 'screen-off', 'volume-up', 'volume-down', 'device-mute-toggle']),
 });
 
 export interface ServerDeps {
@@ -797,6 +797,8 @@ function freeKioskEndpoint(command: FrameCommand): string {
       return '/api/remote/keyboard/volumeup';
     case 'volume-down':
       return '/api/remote/keyboard/volumedown';
+    case 'device-mute-toggle':
+      return '/api/remote/keyboard/mute';
   }
 }
 

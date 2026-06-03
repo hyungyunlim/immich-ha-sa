@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.18
+
+- Add a Home Assistant Device Mute Toggle button that sends Android `KEYCODE_VOLUME_MUTE` through FreeKiosk.
+- Keep Kiosk Mute Toggle separate from Android device audio mute because browser video unmute may be blocked without a real user gesture.
+
 ## 0.1.17
 
 - Make Kiosk Mute Toggle click immich-kiosk's real `.navigation--mute` control before falling back to direct video mute state updates.
