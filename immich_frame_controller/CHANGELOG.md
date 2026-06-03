@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.20
+
+- Add a one-time Home Assistant entity registry migration that disables existing legacy Kiosk Mute Toggle entities after the diagnostic demotion.
+
 ## 0.1.19
 
 - Demote Kiosk Mute Toggle to a diagnostic, default-disabled Home Assistant entity because Android Device Mute Toggle is the reliable frame-wide audio control path.
