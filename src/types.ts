@@ -7,7 +7,8 @@ export type KioskLayout = 'single' | 'portrait' | 'landscape' | 'splitview' | 's
 export type ImageEffect = 'none' | 'zoom' | 'smart-zoom';
 export type ProgressBarPosition = 'top' | 'bottom';
 export type RemoteControlType = 'none' | 'freekiosk';
-export type FrameCommand = 'next' | 'previous' | 'play-pause' | 'reload' | 'screen-on' | 'screen-off' | 'volume-up' | 'volume-down';
+export type KioskArrowAction = 'none' | 'mute' | 'redirects' | 'pause' | 'more-info' | 'fullscreen';
+export type FrameCommand = 'next' | 'previous' | 'play-pause' | 'reload' | 'mute-toggle' | 'screen-on' | 'screen-off' | 'volume-up' | 'volume-down';
 
 export interface FrameCommandEvent {
   command: FrameCommand;
@@ -22,6 +23,7 @@ export interface FrameDevice {
   externalControllerBaseUrl?: string;
   localKioskBaseUrl: string;
   externalKioskBaseUrl?: string;
+  kioskPassword?: string;
   pollIntervalSeconds: number;
   remoteControlType?: RemoteControlType;
   remoteApiUrl?: string;
@@ -38,6 +40,8 @@ export interface FrameState {
   showDate: boolean;
   showWeather: boolean;
   showVideos: boolean;
+  upArrowAction: KioskArrowAction;
+  downArrowAction: KioskArrowAction;
   albumOrder: AlbumOrder;
   networkMode: NetworkMode;
   transition: KioskTransition;

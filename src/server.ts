@@ -20,6 +20,8 @@ const FrameStatePatchSchema = z.object({
   showDate: z.boolean().optional(),
   showWeather: z.boolean().optional(),
   showVideos: z.boolean().optional(),
+  upArrowAction: z.enum(['none', 'mute', 'redirects', 'pause', 'more-info', 'fullscreen']).optional(),
+  downArrowAction: z.enum(['none', 'mute', 'redirects', 'pause', 'more-info', 'fullscreen']).optional(),
   albumOrder: z.enum(['random', 'newest', 'oldest']).optional(),
   networkMode: z.enum(['auto', 'local', 'external']).optional(),
   transition: z.enum(['none', 'fade', 'cross-fade']).optional(),
@@ -106,6 +108,8 @@ const OptionalSecretSchema = z.preprocess(
   z.string().optional(),
 );
 
+const OptionalPatchSecretSchema = z.union([z.string().min(1), z.null()]).optional();
+
 const RequiredUrlSchema = z.preprocess(
   (value) => (typeof value === 'string' ? value.trim() : value),
   z.string().url(),
@@ -119,6 +123,7 @@ const DeviceCreateSchema = z.object({
   externalControllerBaseUrl: OptionalUrlSchema,
   localKioskBaseUrl: OptionalUrlSchema,
   externalKioskBaseUrl: OptionalUrlSchema,
+  kioskPassword: OptionalSecretSchema,
   pollIntervalSeconds: z.number().int().min(5).max(300).default(20),
   remoteControlType: z.enum(['none', 'freekiosk']).default('none'),
   remoteApiUrl: OptionalUrlSchema,
@@ -132,6 +137,7 @@ const DevicePatchSchema = z.object({
   externalControllerBaseUrl: OptionalUrlSchema,
   localKioskBaseUrl: RequiredUrlSchema.optional(),
   externalKioskBaseUrl: OptionalUrlSchema,
+  kioskPassword: OptionalPatchSecretSchema,
   pollIntervalSeconds: z.number().int().min(5).max(300).optional(),
   remoteControlType: z.enum(['none', 'freekiosk']).optional(),
   remoteApiUrl: OptionalUrlSchema,
@@ -139,7 +145,7 @@ const DevicePatchSchema = z.object({
 });
 
 const FrameCommandSchema = z.object({
-  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'screen-on', 'screen-off', 'volume-up', 'volume-down']),
+  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'mute-toggle', 'screen-on', 'screen-off', 'volume-up', 'volume-down']),
 });
 
 export interface ServerDeps {
@@ -148,6 +154,7 @@ export interface ServerDeps {
   immichClient?: ImmichClient;
   events?: FrameEventHub;
   auth?: ControllerAuthManager;
+  kioskConnectionChecker?: typeof checkKioskConnection;
 }
 
 export function createServer(deps: ServerDeps): FastifyInstance {
@@ -208,6 +215,12 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     }
     const pairing = auth.ensurePairingCode();
     const data = store.getData();
+    const kioskConnectionChecker = deps.kioskConnectionChecker ?? checkKioskConnection;
+    const kioskDiagnostics = await Promise.all(Object.values(data.devices).map(async (candidate) => [
+      candidate.id,
+      await kioskConnectionChecker(candidate, kioskPasswordForDevice(candidate, deps.config.kioskPassword)),
+    ] as const));
+    const kioskDiagnosticsByDevice = Object.fromEntries(kioskDiagnostics);
     reply.type('text/html; charset=utf-8').send(renderSetupPage({
       controllerUrl: device.localControllerBaseUrl,
       deviceId: device.id,
@@ -215,6 +228,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       expiresAt: pairing.expiresAt,
       albumCount: data.albumCache.items.length,
       albumRefreshedAt: data.albumCache.refreshedAt,
+      globalKioskPasswordConfigured: Boolean(deps.config.kioskPassword),
       devices: Object.values(data.devices).map((candidate) => {
         const frameState = store.getFrameState(candidate.id);
         const resolved = frameState ? resolveFrameForRequest(candidate.id, request) : null;
@@ -225,6 +239,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           externalControllerBaseUrl: candidate.externalControllerBaseUrl,
           localKioskBaseUrl: candidate.localKioskBaseUrl,
           externalKioskBaseUrl: candidate.externalKioskBaseUrl,
+          kioskPasswordConfigured: Boolean(candidate.kioskPassword),
+          kioskPasswordSource: kioskPasswordSource(candidate, deps.config.kioskPassword),
+          kioskConnection: kioskDiagnosticsByDevice[candidate.id],
           deviceNetworkMode: candidate.networkMode,
           pollIntervalSeconds: candidate.pollIntervalSeconds,
           remoteControlType: candidate.remoteControlType ?? 'none',
@@ -250,6 +267,8 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           hideCursor: frameState?.hideCursor,
           showProgressBar: frameState?.showProgressBar,
           showVideos: frameState?.showVideos,
+          upArrowAction: frameState?.upArrowAction,
+          downArrowAction: frameState?.downArrowAction,
           progressBarPosition: frameState?.progressBarPosition,
           burnInInterval: frameState?.burnInInterval,
           burnInDuration: frameState?.burnInDuration,
@@ -289,6 +308,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return ok({
       items: Object.values(data.devices).map((device) => ({
         ...publicDevice(device),
+        kioskPasswordSource: kioskPasswordSource(device, deps.config.kioskPassword),
         frameUrl: buildFrameUrl(device.localControllerBaseUrl, device.id),
         localFrameUrl: buildFrameUrl(device.localControllerBaseUrl, device.id),
         externalFrameUrl: device.externalControllerBaseUrl
@@ -425,7 +445,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       ...stripNullProfile(parsed.data),
     }));
     const direct = buildRendererUrl(device, { ...updated, networkMode: 'local' }, undefined, {
-      kioskPassword: deps.config.kioskPassword,
+      kioskPassword: kioskPasswordForDevice(device, deps.config.kioskPassword),
     });
     store.updateFrameState(deviceId, (state) => ({
       ...state,
@@ -488,7 +508,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       reply,
       device,
       context: requestContext(request),
-      kioskPassword: deps.config.kioskPassword,
+      globalKioskPassword: deps.config.kioskPassword,
     }, state);
     return reply;
   });
@@ -594,7 +614,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       disableSleep: profile.disableSleep,
     }));
     const direct = buildRendererUrl(device, { ...updated, networkMode: 'local' }, undefined, {
-      kioskPassword: deps.config.kioskPassword,
+      kioskPassword: kioskPasswordForDevice(device, deps.config.kioskPassword),
     });
     store.updateFrameState(deviceId, (state) => ({
       ...state,
@@ -623,7 +643,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     try {
       const context = requestContext(request);
       return buildProxiedRendererUrl(device, state, context, {
-        kioskPassword: deps.config.kioskPassword,
+        kioskPassword: kioskPasswordForDevice(device, deps.config.kioskPassword),
         controllerBaseUrl: controllerBaseUrlForContext(context, device.localControllerBaseUrl),
       });
     } catch (error) {
@@ -745,6 +765,8 @@ function freeKioskEndpoint(command: FrameCommand): string {
       return '/api/remote/playpause';
     case 'reload':
       return '/api/reload';
+    case 'mute-toggle':
+      return '/api/remote/up';
     case 'screen-on':
       return '/api/screen/on';
     case 'screen-off':
@@ -757,7 +779,11 @@ function freeKioskEndpoint(command: FrameCommand): string {
 }
 
 function commandUsesFrameEvents(command: FrameCommand): boolean {
-  return command === 'next' || command === 'previous' || command === 'play-pause' || command === 'reload';
+  return command === 'next'
+    || command === 'previous'
+    || command === 'play-pause'
+    || command === 'reload'
+    || command === 'mute-toggle';
 }
 
 function parseJsonOrText(value: string): unknown {
@@ -849,12 +875,16 @@ function toControllerProxyUrl(
   return proxy.toString();
 }
 
-function publicDevice(device: FrameDevice): Omit<FrameDevice, 'remoteApiKey'> & { remoteApiKeyConfigured: boolean } {
-  const { remoteApiKey: _remoteApiKey, ...publicFields } = device;
+function publicDevice(device: FrameDevice): Omit<FrameDevice, 'remoteApiKey' | 'kioskPassword'> & {
+  remoteApiKeyConfigured: boolean;
+  kioskPasswordConfigured: boolean;
+} {
+  const { remoteApiKey: _remoteApiKey, kioskPassword: _kioskPassword, ...publicFields } = device;
   return {
     ...publicFields,
     remoteControlType: publicFields.remoteControlType ?? 'none',
     remoteApiKeyConfigured: Boolean(_remoteApiKey),
+    kioskPasswordConfigured: Boolean(_kioskPassword),
   };
 }
 
@@ -913,6 +943,7 @@ function createDeviceFromInput(
     externalKioskBaseUrl: input.externalKioskBaseUrl
       ? trimTrailingSlash(input.externalKioskBaseUrl)
       : defaultDevice.externalKioskBaseUrl,
+    kioskPassword: input.kioskPassword,
     pollIntervalSeconds: input.pollIntervalSeconds,
     remoteControlType: input.remoteControlType,
     remoteApiUrl: input.remoteApiUrl ? trimTrailingSlash(input.remoteApiUrl) : undefined,
@@ -945,6 +976,9 @@ function normalizeDevicePatch(input: z.infer<typeof DevicePatchSchema>): Partial
       ? trimTrailingSlash(input.externalKioskBaseUrl)
       : input.externalKioskBaseUrl;
   }
+  if (hasPatchKey(input, 'kioskPassword')) {
+    patch.kioskPassword = input.kioskPassword ?? undefined;
+  }
   if (hasPatchKey(input, 'pollIntervalSeconds')) patch.pollIntervalSeconds = input.pollIntervalSeconds;
   if (hasPatchKey(input, 'remoteControlType')) patch.remoteControlType = input.remoteControlType;
   if (hasPatchKey(input, 'remoteApiUrl')) {
@@ -965,6 +999,77 @@ function trimTrailingSlash(value: string): string {
 
 function buildFrameUrl(controllerBaseUrl: string, deviceId: string): string {
   return `${trimTrailingSlash(controllerBaseUrl)}/frame/${deviceId}`;
+}
+
+function kioskPasswordForDevice(device: FrameDevice, globalKioskPassword: string | undefined): string | undefined {
+  return device.kioskPassword || globalKioskPassword;
+}
+
+function kioskPasswordSource(device: FrameDevice, globalKioskPassword: string | undefined): 'device' | 'global' | 'none' {
+  if (device.kioskPassword) return 'device';
+  if (globalKioskPassword) return 'global';
+  return 'none';
+}
+
+async function checkKioskConnection(
+  device: FrameDevice,
+  kioskPassword: string | undefined,
+): Promise<{
+  status: 'ok' | 'unauthorized' | 'error';
+  statusCode?: number;
+  message: string;
+  checkedAt: string;
+}> {
+  const checkedAt = new Date().toISOString();
+  let url: URL;
+  try {
+    url = new URL('/', `${trimTrailingSlash(device.localKioskBaseUrl)}/`);
+    if (kioskPassword) url.searchParams.set('password', kioskPassword);
+  } catch (error) {
+    return {
+      status: 'error',
+      message: error instanceof Error ? error.message : String(error),
+      checkedAt,
+    };
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: 'text/html,application/xhtml+xml' },
+      signal: AbortSignal.timeout(1500),
+    });
+    await response.body?.cancel().catch(() => undefined);
+    if (response.status >= 200 && response.status < 400) {
+      return {
+        status: 'ok',
+        statusCode: response.status,
+        message: 'Reachable',
+        checkedAt,
+      };
+    }
+    if (response.status === 401 || response.status === 403) {
+      return {
+        status: 'unauthorized',
+        statusCode: response.status,
+        message: kioskPassword
+          ? 'Unauthorized. Check the kiosk password.'
+          : 'Unauthorized. Set kiosk_password or a device override.',
+        checkedAt,
+      };
+    }
+    return {
+      status: 'error',
+      statusCode: response.status,
+      message: `Kiosk returned HTTP ${response.status}`,
+      checkedAt,
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      message: error instanceof Error ? error.message : String(error),
+      checkedAt,
+    };
+  }
 }
 
 function validateAlbumIds(albumIds: string[] | undefined, cache: AlbumCache): string | undefined {

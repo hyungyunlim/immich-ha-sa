@@ -18,6 +18,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ImmichFrameCommandButton(coordinator, "next", "Next", "next"),
             ImmichFrameCommandButton(coordinator, "play_pause", "Play/Pause", "play-pause"),
             ImmichFrameCommandButton(coordinator, "reload", "Reload", "reload"),
+            ImmichFrameCommandButton(coordinator, "kiosk_mute_toggle", "Kiosk Mute Toggle", "mute-toggle"),
             ImmichFrameCommandButton(coordinator, "screen_on", "Screen On", "screen-on"),
             ImmichFrameCommandButton(coordinator, "screen_off", "Screen Off", "screen-off"),
             ImmichFrameCommandButton(coordinator, "volume_up", "Volume Up", "volume-up"),

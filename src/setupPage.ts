@@ -5,7 +5,15 @@ interface SetupPageParams {
   expiresAt: string;
   albumCount: number;
   albumRefreshedAt?: string;
+  globalKioskPasswordConfigured: boolean;
   devices: SetupPageDevice[];
+}
+
+interface SetupPageKioskConnection {
+  status: 'ok' | 'unauthorized' | 'error';
+  statusCode?: number;
+  message: string;
+  checkedAt: string;
 }
 
 interface SetupPageDevice {
@@ -15,6 +23,9 @@ interface SetupPageDevice {
   externalControllerBaseUrl?: string;
   localKioskBaseUrl: string;
   externalKioskBaseUrl?: string;
+  kioskPasswordConfigured: boolean;
+  kioskPasswordSource: 'device' | 'global' | 'none';
+  kioskConnection?: SetupPageKioskConnection;
   deviceNetworkMode: string;
   pollIntervalSeconds: number;
   remoteControlType?: string;
@@ -38,6 +49,8 @@ interface SetupPageDevice {
   hideCursor?: boolean;
   showProgressBar?: boolean;
   showVideos?: boolean;
+  upArrowAction?: string;
+  downArrowAction?: string;
   progressBarPosition?: string;
   burnInInterval?: number;
   burnInDuration?: number;
@@ -143,7 +156,7 @@ export function renderSetupPage(params: SetupPageParams): string {
       gap: 14px;
     }
     .summary {
-      grid-template-columns: 1.3fr repeat(3, minmax(150px, .7fr));
+      grid-template-columns: minmax(220px, 1.3fr) repeat(4, minmax(140px, .7fr));
       margin-bottom: 18px;
     }
     .metric {
@@ -331,6 +344,18 @@ export function renderSetupPage(params: SetupPageParams): string {
     .field.full {
       grid-column: 1 / -1;
     }
+    .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #4b5563;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .checkbox-field input {
+      width: auto;
+      min-height: auto;
+    }
     input,
     select {
       width: 100%;
@@ -435,6 +460,11 @@ export function renderSetupPage(params: SetupPageParams): string {
         <div class="value">${escapeHtml(params.controllerUrl)}</div>
       </div>
       <div class="panel metric">
+        <div class="label">Kiosk Password</div>
+        <div class="value">${params.globalKioskPasswordConfigured ? 'Configured' : 'Not configured'}</div>
+        <p class="muted">Global default</p>
+      </div>
+      <div class="panel metric">
         <div class="label">Default Device</div>
         <div class="value">${escapeHtml(params.deviceId)}</div>
       </div>
@@ -485,6 +515,11 @@ export function renderSetupPage(params: SetupPageParams): string {
         <label class="field full">
           <span class="label">Local Kiosk URL</span>
           <input name="localKioskBaseUrl" type="url" placeholder="http://homeassistant.local:3000">
+        </label>
+        <label class="field full">
+          <span class="label">Kiosk Password Override</span>
+          <input name="kioskPassword" type="password" autocomplete="new-password" placeholder="optional; inherits global kiosk_password when blank">
+          <span class="help-text">Use only when this device's immich-kiosk password differs from the add-on global kiosk_password.</span>
         </label>
         <label class="field full">
           <span class="label">External Controller URL</span>
@@ -581,6 +616,12 @@ export function renderSetupPage(params: SetupPageParams): string {
         remoteControlType: String(formData.get('remoteControlType') || 'none'),
         remoteApiUrl: optionalValue(formData, 'remoteApiUrl'),
       };
+      const kioskPassword = optionalValue(formData, 'kioskPassword');
+      if (!includeId && formData.get('clearKioskPassword') === 'on') {
+        payload.kioskPassword = null;
+      } else if (kioskPassword) {
+        payload.kioskPassword = kioskPassword;
+      }
       const remoteApiKey = optionalValue(formData, 'remoteApiKey');
       if (remoteApiKey) {
         payload.remoteApiKey = remoteApiKey;
@@ -741,6 +782,8 @@ function renderDeviceCard(device: SetupPageDevice): string {
       <dl class="kv">
         ${renderKeyValue('Duration', `${device.durationSeconds ?? 'unknown'}s`)}
         ${renderKeyValue('Fit / Order', `${device.imageFit ?? 'config'} / ${device.albumOrder ?? 'config'}`)}
+        ${renderKeyValue('Kiosk Password', renderKioskPasswordSource(device.kioskPasswordSource))}
+        ${renderKeyValue('Kiosk Connection', renderKioskConnection(device.kioskConnection))}
         ${renderKeyValue('Transition', device.transition ?? 'config')}
         ${renderKeyValue('Layout', device.layout ?? 'config')}
         ${renderKeyValue('Image Effect', device.imageEffect ?? 'config')}
@@ -750,6 +793,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Cursor', device.hideCursor ? 'Hidden' : 'Visible')}
         ${renderKeyValue('Progress Bar', `${boolLabel(device.showProgressBar)} / ${device.progressBarPosition ?? 'top'}`)}
         ${renderKeyValue('Videos', boolLabel(device.showVideos))}
+        ${renderKeyValue('Arrow Actions', `${device.upArrowAction ?? 'none'} / ${device.downArrowAction ?? 'none'}`)}
         ${renderKeyValue('Burn-in', `${device.burnInInterval ?? 0}m / ${device.burnInDuration ?? 30}s / ${device.burnInOpacity ?? 30}%`)}
         ${renderKeyValue('Sleep', sleepWindow)}
         ${renderKeyValue('Remote', `${device.remoteControlType ?? 'none'}${device.remoteApiUrl ? ' / configured' : ''}`)}
@@ -775,6 +819,14 @@ function renderDeviceCard(device: SetupPageDevice): string {
             <span class="label">Local Kiosk URL</span>
             <input name="localKioskBaseUrl" type="url" required value="${escapeAttribute(device.localKioskBaseUrl)}">
           </label>
+          <label class="field full">
+            <span class="label">Kiosk Password Override</span>
+            <input name="kioskPassword" type="password" autocomplete="new-password" placeholder="${device.kioskPasswordConfigured ? 'configured; leave blank to keep' : 'optional; inherits global kiosk_password'}">
+            <span class="help-text">This is the immich-kiosk password, not the Immich API key, HA token, or FreeKiosk key.</span>
+          </label>
+          ${device.kioskPasswordConfigured
+            ? `<label class="field full checkbox-field"><input name="clearKioskPassword" type="checkbox"><span>Clear this device password override and inherit the global kiosk_password</span></label>`
+            : ''}
           <label class="field full">
             <span class="label">External Controller URL</span>
             <input name="externalControllerBaseUrl" type="url" value="${escapeAttribute(device.externalControllerBaseUrl ?? '')}">
@@ -837,6 +889,28 @@ function renderRemoteControlOptions(value: string): string {
 function boolLabel(value: boolean | undefined): string {
   if (value === undefined) return 'config';
   return value ? 'On' : 'Off';
+}
+
+function renderKioskPasswordSource(value: 'device' | 'global' | 'none'): string {
+  switch (value) {
+    case 'device':
+      return 'Device override';
+    case 'global':
+      return 'Global';
+    case 'none':
+      return 'Not configured';
+  }
+}
+
+function renderKioskConnection(value: SetupPageKioskConnection | undefined): string {
+  if (!value) return 'Not checked';
+  const status = value.status === 'ok'
+    ? 'OK'
+    : value.status === 'unauthorized'
+      ? 'Unauthorized'
+      : 'Error';
+  const statusCode = value.statusCode ? ` ${value.statusCode}` : '';
+  return `${status}${statusCode}: ${value.message}`;
 }
 
 function escapeHtml(value: string): string {

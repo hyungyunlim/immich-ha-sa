@@ -33,6 +33,7 @@ The Web UI is an operational console. It shows:
 - Pairing code and controller URL for Home Assistant.
 - Device IDs and fixed frame URLs.
 - Resolved immich-kiosk renderer URLs with sensitive query values redacted.
+- Kiosk password source and connection status for each device.
 - Current sleep, display, motion, UI, progress, and burn-in override state.
 - Local device management controls for creating, editing, and deleting non-default frame devices.
 
@@ -41,6 +42,7 @@ Device management is only available from the local console. For each new device,
 - A fixed URL at `/frame/<device_id>`.
 - A separate frame state record for album, renderer, sleep, and display settings.
 - Optional local and external controller/kiosk URL overrides.
+- Optional per-device immich-kiosk password override. Leave this blank to inherit the add-on `kiosk_password`.
 - Optional FreeKiosk REST remote-control settings.
 
 Add the Home Assistant integration once per frame device ID. Home Assistant entities for the same device ID are grouped under one Home Assistant device page, so `lenovo`, `kitchen`, and `office` can each be adjusted independently.
@@ -56,6 +58,12 @@ If the frame runs FreeKiosk, open the device settings in the add-on console and 
 The Home Assistant device page exposes buttons for next, previous, play/pause, reload, screen on, screen off, volume up, and volume down. Next, previous, play/pause, and reload are sent to the fixed frame page over the controller event stream, then bridged into the same-origin immich-kiosk iframe. Screen and volume controls require FreeKiosk REST endpoints such as `/api/screen/on`, `/api/screen/off`, `/api/remote/keyboard/volumeup`, and `/api/remote/keyboard/volumedown`.
 
 Keep the frame's `disableNavigation` setting off when using next/previous buttons. immich-kiosk's `disable_navigation` option blocks touch/click, keyboard, and menu navigation, so bridged commands and physical key events will be ignored by immich-kiosk if this is enabled.
+
+## Kiosk Audio
+
+The Home Assistant Kiosk Mute Toggle button controls immich-kiosk mute state, not Android device volume. The controller sets `up_arrow_action=mute` by default and sends an Arrow Up action into the proxied kiosk frame. Use the Up Arrow Action and Down Arrow Action select entities if you want those key actions to do something else.
+
+The Volume Up and Volume Down buttons are FreeKiosk/Android device volume controls.
 
 ## Video Playback
 

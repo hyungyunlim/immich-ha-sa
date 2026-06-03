@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.15
+
+- Add kiosk password diagnostics and optional per-device kiosk password overrides in the add-on console.
+- Add a Home Assistant Kiosk Mute Toggle button and Up/Down Arrow Action selects for immich-kiosk.
+
 ## 0.1.14
 
 - Show separate Local Frame URL and External Frame URL values in the add-on console.

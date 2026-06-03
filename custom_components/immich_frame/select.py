@@ -46,6 +46,18 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 "progressBarPosition",
                 ["top", "bottom"],
             ),
+            ImmichFrameArrowActionSelect(
+                coordinator,
+                "up_arrow_action",
+                "Up Arrow Action",
+                "upArrowAction",
+            ),
+            ImmichFrameArrowActionSelect(
+                coordinator,
+                "down_arrow_action",
+                "Down Arrow Action",
+                "downArrowAction",
+            ),
         ]
     )
 
@@ -149,6 +161,33 @@ class ImmichFrameStateSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEn
     @property
     def current_option(self) -> str | None:
         return self.coordinator.data.get("state", {}).get(self._patch_key)
+
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.client.update_frame_state({self._patch_key: option})
+        await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameArrowActionSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEntity):
+    _attr_options = ["none", "mute", "redirects", "pause", "more-info", "fullscreen"]
+
+    def __init__(
+        self,
+        coordinator: ImmichFrameCoordinator,
+        key: str,
+        label: str,
+        patch_key: str,
+    ) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._patch_key = patch_key
+        self._attr_name = f"{frame_label(device_id)} Frame {label}"
+        self._attr_unique_id = frame_unique_id(device_id, key)
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def current_option(self) -> str | None:
+        value = self.coordinator.data.get("state", {}).get(self._patch_key)
+        return value or "none"
 
     async def async_select_option(self, option: str) -> None:
         await self.coordinator.client.update_frame_state({self._patch_key: option})

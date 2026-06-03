@@ -36,12 +36,24 @@ afterEach(() => {
   }
 });
 
+function createTestServer(deps: Parameters<typeof createServer>[0]) {
+  return createServer({
+    kioskConnectionChecker: async () => ({
+      status: 'ok',
+      statusCode: 200,
+      message: 'Reachable',
+      checkedAt: '2026-06-02T00:00:00.000Z',
+    }),
+    ...deps,
+  });
+}
+
 describe('controller API', () => {
   it('returns resolved frame state', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
-    const server = createServer({ config });
+    const server = createTestServer({ config });
 
     const response = await server.inject({
       method: 'GET',
@@ -68,7 +80,7 @@ describe('controller API', () => {
       updatedAt: '2026-06-02T00:00:00.000Z',
     };
     store.setAlbumCache({ items: [album], stale: false, refreshedAt: '2026-06-02T00:00:00.000Z' });
-    const server = createServer({ config, store });
+    const server = createTestServer({ config, store });
 
     const response = await server.inject({
       method: 'PUT',
@@ -88,7 +100,7 @@ describe('controller API', () => {
       ...buildConfig(dir),
       controllerApiToken: 'static-secret',
     };
-    const server = createServer({ config });
+    const server = createTestServer({ config });
 
     const unauthenticated = await server.inject({
       method: 'PUT',
@@ -130,7 +142,7 @@ describe('controller API', () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
-    const server = createServer({ config });
+    const server = createTestServer({ config });
 
     const response = await server.inject({
       method: 'GET',
@@ -146,7 +158,7 @@ describe('controller API', () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
-    const server = createServer({ config });
+    const server = createTestServer({ config });
 
     const response = await server.inject({
       method: 'GET',
@@ -166,7 +178,7 @@ describe('controller API', () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
-    const server = createServer({ config });
+    const server = createTestServer({ config });
 
     const created = await server.inject({
       method: 'POST',
@@ -209,7 +221,7 @@ describe('controller API', () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
-    const server = createServer({ config });
+    const server = createTestServer({ config });
 
     await server.inject({
       method: 'POST',
@@ -263,7 +275,7 @@ describe('controller API', () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
-    const server = createServer({ config });
+    const server = createTestServer({ config });
 
     const updated = await server.inject({
       method: 'PATCH',
@@ -291,11 +303,45 @@ describe('controller API', () => {
     await server.close();
   });
 
+  it('uses device kiosk password override without leaking it through device APIs', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = {
+      ...buildConfig(dir),
+      kioskPassword: 'global-secret',
+    };
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    store.updateDevice('lenovo', { kioskPassword: 'device-secret' });
+    const server = createTestServer({ config, store });
+
+    const state = await server.inject({
+      method: 'GET',
+      url: '/api/frame/lenovo/state',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(state.statusCode).toBe(200);
+    expect(state.json().data.rendererUrl).toContain('password=device-secret');
+    expect(state.json().data.rendererUrl).not.toContain('global-secret');
+
+    const devices = await server.inject({
+      method: 'GET',
+      url: '/api/devices',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(devices.statusCode).toBe(200);
+    const item = devices.json().data.items.find((device: { id: string }) => device.id === 'lenovo');
+    expect(item.kioskPasswordConfigured).toBe(true);
+    expect(item.kioskPasswordSource).toBe('device');
+    expect(JSON.stringify(item)).not.toContain('device-secret');
+
+    await server.close();
+  });
+
   it('blocks device management from the external controller host', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
-    const server = createServer({ config });
+    const server = createTestServer({ config });
 
     const response = await server.inject({
       method: 'POST',
@@ -332,7 +378,7 @@ describe('controller API', () => {
       remoteApiUrl: `http://127.0.0.1:${remotePort}`,
       remoteApiKey: 'test-key',
     });
-    const server = createServer({ config, store });
+    const server = createTestServer({ config, store });
 
     const response = await server.inject({
       method: 'POST',
@@ -372,16 +418,16 @@ describe('controller API', () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
-    const server = createServer({ config });
+    const server = createTestServer({ config });
 
     const response = await server.inject({
       method: 'POST',
       url: '/api/frames/lenovo/command',
-      payload: { command: 'next' },
+      payload: { command: 'mute-toggle' },
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().data.command).toBe('next');
+    expect(response.json().data.command).toBe('mute-toggle');
     expect(response.json().data.frameEvent.delivered).toBe(0);
     await server.close();
   });
@@ -390,7 +436,7 @@ describe('controller API', () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
-    const server = createServer({ config });
+    const server = createTestServer({ config });
 
     const response = await server.inject({
       method: 'POST',
@@ -438,7 +484,7 @@ describe('controller API', () => {
     store.updateDevice('lenovo', {
       localKioskBaseUrl: `http://127.0.0.1:${kioskPort}`,
     });
-    const server = createServer({ config, store });
+    const server = createTestServer({ config, store });
 
     const state = await server.inject({
       method: 'GET',
@@ -501,7 +547,7 @@ describe('controller API', () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
-    const server = createServer({ config });
+    const server = createTestServer({ config });
 
     const root = await server.inject({
       method: 'GET',

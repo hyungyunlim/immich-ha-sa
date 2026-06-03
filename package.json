@@ -1,6 +1,6 @@
 {
   "name": "immich-ha-sa",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "private": true,
   "type": "module",
   "description": "Home Assistant controlled Lenovo Smart Frame controller for Immich and immich-kiosk",
@@ -8,7 +8,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/src/index.js",
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run --pool threads --maxWorkers=1 --no-isolate --testTimeout 120000",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

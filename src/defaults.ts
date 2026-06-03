@@ -10,6 +10,8 @@ export function createDefaultFrameState(device: FrameDevice): FrameState {
     showDate: false,
     showWeather: true,
     showVideos: false,
+    upArrowAction: 'mute',
+    downArrowAction: 'none',
     albumOrder: 'random',
     networkMode: device.networkMode,
     transition: 'none',

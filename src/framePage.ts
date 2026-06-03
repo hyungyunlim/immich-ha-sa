@@ -58,7 +58,8 @@ export function renderFramePage(device: FrameDevice): string {
       var keyMap = {
         next: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
         previous: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
-        'play-pause': { key: ' ', code: 'Space', keyCode: 32 }
+        'play-pause': { key: ' ', code: 'Space', keyCode: 32 },
+        'mute-toggle': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 }
       };
 
       function applyState(state) {
@@ -108,6 +109,7 @@ export function renderFramePage(device: FrameDevice): string {
         var selector = null;
         if (command === 'next') selector = '.navigation--next-asset, [aria-label="Next"], [title="Next"]';
         if (command === 'previous') selector = '.navigation--prev-asset, [aria-label="Previous"], [title="Previous"]';
+        if (command === 'mute-toggle') selector = '[aria-label="Mute"], [aria-label="Unmute"], [title="Mute"], [title="Unmute"], .mute, .unmute';
         if (!selector) return false;
         var control = doc.querySelector(selector);
         if (!control || typeof control.click !== 'function') return false;

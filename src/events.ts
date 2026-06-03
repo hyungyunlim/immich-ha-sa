@@ -6,7 +6,7 @@ interface SseClient {
   reply: FastifyReply;
   device: FrameDevice;
   context: RequestContext;
-  kioskPassword?: string;
+  globalKioskPassword?: string;
 }
 
 export class FrameEventHub {
@@ -14,7 +14,7 @@ export class FrameEventHub {
 
   subscribe(deviceId: string, client: SseClient, state: FrameState): void {
     const initialState = buildProxiedRendererUrl(client.device, state, client.context, {
-      kioskPassword: client.kioskPassword,
+      kioskPassword: kioskPasswordForDevice(client.device, client.globalKioskPassword),
       controllerBaseUrl: controllerBaseUrlForContext(client.context, client.device.localControllerBaseUrl),
     });
     const clients = this.clients.get(deviceId) ?? new Set<SseClient>();
@@ -46,7 +46,7 @@ export class FrameEventHub {
       }
       try {
         this.send(client, 'state', buildProxiedRendererUrl(device ?? client.device, state, client.context, {
-          kioskPassword: client.kioskPassword,
+          kioskPassword: kioskPasswordForDevice(device ?? client.device, client.globalKioskPassword),
           controllerBaseUrl: controllerBaseUrlForContext(client.context, (device ?? client.device).localControllerBaseUrl),
         }));
       } catch {
@@ -82,4 +82,8 @@ export class FrameEventHub {
     client.reply.raw.write(`event: ${event}\n`);
     client.reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
   }
+}
+
+function kioskPasswordForDevice(device: FrameDevice, globalKioskPassword: string | undefined): string | undefined {
+  return device.kioskPassword || globalKioskPassword;
 }

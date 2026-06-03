@@ -23,6 +23,8 @@ const state: FrameState = {
   showDate: false,
   showWeather: true,
   showVideos: false,
+  upArrowAction: 'mute',
+  downArrowAction: 'none',
   albumOrder: 'random',
   networkMode: 'auto',
   transition: 'none',
@@ -75,6 +77,16 @@ describe('renderer URL generation', () => {
   it('adds kiosk password when configured', () => {
     const resolved = buildRendererUrl(device, state, { host: '10.0.0.10:18082' }, { kioskPassword: 'secret' });
     expect(resolved.rendererUrl).toContain('password=secret');
+  });
+
+  it('adds kiosk arrow action overrides', () => {
+    const resolved = buildRendererUrl(device, {
+      ...state,
+      upArrowAction: 'mute',
+      downArrowAction: 'pause',
+    });
+    expect(resolved.rendererUrl).toContain('up_arrow_action=mute');
+    expect(resolved.rendererUrl).toContain('down_arrow_action=pause');
   });
 
   it('adds sleep mode URL overrides', () => {
