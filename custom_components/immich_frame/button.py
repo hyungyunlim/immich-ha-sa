@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DATA_COORDINATOR, DOMAIN
@@ -18,7 +19,14 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ImmichFrameCommandButton(coordinator, "next", "Next", "next"),
             ImmichFrameCommandButton(coordinator, "play_pause", "Play/Pause", "play-pause"),
             ImmichFrameCommandButton(coordinator, "reload", "Reload", "reload"),
-            ImmichFrameCommandButton(coordinator, "kiosk_mute_toggle", "Kiosk Mute Toggle", "mute-toggle"),
+            ImmichFrameCommandButton(
+                coordinator,
+                "kiosk_mute_toggle",
+                "Kiosk Video Mute Diagnostic",
+                "mute-toggle",
+                entity_category=EntityCategory.DIAGNOSTIC,
+                enabled_default=False,
+            ),
             ImmichFrameCommandButton(coordinator, "screen_on", "Screen On", "screen-on"),
             ImmichFrameCommandButton(coordinator, "screen_off", "Screen Off", "screen-off"),
             ImmichFrameCommandButton(coordinator, "volume_up", "Volume Up", "volume-up"),
@@ -48,6 +56,9 @@ class ImmichFrameCommandButton(CoordinatorEntity[ImmichFrameCoordinator], Button
         key: str,
         label: str,
         command: str,
+        *,
+        entity_category: EntityCategory | None = None,
+        enabled_default: bool = True,
     ) -> None:
         super().__init__(coordinator)
         device_id = coordinator.client.device_id
@@ -55,6 +66,9 @@ class ImmichFrameCommandButton(CoordinatorEntity[ImmichFrameCoordinator], Button
         self._attr_name = f"{frame_label(device_id)} Frame {label}"
         self._attr_unique_id = frame_unique_id(device_id, key)
         self._attr_device_info = frame_device_info(device_id)
+        self._attr_entity_registry_enabled_default = enabled_default
+        if entity_category is not None:
+            self._attr_entity_category = entity_category
 
     async def async_press(self) -> None:
         await self.coordinator.client.send_command(self._command)

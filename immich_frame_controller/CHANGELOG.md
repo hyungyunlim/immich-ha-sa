@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.19
+
+- Demote Kiosk Mute Toggle to a diagnostic, default-disabled Home Assistant entity because Android Device Mute Toggle is the reliable frame-wide audio control path.
+
 ## 0.1.18
 
 - Add a Home Assistant Device Mute Toggle button that sends Android `KEYCODE_VOLUME_MUTE` through FreeKiosk.

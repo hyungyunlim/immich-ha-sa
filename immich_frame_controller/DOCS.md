@@ -55,13 +55,15 @@ If the frame runs FreeKiosk, open the device settings in the add-on console and 
 - Remote API URL: the FreeKiosk REST API base URL, for example `http://192.168.1.160:8080`
 - Remote API Key: optional, only if enabled in FreeKiosk
 
-The Home Assistant device page exposes buttons for next, previous, play/pause, reload, kiosk mute toggle, screen on, screen off, volume up, volume down, and device mute toggle. Next, previous, play/pause, reload, and kiosk mute toggle are sent to the fixed frame page over the controller event stream, then bridged into the same-origin immich-kiosk iframe. Kiosk Mute Toggle clicks immich-kiosk's real `.navigation--mute` control first, then falls back to directly updating the current video element's muted state. If no frame browser is connected, these iframe commands fall back to FreeKiosk REST when the device has a FreeKiosk Remote API URL configured. Screen, volume, and device mute controls always require FreeKiosk REST endpoints such as `/api/screen/on`, `/api/screen/off`, `/api/remote/keyboard/volumeup`, `/api/remote/keyboard/volumedown`, and `/api/remote/keyboard/mute`.
+The Home Assistant device page exposes buttons for next, previous, play/pause, reload, screen on, screen off, volume up, volume down, and device mute toggle. Next, previous, play/pause, and reload are sent to the fixed frame page over the controller event stream, then bridged into the same-origin immich-kiosk iframe. If no frame browser is connected, these iframe commands fall back to FreeKiosk REST when the device has a FreeKiosk Remote API URL configured. Screen, volume, and device mute controls always require FreeKiosk REST endpoints such as `/api/screen/on`, `/api/screen/off`, `/api/remote/keyboard/volumeup`, `/api/remote/keyboard/volumedown`, and `/api/remote/keyboard/mute`.
+
+Kiosk Video Mute Diagnostic is intentionally disabled by default and categorized as a diagnostic Home Assistant entity. It clicks immich-kiosk's real `.navigation--mute` control first, then falls back to directly updating the current video element's muted state. Keep it for troubleshooting browser/video behavior, not for normal automations.
 
 Keep the frame's `disableNavigation` setting off when using next/previous buttons. immich-kiosk's `disable_navigation` option blocks touch/click, keyboard, and menu navigation, so bridged commands and physical key events will be ignored by immich-kiosk if this is enabled.
 
 ## Kiosk Audio
 
-The Home Assistant Kiosk Mute Toggle button controls immich-kiosk mute state, not Android device volume. Browser video unmute can still be blocked when there has not been a real user gesture in the WebView. For reliable frame-wide audio control, use Device Mute Toggle instead; it sends Android `KEYCODE_VOLUME_MUTE` through FreeKiosk.
+The Home Assistant Kiosk Video Mute Diagnostic button controls immich-kiosk mute state, not Android device volume. Browser video unmute can still be blocked when there has not been a real user gesture in the WebView. For reliable frame-wide audio control, use Device Mute Toggle instead; it sends Android `KEYCODE_VOLUME_MUTE` through FreeKiosk.
 
 The Volume Up, Volume Down, and Device Mute Toggle buttons are FreeKiosk/Android device audio controls.
 

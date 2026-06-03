@@ -184,6 +184,8 @@ immich_frame.set_renderer_options
 immich_frame.set_network_mode
 ```
 
+For frame audio, use the `Device Mute Toggle`, `Volume Up`, and `Volume Down` entities when FreeKiosk Remote API is configured. The immich-kiosk video mute control is exposed only as a disabled-by-default diagnostic entity because WebView video unmute can be blocked without a real user gesture.
+
 Example automation:
 
 ```yaml
