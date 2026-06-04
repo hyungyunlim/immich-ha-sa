@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -21,6 +22,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ImmichFrameCurrentAlbumSensor(coordinator),
             ImmichFrameRendererUrlSensor(coordinator),
             ImmichFrameResolvedNetworkModeSensor(coordinator),
+            ImmichFrameRemoteLightSensor(coordinator),
         ]
     )
 
@@ -94,6 +96,35 @@ class ImmichFrameResolvedNetworkModeSensor(CoordinatorEntity[ImmichFrameCoordina
     @property
     def native_value(self) -> str | None:
         return self.coordinator.data.get("state", {}).get("resolvedNetworkMode")
+
+
+class ImmichFrameRemoteLightSensor(CoordinatorEntity[ImmichFrameCoordinator], SensorEntity):
+    _attr_device_class = SensorDeviceClass.ILLUMINANCE
+    _attr_native_unit_of_measurement = "lx"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Light Level"
+        self._attr_unique_id = frame_unique_id(device_id, "remote_light_level")
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
+
+    @property
+    def native_value(self) -> float | None:
+        remote_status = self.coordinator.data.get("remote_status") or {}
+        cursor: Any = remote_status.get("status")
+        if not isinstance(cursor, dict):
+            return None
+        sensors = cursor.get("sensors")
+        if not isinstance(sensors, dict):
+            return None
+        value = sensors.get("light")
+        return float(value) if isinstance(value, (int, float)) else None
 
 
 def redact_sensitive_query_params(url: str) -> str:

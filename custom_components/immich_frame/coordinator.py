@@ -7,7 +7,7 @@ from typing import Any
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.core import HomeAssistant
 
-from .api import ImmichFrameClient
+from .api import ImmichFrameApiError, ImmichFrameClient
 from .const import DOMAIN
 
 LOGGER = logging.getLogger(__name__)
@@ -27,8 +27,14 @@ class ImmichFrameCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         state = await self.client.frame_state()
         albums = await self.client.albums()
         profiles = await self.client.profiles()
+        remote_status: dict[str, Any] | None = None
+        try:
+            remote_status = await self.client.remote_status()
+        except ImmichFrameApiError as err:
+            LOGGER.debug("Unable to update FreeKiosk remote status: %s", err.message)
         return {
             "state": state,
             "albums": albums,
             "profiles": profiles,
+            "remote_status": remote_status,
         }

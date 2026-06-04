@@ -28,6 +28,7 @@ from .const import (
 from .coordinator import ImmichFrameCoordinator
 
 PLATFORMS = [
+    Platform.BINARY_SENSOR,
     Platform.SELECT,
     Platform.NUMBER,
     Platform.BUTTON,

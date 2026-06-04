@@ -71,6 +71,29 @@ class ImmichFrameClient:
             auth=True,
         )
 
+    async def remote_status(self) -> dict[str, Any]:
+        return await self._request(
+            "GET",
+            f"/api/frames/{self.device_id}/remote/status",
+            auth=True,
+        )
+
+    async def set_remote_brightness(self, value: int) -> dict[str, Any]:
+        return await self._request(
+            "PUT",
+            f"/api/frames/{self.device_id}/remote/brightness",
+            json={"value": value},
+            auth=True,
+        )
+
+    async def set_remote_volume(self, value: int) -> dict[str, Any]:
+        return await self._request(
+            "PUT",
+            f"/api/frames/{self.device_id}/remote/volume",
+            json={"value": value},
+            auth=True,
+        )
+
     async def _request(
         self,
         method: str,

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from homeassistant.components.number import NumberEntity
+from typing import Any
+
+from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -123,6 +125,22 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 1,
                 "%",
             ),
+            ImmichFrameRemoteNumber(
+                coordinator,
+                "remote_brightness",
+                "Display Brightness",
+                ["screen", "brightness"],
+                "brightness",
+                "mdi:brightness-6",
+            ),
+            ImmichFrameRemoteNumber(
+                coordinator,
+                "remote_volume",
+                "Media Volume",
+                ["audio", "volume"],
+                "volume",
+                "mdi:volume-high",
+            ),
         ]
     )
 
@@ -158,3 +176,56 @@ class ImmichFrameNumber(CoordinatorEntity[ImmichFrameCoordinator], NumberEntity)
         patch_value = int(value) if float(value).is_integer() else value
         await self.coordinator.client.update_frame_state({self._patch_key: patch_value})
         await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameRemoteNumber(CoordinatorEntity[ImmichFrameCoordinator], NumberEntity):
+    _attr_native_min_value = 0
+    _attr_native_max_value = 100
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = "%"
+    _attr_mode = NumberMode.SLIDER
+
+    def __init__(
+        self,
+        coordinator: ImmichFrameCoordinator,
+        key: str,
+        label: str,
+        value_path: list[str],
+        remote_property: str,
+        icon: str,
+    ) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._value_path = value_path
+        self._remote_property = remote_property
+        self._attr_name = f"{frame_label(device_id)} Frame {label}"
+        self._attr_unique_id = frame_unique_id(device_id, key)
+        self._attr_device_info = frame_device_info(device_id)
+        self._attr_icon = icon
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._remote_value is not None
+
+    @property
+    def native_value(self) -> float | None:
+        value = self._remote_value
+        return float(value) if isinstance(value, (int, float)) else None
+
+    async def async_set_native_value(self, value: float) -> None:
+        rounded = int(max(0, min(100, round(value))))
+        if self._remote_property == "brightness":
+            await self.coordinator.client.set_remote_brightness(rounded)
+        elif self._remote_property == "volume":
+            await self.coordinator.client.set_remote_volume(rounded)
+        await self.coordinator.async_request_refresh()
+
+    @property
+    def _remote_value(self) -> Any:
+        remote_status = self.coordinator.data.get("remote_status") or {}
+        cursor: Any = remote_status.get("status")
+        for segment in self._value_path:
+            if not isinstance(cursor, dict) or segment not in cursor:
+                return None
+            cursor = cursor[segment]
+        return cursor

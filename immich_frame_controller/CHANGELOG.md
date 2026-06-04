@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.26
+
+- Add FreeKiosk REST proxy endpoints for remote device status, display brightness, and media volume.
+- Add Home Assistant display brightness and media volume number entities backed by FreeKiosk's direct 0-100 APIs.
+- Add a Home Assistant light level sensor and auto-brightness active diagnostic binary sensor from FreeKiosk status.
+- Keep auto-brightness write control version-tolerant because FreeKiosk 1.2.16 reports auto-brightness state but does not expose the documented REST toggle endpoints.
+
 ## 0.1.25
 
 - Fix binary kiosk proxy streaming so immich-kiosk static assets such as the loading spinner are delivered with their response body intact.

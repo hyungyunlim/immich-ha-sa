@@ -469,6 +469,109 @@ describe('controller API', () => {
     await new Promise<void>((resolve) => remote.close(() => resolve()));
   });
 
+  it('proxies FreeKiosk status, brightness, and volume controls', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const requests: Array<{ method?: string; url?: string; body?: unknown; apiKey?: string | string[] }> = [];
+    const remote = createHttpServer((request, response) => {
+      let raw = '';
+      request.on('data', (chunk) => {
+        raw += String(chunk);
+      });
+      request.on('end', () => {
+        requests.push({
+          method: request.method,
+          url: request.url,
+          body: raw ? JSON.parse(raw) as unknown : undefined,
+          apiKey: request.headers['x-api-key'],
+        });
+        response.setHeader('content-type', 'application/json');
+
+        if (request.url === '/') {
+          response.end(JSON.stringify({
+            success: true,
+            data: {
+              endpoints: {
+                GET: ['/api/status - Full device status', '/api/sensors - Device sensors'],
+                POST: ['/api/brightness - Set brightness {value: 0-100}', '/api/volume - Set volume {value: 0-100}'],
+              },
+            },
+          }));
+          return;
+        }
+
+        if (request.url === '/api/status') {
+          response.end(JSON.stringify({
+            success: true,
+            data: {
+              screen: { on: true, brightness: 55 },
+              audio: { volume: 42 },
+              sensors: { light: 123, proximity: 0 },
+              autoBrightness: { enabled: false, min: 0, max: 100, currentLightLevel: 123 },
+            },
+          }));
+          return;
+        }
+
+        if (request.url === '/api/brightness' || request.url === '/api/volume') {
+          response.end(JSON.stringify({ success: true, data: { executed: true } }));
+          return;
+        }
+
+        response.statusCode = 404;
+        response.end(JSON.stringify({ success: false, error: 'Endpoint not found' }));
+      });
+    });
+    await new Promise<void>((resolve) => remote.listen(0, '127.0.0.1', resolve));
+
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    const remotePort = (remote.address() as AddressInfo).port;
+    store.updateDevice('lenovo', {
+      remoteControlType: 'freekiosk',
+      remoteApiUrl: `http://127.0.0.1:${remotePort}`,
+      remoteApiKey: 'test-key',
+    });
+    const server = createTestServer({ config, store });
+
+    const status = await server.inject({
+      method: 'GET',
+      url: '/api/frames/lenovo/remote/status',
+    });
+    expect(status.statusCode).toBe(200);
+    expect(status.json().data.status.screen.brightness).toBe(55);
+    expect(status.json().data.status.audio.volume).toBe(42);
+    expect(status.json().data.status.sensors.light).toBe(123);
+    expect(status.json().data.capabilities.autoBrightnessStatus).toBe(true);
+    expect(status.json().data.capabilities.autoBrightnessControl).toBe(false);
+
+    const brightness = await server.inject({
+      method: 'PUT',
+      url: '/api/frames/lenovo/remote/brightness',
+      payload: { value: 61 },
+    });
+    expect(brightness.statusCode).toBe(200);
+    expect(brightness.json().data.endpoint).toBe('/api/brightness');
+
+    const volume = await server.inject({
+      method: 'PUT',
+      url: '/api/frames/lenovo/remote/volume',
+      payload: { value: 33 },
+    });
+    expect(volume.statusCode).toBe(200);
+    expect(volume.json().data.endpoint).toBe('/api/volume');
+
+    expect(requests).toEqual([
+      { method: 'GET', url: '/api/status', body: undefined, apiKey: 'test-key' },
+      { method: 'GET', url: '/', body: undefined, apiKey: 'test-key' },
+      { method: 'POST', url: '/api/brightness', body: { value: 61 }, apiKey: 'test-key' },
+      { method: 'POST', url: '/api/volume', body: { value: 33 }, apiKey: 'test-key' },
+    ]);
+
+    await server.close();
+    await new Promise<void>((resolve) => remote.close(() => resolve()));
+  });
+
   it('emits frame commands without requiring a remote backend', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);

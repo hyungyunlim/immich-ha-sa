@@ -207,6 +207,17 @@ const FrameCommandSchema = z.object({
   command: z.enum(['next', 'previous', 'play-pause', 'reload', 'mute-toggle', 'screen-on', 'screen-off', 'volume-up', 'volume-down', 'device-mute-toggle']),
 });
 
+const RemoteLevelSchema = z.object({
+  value: z.number().int().min(0).max(100),
+});
+
+const RemoteAutoBrightnessSchema = z.object({
+  enabled: z.boolean(),
+  min: z.number().int().min(0).max(100).optional(),
+  max: z.number().int().min(0).max(100).optional(),
+  offset: z.number().int().min(0).max(100).optional(),
+});
+
 export interface ServerDeps {
   config: AppConfig;
   store?: JsonStore;
@@ -608,6 +619,93 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     }
   });
 
+  app.get('/api/frames/:deviceId/remote/status', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const { deviceId } = request.params as { deviceId: string };
+    const device = store.getDevice(deviceId);
+    if (!device) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
+    try {
+      return ok(await getRemoteStatus(device));
+    } catch (error) {
+      const remoteError = error instanceof RemoteCommandError
+        ? error
+        : new RemoteCommandError('REMOTE_STATUS_FAILED', error instanceof Error ? error.message : String(error));
+      reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
+    }
+  });
+
+  app.put('/api/frames/:deviceId/remote/brightness', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const { deviceId } = request.params as { deviceId: string };
+    const parsed = RemoteLevelSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid brightness value.'));
+      return;
+    }
+    const device = store.getDevice(deviceId);
+    if (!device) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
+    try {
+      return ok(await setRemoteLevel(device, 'brightness', parsed.data.value));
+    } catch (error) {
+      const remoteError = error instanceof RemoteCommandError
+        ? error
+        : new RemoteCommandError('REMOTE_COMMAND_FAILED', error instanceof Error ? error.message : String(error));
+      reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
+    }
+  });
+
+  app.put('/api/frames/:deviceId/remote/volume', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const { deviceId } = request.params as { deviceId: string };
+    const parsed = RemoteLevelSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid volume value.'));
+      return;
+    }
+    const device = store.getDevice(deviceId);
+    if (!device) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
+    try {
+      return ok(await setRemoteLevel(device, 'volume', parsed.data.value));
+    } catch (error) {
+      const remoteError = error instanceof RemoteCommandError
+        ? error
+        : new RemoteCommandError('REMOTE_COMMAND_FAILED', error instanceof Error ? error.message : String(error));
+      reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
+    }
+  });
+
+  app.put('/api/frames/:deviceId/remote/auto-brightness', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const { deviceId } = request.params as { deviceId: string };
+    const parsed = RemoteAutoBrightnessSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid auto-brightness request.'));
+      return;
+    }
+    const device = store.getDevice(deviceId);
+    if (!device) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
+    try {
+      return ok(await setRemoteAutoBrightness(device, parsed.data));
+    } catch (error) {
+      const remoteError = error instanceof RemoteCommandError
+        ? error
+        : new RemoteCommandError('REMOTE_COMMAND_FAILED', error instanceof Error ? error.message : String(error));
+      reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
+    }
+  });
+
   app.get('/api/frame/:deviceId/events', async (request, reply) => {
     const { deviceId } = request.params as { deviceId: string };
     const device = store.getDevice(deviceId);
@@ -860,6 +958,14 @@ class RemoteCommandError extends Error {
   }
 }
 
+type RemoteRequestMethod = 'GET' | 'POST';
+
+interface RemoteRequestResult {
+  endpoint: string;
+  statusCode: number;
+  result: unknown;
+}
+
 async function sendRemoteCommand(
   device: FrameDevice,
   command: FrameCommand,
@@ -870,6 +976,95 @@ async function sendRemoteCommand(
   statusCode: number;
   result: unknown;
 }> {
+  const endpoint = freeKioskEndpoint(command);
+  const remote = await sendRemoteRequest(device, endpoint, { method: 'POST' });
+  return {
+    provider: 'freekiosk',
+    command,
+    endpoint,
+    statusCode: remote.statusCode,
+    result: remote.result,
+  };
+}
+
+async function getRemoteStatus(device: FrameDevice): Promise<{
+  provider: 'freekiosk';
+  endpoint: string;
+  statusCode: number;
+  status: unknown;
+  capabilities: ReturnType<typeof inferFreeKioskCapabilities>;
+}> {
+  const remote = await sendRemoteRequest(device, '/api/status', { method: 'GET' });
+  const capabilities = await getRemoteCapabilities(device, remote.result);
+  return {
+    provider: 'freekiosk',
+    endpoint: remote.endpoint,
+    statusCode: remote.statusCode,
+    status: remote.result,
+    capabilities,
+  };
+}
+
+async function setRemoteLevel(
+  device: FrameDevice,
+  property: 'brightness' | 'volume',
+  value: number,
+): Promise<{
+  provider: 'freekiosk';
+  property: 'brightness' | 'volume';
+  value: number;
+  endpoint: string;
+  statusCode: number;
+  result: unknown;
+}> {
+  const endpoint = `/api/${property}`;
+  const remote = await sendRemoteRequest(device, endpoint, {
+    method: 'POST',
+    body: { value },
+  });
+  return {
+    provider: 'freekiosk',
+    property,
+    value,
+    endpoint,
+    statusCode: remote.statusCode,
+    result: remote.result,
+  };
+}
+
+async function setRemoteAutoBrightness(
+  device: FrameDevice,
+  options: z.infer<typeof RemoteAutoBrightnessSchema>,
+): Promise<{
+  provider: 'freekiosk';
+  enabled: boolean;
+  endpoint: string;
+  statusCode: number;
+  result: unknown;
+}> {
+  const endpoint = options.enabled ? '/api/autoBrightness/enable' : '/api/autoBrightness/disable';
+  const { enabled: _enabled, ...body } = options;
+  const remote = await sendRemoteRequest(device, endpoint, {
+    method: 'POST',
+    body: options.enabled ? body : undefined,
+  });
+  return {
+    provider: 'freekiosk',
+    enabled: options.enabled,
+    endpoint,
+    statusCode: remote.statusCode,
+    result: remote.result,
+  };
+}
+
+async function sendRemoteRequest(
+  device: FrameDevice,
+  endpoint: string,
+  options: {
+    method: RemoteRequestMethod;
+    body?: Record<string, unknown>;
+  },
+): Promise<RemoteRequestResult> {
   if ((device.remoteControlType ?? 'none') !== 'freekiosk') {
     throw new RemoteCommandError('REMOTE_NOT_CONFIGURED', `Frame ${device.id} is not configured for FreeKiosk remote control.`, 400);
   }
@@ -877,35 +1072,90 @@ async function sendRemoteCommand(
     throw new RemoteCommandError('REMOTE_NOT_CONFIGURED', `Frame ${device.id} is missing remoteApiUrl.`, 400);
   }
 
-  const endpoint = freeKioskEndpoint(command);
   const url = `${trimTrailingSlash(device.remoteApiUrl)}${endpoint}`;
   const headers: Record<string, string> = {};
   if (device.remoteApiKey) {
     headers['X-Api-Key'] = device.remoteApiKey;
   }
+  if (options.body) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   const response = await fetch(url, {
-    method: 'POST',
+    method: options.method,
     headers,
+    body: options.body ? JSON.stringify(options.body) : undefined,
     signal: AbortSignal.timeout(7000),
   });
   const text = await response.text();
   const payload = parseJsonOrText(text);
 
   if (!response.ok || (isRecord(payload) && payload.success === false)) {
-    const message = isRecord(payload) && isRecord(payload.error)
-      ? String(payload.error.message ?? 'FreeKiosk command failed.')
-      : `FreeKiosk command failed with HTTP ${response.status}.`;
-    throw new RemoteCommandError('REMOTE_COMMAND_FAILED', message, 502);
+    const message = remoteErrorMessage(payload, response.status);
+    const code = response.status === 404 ? 'REMOTE_UNSUPPORTED' : 'REMOTE_COMMAND_FAILED';
+    throw new RemoteCommandError(code, message, response.status === 404 ? 404 : 502);
   }
 
   return {
-    provider: 'freekiosk',
-    command,
     endpoint,
     statusCode: response.status,
     result: isRecord(payload) && 'data' in payload ? payload.data : payload,
   };
+}
+
+async function getRemoteCapabilities(
+  device: FrameDevice,
+  status: unknown,
+): Promise<ReturnType<typeof inferFreeKioskCapabilities>> {
+  try {
+    const root = await sendRemoteRequest(device, '/', { method: 'GET' });
+    return inferFreeKioskCapabilities(status, root.result);
+  } catch {
+    return inferFreeKioskCapabilities(status);
+  }
+}
+
+function inferFreeKioskCapabilities(status: unknown, apiIndex?: unknown): {
+  status: boolean;
+  brightnessControl: boolean;
+  volumeControl: boolean;
+  sensors: boolean;
+  autoBrightnessStatus: boolean;
+  autoBrightnessControl: boolean;
+} {
+  return {
+    status: true,
+    brightnessControl: hasEndpoint(apiIndex, '/api/brightness') || hasStatusPath(status, ['screen', 'brightness']),
+    volumeControl: hasEndpoint(apiIndex, '/api/volume') || hasStatusPath(status, ['audio', 'volume']),
+    sensors: hasEndpoint(apiIndex, '/api/sensors') || hasStatusPath(status, ['sensors']),
+    autoBrightnessStatus: hasEndpoint(apiIndex, '/api/autoBrightness') || hasStatusPath(status, ['autoBrightness']),
+    autoBrightnessControl: hasEndpoint(apiIndex, '/api/autoBrightness/enable')
+      && hasEndpoint(apiIndex, '/api/autoBrightness/disable'),
+  };
+}
+
+function hasEndpoint(apiIndex: unknown, endpoint: string): boolean {
+  if (!isRecord(apiIndex) || !isRecord(apiIndex.endpoints)) return false;
+  return Object.values(apiIndex.endpoints).some((entries) => (
+    Array.isArray(entries) && entries.some((entry) => String(entry).startsWith(endpoint))
+  ));
+}
+
+function hasStatusPath(status: unknown, path: string[]): boolean {
+  let cursor = status;
+  for (const segment of path) {
+    if (!isRecord(cursor) || !(segment in cursor)) return false;
+    cursor = cursor[segment];
+  }
+  return true;
+}
+
+function remoteErrorMessage(payload: unknown, statusCode: number): string {
+  if (isRecord(payload)) {
+    if (typeof payload.error === 'string') return payload.error;
+    if (isRecord(payload.error)) return String(payload.error.message ?? 'FreeKiosk command failed.');
+  }
+  return `FreeKiosk command failed with HTTP ${statusCode}.`;
 }
 
 function freeKioskEndpoint(command: FrameCommand): string {
