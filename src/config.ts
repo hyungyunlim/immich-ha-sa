@@ -24,6 +24,7 @@ const EnvSchema = z.object({
   DEFAULT_FRAME_NAME: z.string().min(1).default('Lenovo Smart Frame'),
   DEFAULT_NETWORK_MODE: NetworkModeSchema.default('auto'),
   POLL_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(300).default(20),
+  ALBUM_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(0).max(86400).default(900),
   CONTROLLER_API_TOKEN: z.string().optional(),
 });
 
@@ -37,6 +38,7 @@ export interface AppConfig {
   kioskPassword?: string;
   defaultDevice: FrameDevice;
   controllerApiToken?: string;
+  albumRefreshIntervalSeconds?: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -73,6 +75,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     kioskPassword: parsed.KIOSK_PASSWORD || undefined,
     defaultDevice,
     controllerApiToken: parsed.CONTROLLER_API_TOKEN || undefined,
+    albumRefreshIntervalSeconds: parsed.ALBUM_REFRESH_INTERVAL_SECONDS,
   };
 }
 

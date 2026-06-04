@@ -13,6 +13,7 @@ The add-on is the runtime. The Home Assistant integration remains the control su
 - `kiosk_internal_url`: immich-kiosk URL reachable from this add-on container.
 - `local_public_controller_url`: URL that Home Assistant and the frame can reach on the LAN.
 - `local_public_kiosk_url`: immich-kiosk URL used by the controller's same-origin frame proxy.
+- `album_refresh_interval_seconds`: how often the controller refreshes Immich albums in the background. The default is `900`; set `0` to disable automatic refresh.
 
 The default controller port is `8082`. If you change the add-on network port, update `local_public_controller_url` and the Home Assistant integration controller URL to match.
 
@@ -79,6 +80,9 @@ Use Home Assistant entities and services for actual control. Sleep settings are 
 
 For album control:
 
+- Home Assistant reads the controller's album cache every 30 seconds.
+- The controller refreshes that cache from Immich every `album_refresh_interval_seconds` seconds.
+- Use the Home Assistant Refresh Albums button or `immich_frame.refresh_albums` service to force an immediate refresh.
 - Use the Album select entity for quick single-album selection.
 - Use the Albums text entity for multiple albums, separated by commas. Values may be Immich album names or album IDs.
 - Use the `set_album` service with `album_ids` or `album_names` for automations.

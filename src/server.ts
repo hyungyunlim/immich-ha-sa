@@ -241,12 +241,33 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   });
   const events = deps.events ?? new FrameEventHub();
   const auth = deps.auth ?? new ControllerAuthManager(store, deps.config.controllerApiToken);
+  let albumRefreshInFlight: Promise<AlbumCache> | undefined;
 
   app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'buffer' }, (_request, body, done) => {
     done(null, body);
   });
 
   setInterval(() => events.heartbeat(), 25000).unref();
+  const albumRefreshIntervalSeconds = deps.config.albumRefreshIntervalSeconds ?? 0;
+  const runAutomaticAlbumRefresh = () => {
+    void refreshAlbumCache('automatic').catch((error) => {
+      markAlbumRefreshFailed(error, 'automatic');
+    });
+  };
+  let albumRefreshTimer: NodeJS.Timeout | undefined;
+  const albumStartupRefreshTimer = albumRefreshIntervalSeconds > 0
+    ? setTimeout(() => {
+      runAutomaticAlbumRefresh();
+      albumRefreshTimer = setInterval(runAutomaticAlbumRefresh, albumRefreshIntervalSeconds * 1000);
+      albumRefreshTimer.unref();
+    }, 1000)
+    : undefined;
+  albumStartupRefreshTimer?.unref();
+
+  app.addHook('onClose', async () => {
+    if (albumStartupRefreshTimer) clearTimeout(albumStartupRefreshTimer);
+    if (albumRefreshTimer) clearInterval(albumRefreshTimer);
+  });
 
   app.get('/api/health', async () => {
     const data = store.getData();
@@ -259,6 +280,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         stale: data.albumCache.stale,
         refreshedAt: data.albumCache.refreshedAt,
         lastError: data.albumCache.lastError,
+        refreshIntervalSeconds: albumRefreshIntervalSeconds,
       },
       frames: Object.fromEntries(Object.entries(data.frames).map(([id, state]) => [id, {
         version: state.version,
@@ -734,22 +756,10 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   app.post('/api/immich/albums/refresh', async (request, reply) => {
     if (!auth.requireMutationAuth(request, reply)) return;
     try {
-      const items = await immich.listAlbums();
-      const cache: AlbumCache = {
-        items,
-        refreshedAt: new Date().toISOString(),
-        stale: false,
-      };
-      store.setAlbumCache(cache);
+      const cache = await refreshAlbumCache('manual');
       return ok(cache, { refreshedAt: cache.refreshedAt, stale: false });
     } catch (error) {
-      const current = store.getAlbumCache();
-      const cache: AlbumCache = {
-        ...current,
-        stale: true,
-        lastError: error instanceof Error ? error.message : String(error),
-      };
-      store.setAlbumCache(cache);
+      const cache = markAlbumRefreshFailed(error, 'manual');
       reply.status(502).send(fail('IMMICH_REFRESH_FAILED', cache.lastError ?? 'Failed to refresh Immich albums.'));
     }
   });
@@ -892,6 +902,40 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         rendererUrl: toControllerProxyUrl(device, state.lastKnownGoodRendererUrl, request),
       };
     }
+  }
+
+  async function refreshAlbumCache(source: 'manual' | 'automatic'): Promise<AlbumCache> {
+    if (albumRefreshInFlight) return albumRefreshInFlight;
+
+    albumRefreshInFlight = (async () => {
+      const items = await immich.listAlbums();
+      const cache: AlbumCache = {
+        items,
+        refreshedAt: new Date().toISOString(),
+        stale: false,
+      };
+      store.setAlbumCache(cache);
+      app.log.info({ source, count: items.length }, 'Immich album cache refreshed');
+      return cache;
+    })();
+
+    try {
+      return await albumRefreshInFlight;
+    } finally {
+      albumRefreshInFlight = undefined;
+    }
+  }
+
+  function markAlbumRefreshFailed(error: unknown, source: 'manual' | 'automatic'): AlbumCache {
+    const current = store.getAlbumCache();
+    const cache: AlbumCache = {
+      ...current,
+      stale: true,
+      lastError: error instanceof Error ? error.message : String(error),
+    };
+    store.setAlbumCache(cache);
+    app.log.warn({ source, error: cache.lastError }, 'Immich album cache refresh failed');
+    return cache;
   }
 
   async function proxyKioskRequest(request: FastifyRequest, reply: FastifyReply) {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.27
+
+- Add automatic Immich album cache refresh in the controller, configured by `album_refresh_interval_seconds`.
+- Keep the Home Assistant Refresh Albums button and `immich_frame.refresh_albums` service as immediate manual refresh paths.
+- Include the configured album refresh interval in controller health output.
+
 ## 0.1.26
 
 - Add FreeKiosk REST proxy endpoints for remote device status, display brightness, and media volume.

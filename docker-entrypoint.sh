@@ -50,6 +50,7 @@ if [ -f "$OPTIONS_PATH" ]; then
   set_env_from_option DEFAULT_FRAME_NAME default_frame_name
   set_env_from_option DEFAULT_NETWORK_MODE default_network_mode
   set_env_from_option POLL_INTERVAL_SECONDS poll_interval_seconds
+  set_env_from_option ALBUM_REFRESH_INTERVAL_SECONDS album_refresh_interval_seconds
   set_env_from_option CONTROLLER_API_TOKEN controller_api_token
 fi
 

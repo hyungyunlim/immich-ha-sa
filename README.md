@@ -59,6 +59,7 @@ LOCAL_PUBLIC_CONTROLLER_URL=http://<rpi-lan-ip>:<controller-host-port>
 LOCAL_PUBLIC_KIOSK_URL=http://<rpi-lan-ip>:3000
 EXTERNAL_PUBLIC_CONTROLLER_URL=https://frame.example.com
 EXTERNAL_PUBLIC_KIOSK_URL=https://frame.example.com/kiosk
+ALBUM_REFRESH_INTERVAL_SECONDS=900
 CONTROLLER_API_TOKEN=
 ```
 
@@ -123,6 +124,7 @@ https://github.com/hyungyunlim/immich-ha-sa
    - `kiosk_internal_url`: immich-kiosk URL reachable from the add-on
    - `local_public_controller_url`: usually `http://<home-assistant-host>:8082`
    - `local_public_kiosk_url`: browser-facing immich-kiosk URL
+   - `album_refresh_interval_seconds`: how often the controller refreshes Immich albums in the background; `0` disables automatic refresh
 6. Start the add-on.
 7. Open the add-on Web UI or:
 
@@ -173,6 +175,8 @@ immich_frame:
 ```
 
 When the pairing flow succeeds, Home Assistant stores the issued controller API token in the config entry. Users do not need to SSH into the RPi or copy `CONTROLLER_API_TOKEN` from `.env`.
+
+Album options shown in Home Assistant come from the controller cache. The integration reads that cache every 30 seconds, while the controller refreshes it from Immich every `album_refresh_interval_seconds` seconds. Use the `Refresh Albums` button or `immich_frame.refresh_albums` service when a newly created Immich album needs to appear immediately.
 
 Provided services:
 

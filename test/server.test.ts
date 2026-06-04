@@ -3,10 +3,11 @@ import { createServer as createHttpServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createServer } from '../src/server.js';
 import { JsonStore } from '../src/store.js';
 import type { AppConfig } from '../src/config.js';
+import type { ImmichClient } from '../src/immichClient.js';
 import type { AlbumCacheEntry, FrameDevice } from '../src/types.js';
 
 const tempDirs: string[] = [];
@@ -115,6 +116,50 @@ describe('controller API', () => {
     expect(body.data.rendererUrl).toContain('filter_date=last-30-days');
     expect(body.data.rendererUrl).toContain('filter_newest=200');
     await server.close();
+  });
+
+  it('automatically refreshes the album cache from Immich', async () => {
+    vi.useFakeTimers();
+    try {
+      const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+      tempDirs.push(dir);
+      const config = {
+        ...buildConfig(dir),
+        albumRefreshIntervalSeconds: 2,
+      };
+      const store = new JsonStore(config.storePath, config.defaultDevice);
+      const album: AlbumCacheEntry = {
+        id: 'auto-album',
+        albumName: 'Auto Album',
+        updatedAt: '2026-06-04T00:00:00.000Z',
+      };
+      const immichClient = {
+        checkConnection: vi.fn(async () => ({ ok: true })),
+        listAlbums: vi.fn(async () => [album]),
+      } as unknown as ImmichClient;
+      const server = createTestServer({ config, store, immichClient });
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(immichClient.listAlbums).toHaveBeenCalledTimes(1);
+      const albums = await server.inject({
+        method: 'GET',
+        url: '/api/immich/albums',
+      });
+      expect(albums.statusCode).toBe(200);
+      expect(albums.json().data.items).toEqual([album]);
+      expect(albums.json().data.stale).toBe(false);
+
+      const health = await server.inject({
+        method: 'GET',
+        url: '/api/health',
+      });
+      expect(health.json().data.albumCache.refreshIntervalSeconds).toBe(2);
+
+      await server.close();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('issues paired API tokens for authenticated controllers', async () => {
