@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.25
+
+- Fix binary kiosk proxy streaming so immich-kiosk static assets such as the loading spinner are delivered with their response body intact.
+- Add regression coverage for non-range proxied binary assets.
+
 ## 0.1.24
 
 - Fix proxied immich-kiosk slideshow polling by rewriting JavaScript `/asset/` route checks to the controller proxy path.

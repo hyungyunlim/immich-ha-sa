@@ -1,3 +1,6 @@
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { ControllerAuthManager } from './auth.js';
@@ -817,23 +820,28 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       });
       const contentType = response.headers.get('content-type') ?? '';
 
-      reply.status(response.status);
-      forwardProxyHeaders(response, reply);
       if (isTextResponse(contentType)) {
         const body = Buffer.from(await response.arrayBuffer());
+        reply.status(response.status);
+        forwardProxyHeaders(response, reply);
         reply.type(contentType || 'text/plain; charset=utf-8').send(rewriteProxyText(body.toString('utf8'), proxyPrefix, contentType));
         return;
       }
-      if (contentType) reply.type(contentType);
       if (request.headers.range) {
+        reply.status(response.status);
+        forwardProxyHeaders(response, reply);
+        if (contentType) reply.type(contentType);
         reply.send(Buffer.from(await response.arrayBuffer()));
         return;
       }
       if (request.method === 'HEAD' || !response.body) {
+        reply.status(response.status);
+        forwardProxyHeaders(response, reply);
+        if (contentType) reply.type(contentType);
         reply.send();
         return;
       }
-      reply.send(response.body);
+      await streamProxyResponse(response, reply, contentType);
     } catch (error) {
       reply.status(502).send(fail('KIOSK_PROXY_FAILED', error instanceof Error ? error.message : String(error)));
     }
@@ -979,21 +987,39 @@ function proxyRequestSignal(method: string): AbortSignal | undefined {
 }
 
 function forwardProxyHeaders(response: Response, reply: FastifyReply): void {
-  for (const header of [
-    'accept-ranges',
-    'cache-control',
-    'content-disposition',
-    'content-range',
-    'etag',
-    'expires',
-    'last-modified',
-    'set-cookie',
-    'vary',
-  ]) {
+  for (const header of PROXY_RESPONSE_HEADERS) {
     const value = response.headers.get(header);
     if (value) reply.header(header, value);
   }
 }
+
+async function streamProxyResponse(response: Response, reply: FastifyReply, contentType: string): Promise<void> {
+  if (!response.body) {
+    reply.status(response.status).send();
+    return;
+  }
+
+  reply.hijack();
+  reply.raw.statusCode = response.status;
+  if (contentType) reply.raw.setHeader('content-type', contentType);
+  for (const header of PROXY_RESPONSE_HEADERS) {
+    const value = response.headers.get(header);
+    if (value) reply.raw.setHeader(header, value);
+  }
+  await pipeline(Readable.fromWeb(response.body as NodeReadableStream<Uint8Array>), reply.raw);
+}
+
+const PROXY_RESPONSE_HEADERS = [
+  'accept-ranges',
+  'cache-control',
+  'content-disposition',
+  'content-range',
+  'etag',
+  'expires',
+  'last-modified',
+  'set-cookie',
+  'vary',
+] as const;
 
 function isTextResponse(contentType: string): boolean {
   const normalized = contentType.toLowerCase();

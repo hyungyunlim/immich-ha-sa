@@ -529,6 +529,11 @@ describe('controller API', () => {
         response.end(Buffer.from([0, 1, 2, 3]));
         return;
       }
+      if (request.url?.startsWith('/image')) {
+        response.setHeader('content-type', 'image/gif');
+        response.end(Buffer.from([71, 73, 70, 56, 57, 97]));
+        return;
+      }
       response.setHeader('content-type', 'text/html; charset=utf-8');
       response.end('<link href="/style.css"><script src="/kiosk.js"></script><main hx-post="/asset/new"><img src="/image"></main>');
     });
@@ -591,10 +596,20 @@ describe('controller API', () => {
     expect(video.headers['content-type']).toContain('video/mp4');
     expect(video.body.length).toBe(4);
 
+    const image = await server.inject({
+      method: 'GET',
+      url: '/kiosk-proxy/lenovo/image',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(image.statusCode).toBe(200);
+    expect(image.headers['content-type']).toContain('image/gif');
+    expect(image.body).toBe('GIF89a');
+
     expect(kioskRequests).toContain('/?duration=60');
     expect(kioskRequests).toContain('/style.css');
     expect(kioskRequests).toContain('/kiosk.js');
     expect(kioskRequests).toContain('/video/asset-1');
+    expect(kioskRequests).toContain('/image');
 
     await server.close();
     await new Promise<void>((resolve) => kiosk.close(() => resolve()));
