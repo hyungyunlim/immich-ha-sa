@@ -76,6 +76,10 @@ Turn on the frame's Show Videos switch in Home Assistant to pass `show_videos=tr
 
 The controller proxy preserves HTTP range headers required by WebView video playback. If videos show a poster but do not start, confirm the add-on is running `0.1.13` or newer.
 
+## Archived Immich Assets
+
+Turn on the frame's Show Archived switch in Home Assistant to pass `show_archived=true` to immich-kiosk. This is required when the selected Immich album contains only archived assets, because immich-kiosk excludes archived assets by default and will otherwise show `Error Retrieving asset`.
+
 Use Home Assistant entities and services for actual control. Sleep settings are exposed as `sleepStart`, `sleepEnd`, `sleepIcon`, `sleepDimScreen`, and `disableSleep`, and are applied to immich-kiosk as URL query overrides.
 
 For album control:
@@ -93,12 +97,12 @@ For asset filters:
 - Use the Filter Start Date and Filter End Date picker entities for custom date ranges. Setting a start date without an end date writes `YYYY-MM-DD_to_today`; setting an end date writes a fixed `YYYY-MM-DD_to_YYYY-MM-DD` range.
 - Use the Date Filter text entity for advanced/raw immich-kiosk `filter_date` values. Examples: `last-30-days`, `2021-01-01_to_today`, or an empty value to clear the filter.
 - Use the Newest Filter number entity to apply immich-kiosk `filter_newest`. Set it to `0` to disable the newest-assets filter.
-- Use `set_renderer_options` with `filterDate` and `filterNewest` for automations and scripts.
+- Use `set_renderer_options` with `filterDate`, `filterNewest`, and `showArchived` for automations and scripts.
 
 The controller also exposes common immich-kiosk URL override settings for frame-specific behavior:
 
 - Motion: `transition`, `fadeTransitionDuration`, `crossFadeTransitionDuration`, `imageEffect`, `imageEffectAmount`.
-- Layout and display: `layout`, `imageFit`, `backgroundBlur`, `backgroundBlurAmount`, `fontSize`, `frameless`.
+- Layout and display: `layout`, `imageFit`, `backgroundBlur`, `backgroundBlurAmount`, `fontSize`, `frameless`, `showArchived`.
 - Clock and weather: `showTime`, `timeFormat`, `showAmPm`, `showSeconds`, `showDate`, `dateFormat`, `clockSource`, `showWeather`, `weatherLocation`, `weatherRotationInterval`.
 - Image metadata: `showImageDate`, `showImageTime`, `showAlbumName`, `showPersonName`, `showPersonAge`, `showImageLocation`, `showImageCamera`, `showImageExif`, `showImageDescription`, `showImageRating`, `showOwner`, `showUser`, `showImageQr`, `showImageId`, `showMoreInfo`.
 - Kiosk UI: `disableNavigation`, `hideCursor`, `showProgressBar`, `progressBarPosition`.

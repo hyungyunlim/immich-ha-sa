@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.28
+
+- Add a Home Assistant Show Archived switch that passes `show_archived` to immich-kiosk.
+- Support archive-only Immich albums, such as direct-upload collections whose assets have `visibility=archive`.
+
 ## 0.1.27
 
 - Add automatic Immich album cache refresh in the controller, configured by `album_refresh_interval_seconds`.

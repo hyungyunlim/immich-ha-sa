@@ -30,6 +30,7 @@ const state: FrameState = {
   weatherLocation: '',
   weatherRotationInterval: 60,
   showVideos: false,
+  showArchived: false,
   filterDate: '',
   filterNewest: 0,
   upArrowAction: 'mute',
@@ -148,6 +149,7 @@ describe('renderer URL generation', () => {
       weatherLocation: 'rotate',
       weatherRotationInterval: 120,
       transition: 'fade',
+      showArchived: true,
       fadeTransitionDuration: 1.5,
       layout: 'splitview',
       imageEffect: 'smart-zoom',
@@ -197,6 +199,7 @@ describe('renderer URL generation', () => {
     expect(resolved.rendererUrl).toContain('weather=rotate');
     expect(resolved.rendererUrl).toContain('rotation_interval=120');
     expect(resolved.rendererUrl).toContain('show_videos=true');
+    expect(resolved.rendererUrl).toContain('show_archived=true');
     expect(resolved.rendererUrl).toContain('background_blur=false');
     expect(resolved.rendererUrl).toContain('background_blur_amount=18');
     expect(resolved.rendererUrl).toContain('font_size=120');

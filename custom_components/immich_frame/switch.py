@@ -113,6 +113,13 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ),
             ImmichFrameSleepSwitch(
                 coordinator,
+                "show_archived",
+                "Show Archived",
+                "showArchived",
+                False,
+            ),
+            ImmichFrameSleepSwitch(
+                coordinator,
                 "show_image_rating",
                 "Show Image Rating",
                 "showImageRating",

@@ -114,6 +114,10 @@ set_renderer_options:
       required: false
       selector:
         boolean:
+    showArchived:
+      required: false
+      selector:
+        boolean:
     filterDate:
       required: false
       selector:

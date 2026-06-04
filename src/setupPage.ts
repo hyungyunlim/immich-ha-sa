@@ -62,6 +62,7 @@ interface SetupPageDevice {
   hideCursor?: boolean;
   showProgressBar?: boolean;
   showVideos?: boolean;
+  showArchived?: boolean;
   showImageRating?: boolean;
   showOwner?: boolean;
   showAlbumName?: boolean;
@@ -828,6 +829,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Cursor', device.hideCursor ? 'Hidden' : 'Visible')}
         ${renderKeyValue('Progress Bar', `${boolLabel(device.showProgressBar)} / ${device.progressBarPosition ?? 'top'}`)}
         ${renderKeyValue('Videos', boolLabel(device.showVideos))}
+        ${renderKeyValue('Archived Assets', boolLabel(device.showArchived))}
         ${renderKeyValue('Metadata', renderMetadataSummary(device))}
         ${renderKeyValue('Asset Filters', renderAssetFilters(device))}
         ${renderKeyValue('Arrow Actions', `${device.upArrowAction ?? 'none'} / ${device.downArrowAction ?? 'none'}`)}

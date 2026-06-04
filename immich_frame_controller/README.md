@@ -18,7 +18,7 @@ Then add the `Immich Frame Controller` integration and use the same controller U
 http://<home-assistant-host>:8082
 ```
 
-Album, renderer, network mode, date/newest asset filters, date picker ranges, sleep cycle, layout, transition, image effect, frame UI, progress bar, and burn-in changes are controlled through the Home Assistant integration entities and services. Each configured frame device gets its own Home Assistant device page, and multi-album selection is available through the frame Albums text entity or the `album_ids` / `album_names` service fields.
+Album, renderer, network mode, archived asset display, date/newest asset filters, date picker ranges, sleep cycle, layout, transition, image effect, frame UI, progress bar, and burn-in changes are controlled through the Home Assistant integration entities and services. Each configured frame device gets its own Home Assistant device page, and multi-album selection is available through the frame Albums text entity or the `album_ids` / `album_names` service fields.
 
 The controller refreshes the Immich album cache in the background using `album_refresh_interval_seconds`, while the Home Assistant integration keeps reading that cache every 30 seconds. Use Refresh Albums for an immediate manual update.
 

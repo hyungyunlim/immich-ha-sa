@@ -201,6 +201,7 @@ def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional("weatherLocation"): cv.string,
                 vol.Optional("weatherRotationInterval"): vol.All(vol.Coerce(int), vol.Range(min=10, max=3600)),
                 vol.Optional("showVideos"): cv.boolean,
+                vol.Optional("showArchived"): cv.boolean,
                 vol.Optional("filterDate"): cv.string,
                 vol.Optional("filterNewest"): vol.All(vol.Coerce(int), vol.Range(min=0, max=50000)),
                 vol.Optional("albumOrder"): vol.In(["random", "newest", "oldest"]),
