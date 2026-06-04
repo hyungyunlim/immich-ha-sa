@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.24
+
+- Fix proxied immich-kiosk slideshow polling by rewriting JavaScript `/asset/` route checks to the controller proxy path.
+- Stream full binary kiosk proxy responses instead of buffering them behind the controller, while preserving buffered range responses for media seeking.
+
 ## 0.1.23
 
 - Add Home Assistant controls for immich-kiosk clock, weather selection, font size, background blur amount, and image metadata URL overrides.

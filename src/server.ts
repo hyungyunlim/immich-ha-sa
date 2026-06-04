@@ -813,19 +813,27 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         method: request.method,
         headers: proxyRequestHeaders(request),
         body: proxyRequestBody(request),
-        signal: AbortSignal.timeout(15000),
+        signal: proxyRequestSignal(request.method),
       });
       const contentType = response.headers.get('content-type') ?? '';
-      const body = Buffer.from(await response.arrayBuffer());
 
       reply.status(response.status);
       forwardProxyHeaders(response, reply);
       if (isTextResponse(contentType)) {
+        const body = Buffer.from(await response.arrayBuffer());
         reply.type(contentType || 'text/plain; charset=utf-8').send(rewriteProxyText(body.toString('utf8'), proxyPrefix, contentType));
         return;
       }
       if (contentType) reply.type(contentType);
-      reply.send(body);
+      if (request.headers.range) {
+        reply.send(Buffer.from(await response.arrayBuffer()));
+        return;
+      }
+      if (request.method === 'HEAD' || !response.body) {
+        reply.send();
+        return;
+      }
+      reply.send(response.body);
     } catch (error) {
       reply.status(502).send(fail('KIOSK_PROXY_FAILED', error instanceof Error ? error.message : String(error)));
     }
@@ -966,6 +974,10 @@ function proxyRequestBody(request: FastifyRequest): BodyInit | undefined {
   return JSON.stringify(body);
 }
 
+function proxyRequestSignal(method: string): AbortSignal | undefined {
+  return method === 'GET' || method === 'HEAD' ? undefined : AbortSignal.timeout(15000);
+}
+
 function forwardProxyHeaders(response: Response, reply: FastifyReply): void {
   for (const header of [
     'accept-ranges',
@@ -996,7 +1008,7 @@ function rewriteProxyText(value: string, proxyPrefix: string, contentType: strin
   const normalizedPrefix = proxyPrefix.replace(/\/+$/, '');
   const normalizedContentType = contentType.toLowerCase();
   if (normalizedContentType.includes('javascript')) {
-    return value.replace(/(["'`])\/(assets)(?=[/"'`?])/g, `$1${normalizedPrefix}/$2`);
+    return value.replace(/(["'`])\/(assets|asset)(?=[/"'`?])/g, `$1${normalizedPrefix}/$2`);
   }
   if (normalizedContentType.startsWith('text/css')) {
     return value.replace(/url\((["']?)\/(?!\/|kiosk-proxy\/)/g, `url($1${normalizedPrefix}/`);

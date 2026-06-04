@@ -518,7 +518,7 @@ describe('controller API', () => {
       }
       if (request.url?.startsWith('/kiosk.js')) {
         response.setHeader('content-type', 'text/javascript');
-        response.end('const dataAttr = /^data-[\\w]+$/; navigator.serviceWorker.register("/assets/js/sw.js");');
+        response.end('const dataAttr = /^data-[\\w]+$/; navigator.serviceWorker.register("/assets/js/sw.js"); if (path.startsWith("/asset/")) startPolling();');
         return;
       }
       if (request.url?.startsWith('/video')) {
@@ -577,6 +577,7 @@ describe('controller API', () => {
     expect(javascript.statusCode).toBe(200);
     expect(javascript.body).toContain('const dataAttr = /^data-[\\w]+$/;');
     expect(javascript.body).toContain('register("/kiosk-proxy/lenovo/assets/js/sw.js")');
+    expect(javascript.body).toContain('startsWith("/kiosk-proxy/lenovo/asset/")');
     expect(javascript.body).not.toContain('/kiosk-proxy/lenovo/^data');
 
     const video = await server.inject({
