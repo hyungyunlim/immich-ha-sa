@@ -24,6 +24,7 @@ The default controller port is `8082`. If you change the add-on network port, up
 3. Add the `Immich Frame Controller` integration.
 4. Enter the controller URL, usually `http://<home-assistant-host>:8082`.
 5. Enter the pairing code shown on the add-on console.
+6. Choose the frame device from the device list. If the list cannot be loaded, enter the device ID manually.
 
 The integration stores the issued controller API token. You usually do not need to configure `controller_api_token`.
 
@@ -47,6 +48,8 @@ Device management is only available from the local console. For each new device,
 - Optional FreeKiosk REST remote-control settings.
 
 Add the Home Assistant integration once per frame device ID. Home Assistant entities for the same device ID are grouped under one Home Assistant device page, so `lenovo`, `kitchen`, and `office` can each be adjusted independently.
+
+The Home Assistant config flow reads the controller's device list after pairing and shows those devices as choices. Device creation and editing still happen in the add-on Web UI so local URLs, external URLs, kiosk passwords, and FreeKiosk REST settings stay centralized in the controller.
 
 ## FreeKiosk Remote Control
 

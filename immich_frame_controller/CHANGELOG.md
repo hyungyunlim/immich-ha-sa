@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.29
+
+- Add an authenticated read-only integration device list endpoint.
+- Update the Home Assistant config flow to choose a controller device from a dropdown after pairing.
+- Keep manual device ID entry as a fallback when the controller device list cannot be loaded.
+
 ## 0.1.28
 
 - Add a Home Assistant Show Archived switch that passes `show_archived` to immich-kiosk.

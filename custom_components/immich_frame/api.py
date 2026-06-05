@@ -31,6 +31,9 @@ class ImmichFrameClient:
     async def albums(self) -> dict[str, Any]:
         return await self._request("GET", "/api/immich/albums")
 
+    async def devices(self) -> dict[str, Any]:
+        return await self._request("GET", "/api/integration/devices", auth=True)
+
     async def refresh_albums(self) -> dict[str, Any]:
         return await self._request("POST", "/api/immich/albums/refresh", auth=True)
 

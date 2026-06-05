@@ -3,27 +3,42 @@
     "step": {
       "user": {
         "title": "Immich Frame Controller",
-        "description": "Enter the controller URL and the frame device ID.",
+        "description": "Enter the controller URL. You will choose a frame device after pairing.",
         "data": {
-          "controller_url": "Controller URL",
-          "device_id": "Device ID"
+          "controller_url": "Controller URL"
         }
       },
       "pair": {
         "title": "Pair Controller",
-        "description": "Open [the controller setup page]({setup_url}) and enter the pairing code shown for `{device_id}`. If you already have a controller API token, you can enter it instead.",
+        "description": "Open [the controller setup page]({setup_url}) and enter the pairing code. If you already have a controller API token, you can enter it instead.",
         "data": {
           "setup_url": "Setup URL",
           "pairing_code": "Pairing code",
           "api_token": "Controller API token (optional fallback)"
         }
+      },
+      "device": {
+        "title": "Choose Frame Device",
+        "description": "Choose the frame device to add to Home Assistant.",
+        "data": {
+          "device_id": "Frame device"
+        }
+      },
+      "device_manual": {
+        "title": "Enter Frame Device ID",
+        "description": "Enter a frame device ID manually. Use this if the controller device list could not be loaded.",
+        "data": {
+          "device_id": "Device ID"
+        }
       }
     },
     "error": {
       "cannot_connect": "Unable to connect to the frame controller.",
+      "cannot_load_devices": "Unable to load the controller device list. Enter a device ID manually.",
       "invalid_url": "Enter a URL that starts with http:// or https://.",
       "invalid_pairing_code": "The pairing code is invalid or expired.",
       "invalid_auth": "The controller API token is invalid.",
+      "no_devices": "The controller did not return any frame devices. Enter a device ID manually.",
       "required": "This field is required.",
       "unknown": "Unexpected error."
     },

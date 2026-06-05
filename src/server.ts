@@ -449,6 +449,26 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     });
   });
 
+  app.get('/api/integration/devices', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const data = store.getData();
+    return ok({
+      items: Object.values(data.devices).map((device) => ({
+        id: device.id,
+        name: device.name,
+        networkMode: device.networkMode,
+        localFrameUrl: buildFrameUrl(device.localControllerBaseUrl, device.id),
+        externalFrameUrl: device.externalControllerBaseUrl
+          ? buildFrameUrl(device.externalControllerBaseUrl, device.id)
+          : undefined,
+        remoteControlType: device.remoteControlType ?? 'none',
+        remoteApiConfigured: Boolean(device.remoteApiUrl),
+        frameEventClients: events.connectedClientCount(device.id),
+        isDefault: device.id === deps.config.defaultDevice.id,
+      })),
+    });
+  });
+
   app.post('/api/devices', async (request, reply) => {
     if (!requireLocalConsoleAccess(request, reply)) return;
     const parsed = DeviceCreateSchema.safeParse(request.body);

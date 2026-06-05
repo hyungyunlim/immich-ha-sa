@@ -3,27 +3,42 @@
     "step": {
       "user": {
         "title": "Immich Frame Controller",
-        "description": "Controller URL과 프레임 Device ID를 입력하세요.",
+        "description": "Controller URL을 입력하세요. Pairing 후 프레임 device를 선택합니다.",
         "data": {
-          "controller_url": "Controller URL",
-          "device_id": "Device ID"
+          "controller_url": "Controller URL"
         }
       },
       "pair": {
         "title": "Pair Controller",
-        "description": "[컨트롤러 setup 페이지]({setup_url})를 열고 `{device_id}`에 표시된 pairing code를 입력하세요. 이미 controller API token이 있으면 대신 입력할 수 있습니다.",
+        "description": "[컨트롤러 setup 페이지]({setup_url})를 열고 pairing code를 입력하세요. 이미 controller API token이 있으면 대신 입력할 수 있습니다.",
         "data": {
           "setup_url": "Setup URL",
           "pairing_code": "Pairing code",
           "api_token": "Controller API token (선택, fallback)"
         }
+      },
+      "device": {
+        "title": "프레임 Device 선택",
+        "description": "Home Assistant에 추가할 프레임 device를 선택하세요.",
+        "data": {
+          "device_id": "프레임 device"
+        }
+      },
+      "device_manual": {
+        "title": "프레임 Device ID 입력",
+        "description": "프레임 device ID를 직접 입력하세요. Controller device 목록을 불러올 수 없을 때 사용합니다.",
+        "data": {
+          "device_id": "Device ID"
+        }
       }
     },
     "error": {
       "cannot_connect": "프레임 컨트롤러에 연결할 수 없습니다.",
+      "cannot_load_devices": "Controller device 목록을 불러올 수 없습니다. Device ID를 직접 입력하세요.",
       "invalid_url": "http:// 또는 https://로 시작하는 URL을 입력하세요.",
       "invalid_pairing_code": "Pairing code가 올바르지 않거나 만료되었습니다.",
       "invalid_auth": "Controller API token이 올바르지 않습니다.",
+      "no_devices": "Controller가 프레임 device를 반환하지 않았습니다. Device ID를 직접 입력하세요.",
       "required": "필수 항목입니다.",
       "unknown": "예상하지 못한 오류가 발생했습니다."
     },

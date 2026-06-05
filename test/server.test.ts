@@ -118,6 +118,67 @@ describe('controller API', () => {
     await server.close();
   });
 
+  it('returns authenticated integration device choices without local console access', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = {
+      ...buildConfig(dir),
+      controllerApiToken: 'test-token',
+    };
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    store.createDevice({
+      ...config.defaultDevice,
+      id: 'office',
+      name: 'Office Frame',
+      remoteControlType: 'freekiosk',
+      remoteApiUrl: 'http://10.0.0.23:8080',
+    });
+    const server = createTestServer({ config, store });
+
+    const localConsoleResponse = await server.inject({
+      method: 'GET',
+      url: '/api/devices',
+      headers: { host: 'frame.example.com', 'x-forwarded-proto': 'https' },
+    });
+    expect(localConsoleResponse.statusCode).toBe(403);
+
+    const unauthenticated = await server.inject({
+      method: 'GET',
+      url: '/api/integration/devices',
+      headers: { host: 'frame.example.com', 'x-forwarded-proto': 'https' },
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/integration/devices',
+      headers: {
+        authorization: 'Bearer test-token',
+        host: 'frame.example.com',
+        'x-forwarded-proto': 'https',
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.data.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'lenovo',
+        name: 'Lenovo',
+        remoteApiConfigured: false,
+      }),
+      expect.objectContaining({
+        id: 'office',
+        name: 'Office Frame',
+        remoteControlType: 'freekiosk',
+        remoteApiConfigured: true,
+      }),
+    ]));
+    expect(JSON.stringify(body)).not.toContain('test-token');
+    expect(JSON.stringify(body)).not.toContain('10.0.0.23:8080');
+    await server.close();
+  });
+
   it('automatically refreshes the album cache from Immich', async () => {
     vi.useFakeTimers();
     try {
