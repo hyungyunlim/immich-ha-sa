@@ -39,6 +39,8 @@ The Web UI is an operational console. It shows:
 - Current sleep, display, motion, UI, progress, and burn-in override state.
 - Local device management controls for creating, editing, and deleting non-default frame devices.
 
+For physical frame pairing, open the controller Pair URL on the frame, for example `http://<home-assistant-host>:8082/pair`. The add-on root URL opens this setup console. After a frame code is claimed, the console shows a stable frame path such as `/f/kitchen-frame-8k2p`; use that stable path as the device's long-lived URL.
+
 Device management is only available from the local console. For each new device, the controller creates:
 
 - A fixed URL at `/frame/<device_id>`.
@@ -90,7 +92,7 @@ For album control:
 - Home Assistant reads the controller's album cache every 30 seconds.
 - The controller refreshes that cache from Immich every `album_refresh_interval_seconds` seconds.
 - Use the Home Assistant Refresh Albums button or `immich_frame.refresh_albums` service to force an immediate refresh.
-- Use the Album select entity for quick single-album selection.
+- Use the Album select entity for quick single-album selection. `All Photos` clears the album filter.
 - Use the Albums text entity for multiple albums, separated by commas. Values may be Immich album names or album IDs.
 - Use the `set_album` service with `album_ids` or `album_names` for automations.
 

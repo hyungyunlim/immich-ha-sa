@@ -16,6 +16,9 @@ from .date_filter import (
 )
 from .entity_helpers import frame_device_info, frame_label, frame_unique_id
 
+ALBUM_OPTION_ALL_PHOTOS = "All Photos"
+ALBUM_OPTION_MULTIPLE_ALBUMS = "Multiple Albums"
+
 
 async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
     coordinator: ImmichFrameCoordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
@@ -100,17 +103,32 @@ class ImmichFrameAlbumSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEn
 
     @property
     def options(self) -> list[str]:
-        return [album["albumName"] for album in self._albums]
+        active = self._active_album_ids
+        options = [ALBUM_OPTION_ALL_PHOTOS]
+        if len(active) > 1:
+            options.append(ALBUM_OPTION_MULTIPLE_ALBUMS)
+        options.extend(album["albumName"] for album in self._albums)
+        if len(active) == 1 and not self._album_for_id(active[0]):
+            options.append(active[0])
+        return list(dict.fromkeys(options))
 
     @property
     def current_option(self) -> str | None:
-        active = self.coordinator.data.get("state", {}).get("activeAlbumIds", [])
-        if len(active) != 1:
-            return None
-        album = next((album for album in self._albums if album["id"] == active[0]), None)
+        active = self._active_album_ids
+        if not active:
+            return ALBUM_OPTION_ALL_PHOTOS
+        if len(active) > 1:
+            return ALBUM_OPTION_MULTIPLE_ALBUMS
+        album = self._album_for_id(active[0])
         return album["albumName"] if album else active[0]
 
     async def async_select_option(self, option: str) -> None:
+        if option == ALBUM_OPTION_ALL_PHOTOS:
+            await self.coordinator.client.update_frame_state({"activeAlbumIds": []})
+            await self.coordinator.async_request_refresh()
+            return
+        if option == ALBUM_OPTION_MULTIPLE_ALBUMS:
+            return
         album = next(album for album in self._albums if album["albumName"] == option)
         await self.coordinator.client.update_frame_state({"activeAlbumIds": [album["id"]]})
         await self.coordinator.async_request_refresh()
@@ -118,6 +136,14 @@ class ImmichFrameAlbumSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEn
     @property
     def _albums(self) -> list[dict[str, Any]]:
         return self.coordinator.data.get("albums", {}).get("items", [])
+
+    @property
+    def _active_album_ids(self) -> list[str]:
+        active = self.coordinator.data.get("state", {}).get("activeAlbumIds", [])
+        return active if isinstance(active, list) else []
+
+    def _album_for_id(self, album_id: str) -> dict[str, Any] | None:
+        return next((album for album in self._albums if album["id"] == album_id), None)
 
 
 class ImmichFrameProfileSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEntity):

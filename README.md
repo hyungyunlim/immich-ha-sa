@@ -176,7 +176,15 @@ immich_frame:
 
 When the pairing flow succeeds, Home Assistant stores the issued controller API token in the config entry. Users do not need to SSH into the RPi or copy `CONTROLLER_API_TOKEN` from `.env`.
 
-Album options shown in Home Assistant come from the controller cache. The integration reads that cache every 30 seconds, while the controller refreshes it from Immich every `album_refresh_interval_seconds` seconds. Use the `Refresh Albums` button or `immich_frame.refresh_albums` service when a newly created Immich album needs to appear immediately.
+Album options shown in Home Assistant come from the controller cache. The integration reads that cache every 30 seconds, while the controller refreshes it from Immich every `album_refresh_interval_seconds` seconds. Use the `Refresh Albums` button or `immich_frame.refresh_albums` service when a newly created Immich album needs to appear immediately. When no album filter is active, the Album select shows `All Photos`; for multiple selected albums, use the Albums text entity or service fields.
+
+For physical frame pairing, open the controller Pair URL on the frame:
+
+```text
+http://<home-assistant-host>:8082/pair
+```
+
+The add-on root URL opens the setup console. After claiming a frame code in the console, use the generated stable frame path such as `/f/kitchen-frame-8k2p` as the durable URL for that device.
 
 Provided services:
 

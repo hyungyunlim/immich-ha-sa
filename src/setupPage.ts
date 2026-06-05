@@ -124,6 +124,7 @@ export function renderSetupPage(params: SetupPageParams): string {
   const inheritedPreviewOrientation = previewOrientation(defaultDevice);
   const defaultFrameUrl = defaultDevice?.localStableFrameUrl
     ?? `${params.controllerUrl.replace(/\/+$/, '')}/frame/${params.deviceId}`;
+  const pairUrl = `${params.controllerUrl.replace(/\/+$/, '')}/pair`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -758,6 +759,7 @@ export function renderSetupPage(params: SetupPageParams): string {
       </div>
       <div class="toolbar">
         <button type="button" data-copy="${escapeAttribute(params.controllerUrl)}">Copy Controller URL</button>
+        <button type="button" data-copy="${escapeAttribute(pairUrl)}">Copy Pair URL</button>
         <button type="button" data-copy="${escapeAttribute(defaultFrameUrl)}">Copy Default Frame URL</button>
       </div>
     </header>
@@ -794,7 +796,7 @@ export function renderSetupPage(params: SetupPageParams): string {
     </div>
     <section class="panel">
       <form class="form-grid" data-frame-claim>
-        <p class="form-lead">Open the controller root URL on a physical frame, then enter the six-digit code shown on that screen. The claimed frame gets a stable alias path like <code>/f/kitchen-frame-8k2p</code>.</p>
+        <p class="form-lead">Open the Pair URL on a physical frame: <code>${escapeHtml(pairUrl)}</code>. The add-on root URL opens this setup console; <code>/pair</code> shows the six-digit frame code. The claimed frame gets a stable alias path like <code>/f/kitchen-frame-8k2p</code>.</p>
         <label class="field">
           <span class="label">Frame Code</span>
           <input name="claimCode" required inputmode="numeric" autocomplete="one-time-code" placeholder="842 193">
@@ -1470,7 +1472,7 @@ function renderFrameClaimRows(claims: SetupPageFrameClaim[]): string {
     .filter((claim) => claim.status === 'pending')
     .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
   if (activeClaims.length === 0) {
-    return `<div class="claim-list"><div class="claim-row"><span>No pending frame codes. Open the controller root URL on a frame to generate one.</span></div></div>`;
+    return `<div class="claim-list"><div class="claim-row"><span>No pending frame codes. Open the controller Pair URL ending in <code>/pair</code> on a frame to generate one.</span></div></div>`;
   }
   return `<div class="claim-list">${activeClaims.map((claim) => {
     const expiresAt = new Date(claim.expiresAt).toLocaleTimeString([], {

@@ -124,7 +124,7 @@ https://frame.example.com
 https://frame.example.com/f/kitchen-frame-8k2p
 ```
 
-The root URL is used for first-time pairing. The stable `/f/:alias` URL is the durable entry URL for an already claimed physical frame.
+The explicit `/pair` URL is used for first-time physical frame pairing. The stable `/f/:alias` URL is the durable entry URL for an already claimed physical frame.
 
 The controller page should internally load a generated `immich-kiosk` URL, for example:
 
@@ -230,7 +230,7 @@ Problem:
 Decision:
 
 - Support two user-facing frame entry paths:
-  - Root pairing path: `https://frame.example.com`
+  - Explicit pairing path: `https://frame.example.com/pair`
   - Stable claimed path: `https://frame.example.com/f/:alias`
 - Keep the existing `/frame/:deviceId` route for internal use, debugging, and backward compatibility.
 - Existing devices without an explicit alias resolve through `/f/:deviceId`, so they also get a stable short path without migration.
@@ -239,11 +239,11 @@ Decision:
 Preferred first-time setup flow:
 
 1. User opens the add-on console and clicks `Add Frame`.
-2. Console shows a short domain to type into the physical frame, normally the external controller domain or LAN controller URL.
-3. User enters only that short URL on the frame:
+2. Console shows a short Pair URL to type into the physical frame, normally the external controller domain or LAN controller URL plus `/pair`.
+3. User enters that Pair URL on the frame:
 
    ```text
-   https://frame.example.com
+   https://frame.example.com/pair
    ```
 
 4. If the frame is not already claimed, the controller shows a large pairing code on the frame screen.
@@ -268,12 +268,12 @@ Stable alias rules:
 - Alias should allow lowercase letters, numbers, and hyphens only.
 - Old aliases may be retained as redirects when the alias changes, if feasible.
 
-Root pairing behavior:
+Pair URL behavior:
 
 - On first load, the controller creates a pending frame claim and displays a short code.
 - The frame page must use only browser-safe state: a cookie/localStorage key or server-side pending id, no API secrets.
 - If storage is unavailable, the pairing code page should continue to poll by its pending claim id for the current page lifetime.
-- Pending claims should expire if not claimed, but the root page can issue a new code after expiration.
+- Pending claims should expire if not claimed, but the `/pair` page can issue a new code after expiration.
 - Pairing code display must be high contrast, large, and usable from several feet away.
 
 Claiming behavior:
@@ -286,7 +286,7 @@ Claiming behavior:
 Recovery behavior:
 
 - If a frame loses browser storage, the stable `/f/:alias` path can still recover the same device.
-- If a user only entered the root domain and storage is lost, the frame may show a new pairing code. This is acceptable if the console clearly shows how to re-claim or rebind.
+- If a user only entered the Pair URL and storage is lost, the frame may show a new pairing code. This is acceptable if the console clearly shows how to re-claim or rebind.
 - Existing `/frame/:deviceId` URLs must keep working during migration.
 
 Security posture:
@@ -349,7 +349,7 @@ GET /frame/:deviceId
 Responsibilities:
 
 - Render a fullscreen page suitable for the Lenovo frame's kiosk browser.
-- Show a first-time pairing screen when a physical frame opens the root URL and is not claimed.
+- Show a first-time pairing screen when a physical frame opens `/pair` and is not claimed.
 - Resolve stable aliases to frame devices.
 - Load the current `immich-kiosk` URL in an iframe.
 - Subscribe to controller state updates.
@@ -727,7 +727,7 @@ Routing rules:
 Recommended external topology:
 
 ```text
-https://frame.example.com                  -> controller root pairing page
+https://frame.example.com/pair             -> controller explicit frame pairing page
 https://frame.example.com/f/kitchen-8k2p   -> controller stable frame path
 https://frame.example.com/frame/lenovo      -> controller /frame/lenovo
 https://frame.example.com/kiosk/...         -> reverse proxy to immich-kiosk
@@ -740,7 +740,7 @@ Cloudflare Tunnel requirements:
 
 - Public frame route must not expose Immich API keys.
 - Public API mutation routes should require a paired controller token or a configured static fallback token.
-- Pairing code display should be available from the LAN setup URL and blocked from the configured external controller host.
+- Pairing code display should be available from the explicit `/pair` URL and should not require opening the add-on setup console on the frame.
 - Frame read routes may use a per-device secret path or token if the domain is public.
 - Cache headers should not cache state/event responses incorrectly.
 - WebSocket/SSE support through the tunnel must be tested; polling fallback is required.
@@ -840,7 +840,7 @@ Automated tests:
 
 Manual verification:
 
-- Verify a new frame can be claimed by typing only the controller root URL and entering the displayed pairing code in the add-on console.
+- Verify a new frame can be claimed by typing only the controller Pair URL ending in `/pair` and entering the displayed pairing code in the add-on console.
 - Verify a claimed frame can be reopened from `/f/:alias` after browser restart.
 - Verify a display name change does not change the stable alias path.
 - Verify `immich-kiosk` album override behavior using real album IDs.
@@ -924,7 +924,7 @@ Acceptance:
 
 ### Milestone 1.5: Frame Pairing and Stable Paths
 
-- Add root pairing page.
+- Add explicit `/pair` pairing page.
 - Add pending claim store with short code generation.
 - Add add-on console claim UI.
 - Add device alias generation from name plus random suffix.
@@ -934,7 +934,7 @@ Acceptance:
 
 Acceptance:
 
-- A new frame can be added by typing only the controller root URL on the physical frame.
+- A new frame can be added by typing only the controller Pair URL ending in `/pair` on the physical frame.
 - The frame shows a short pairing code without exposing secrets.
 - Entering the code in the add-on console creates a device and stable alias.
 - Claimed frame transitions to the photo display without changing the frame settings.
@@ -1027,7 +1027,7 @@ Acceptance:
 7. Should external mode expose `immich-kiosk` as a separate tunnel hostname or proxy it under the controller domain?
 8. What authentication model should protect public mutation APIs when using Cloudflare Tunnel?
 9. Can the remote Lenovo kiosk browser maintain SSE through Cloudflare, or should remote mode default to polling?
-10. Should the root public URL always show pairing for unknown sessions, or should it redirect to a default device when one exists?
+10. Should the public root URL redirect to `/pair`, the setup console, or a default device when one exists?
 11. How much random suffix entropy is enough for public stable aliases while keeping them typeable?
 12. Should old aliases remain as permanent redirects after a user edits an alias?
 13. Should pairing codes be numeric-only for easier reading from the frame, or mixed alphanumeric for more entropy?
@@ -1042,7 +1042,7 @@ Acceptance:
 - Cloudflare Tunnel may interrupt or buffer SSE; polling fallback is mandatory.
 - A public frame URL can expose the existence of the frame service if not protected.
 - Human-readable aliases can be guessed if no random suffix or access protection is used.
-- Root-domain pairing on a public tunnel could be discovered by outsiders if claim APIs are not protected and pairing codes are too weak.
+- Public `/pair` pairing could be discovered by outsiders if claim APIs are not protected and pairing codes are too weak.
 - External mode may add latency compared with LAN mode.
 - Mixed local/external URL generation bugs could cause blank frames if not tested.
 
@@ -1051,7 +1051,7 @@ Acceptance:
 MVP is successful when:
 
 - Lenovo frame keeps one fixed short URL.
-- New frames can be installed by typing a short root domain or stable alias path, not a long token URL.
+- New frames can be installed by typing a short Pair URL or stable alias path, not a long token URL.
 - Claimed frames have stable alias URLs that survive display-name changes.
 - HA can list Immich albums.
 - HA can change the active album/profile.

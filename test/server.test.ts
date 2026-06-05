@@ -303,6 +303,10 @@ describe('controller API', () => {
     expect(response.body).toContain('http://10.0.0.10:18082/f/lenovo');
     expect(response.body).toContain('https://frame.example.com/f/lenovo');
     expect(response.body).toContain('http://10.0.0.10:18082/frame/lenovo');
+    expect(response.body).toContain('Copy Pair URL');
+    expect(response.body).toContain('http://10.0.0.10:18082/pair');
+    expect(response.body).toContain('The add-on root URL opens this setup console');
+    expect(response.body).toContain('Pair URL ending in <code>/pair</code>');
     expect(response.body).toContain('Advanced settings');
     expect(response.body).toContain('Blank inherits http://10.0.0.10:3000.');
     expect(response.body).toContain('title="Lenovo preview"');

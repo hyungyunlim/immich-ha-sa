@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.37
+
+- Show `All Photos` in the Home Assistant Album select when no album filter is active instead of leaving the entity as unknown.
+- Show `Multiple Albums` in the Album select when the frame is controlled by the multi-album text entity or service.
+- Clarify that physical frame pairing uses the controller `/pair` URL, while the add-on root URL opens the setup console.
+
 ## 0.1.36
 
 - Show configured frame cards as a vertical list instead of auto-fitting them into horizontal columns.
