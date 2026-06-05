@@ -59,6 +59,16 @@ export function buildRendererUrl(
       url.searchParams.append('album', albumId);
     }
   }
+  if (state.activePersonIds.length > 0) {
+    url.searchParams.delete('person');
+    for (const personId of state.activePersonIds) {
+      url.searchParams.append('person', personId);
+    }
+  }
+  url.searchParams.delete('require_all_people');
+  if (state.requireAllPeople) {
+    url.searchParams.set('require_all_people', 'true');
+  }
   if (options.kioskPassword) {
     url.searchParams.set('password', options.kioskPassword);
   }

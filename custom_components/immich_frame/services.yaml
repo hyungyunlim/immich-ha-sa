@@ -32,7 +32,37 @@ set_profile:
       selector:
         text:
 
+set_people:
+  fields:
+    device_id:
+      required: false
+      selector:
+        text:
+    person_id:
+      required: false
+      selector:
+        text:
+    person_ids:
+      required: false
+      selector:
+        object:
+    person_name:
+      required: false
+      selector:
+        text:
+    person_names:
+      required: false
+      selector:
+        object:
+
 refresh_albums:
+  fields:
+    device_id:
+      required: false
+      selector:
+        text:
+
+refresh_people:
   fields:
     device_id:
       required: false
@@ -110,10 +140,26 @@ set_renderer_options:
           max: 3600
           step: 1
           unit_of_measurement: s
+    activePersonIds:
+      required: false
+      selector:
+        object:
+    requireAllPeople:
+      required: false
+      selector:
+        boolean:
     showVideos:
       required: false
       selector:
         boolean:
+    excludeVideosOver:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 86400
+          step: 1
+          unit_of_measurement: s
     showArchived:
       required: false
       selector:

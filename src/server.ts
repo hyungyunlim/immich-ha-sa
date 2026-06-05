@@ -14,10 +14,12 @@ import { ImmichClient } from './immichClient.js';
 import { buildProxiedRendererUrl, buildRendererUrl, controllerBaseUrlForContext } from './rendererUrl.js';
 import { renderSetupBlockedPage, renderSetupPage } from './setupPage.js';
 import { JsonStore } from './store.js';
-import type { AlbumCache, FrameClaim, FrameCommand, FrameDevice, FrameState } from './types.js';
+import type { AlbumCache, FrameClaim, FrameCommand, FrameDevice, FrameState, PersonCache } from './types.js';
 
 const FrameStatePatchSchema = z.object({
   activeAlbumIds: z.array(z.string().min(1)).optional(),
+  activePersonIds: z.array(z.string().min(1)).optional(),
+  requireAllPeople: z.boolean().optional(),
   activeProfileId: z.string().min(1).optional().nullable(),
   durationSeconds: z.number().int().min(5).max(3600).optional(),
   imageFit: z.enum(['contain', 'cover', 'none']).optional(),
@@ -85,6 +87,8 @@ const ProfileSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   albumIds: z.array(z.string().min(1)),
+  personIds: z.array(z.string().min(1)).default([]),
+  requireAllPeople: z.boolean().default(false),
   durationSeconds: z.number().int().min(5).max(3600),
   imageFit: z.enum(['contain', 'cover', 'none']),
   showTime: z.boolean(),
@@ -282,6 +286,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   const events = deps.events ?? new FrameEventHub();
   const auth = deps.auth ?? new ControllerAuthManager(store, deps.config.controllerApiToken);
   let albumRefreshInFlight: Promise<AlbumCache> | undefined;
+  let personRefreshInFlight: Promise<PersonCache> | undefined;
 
   app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'buffer' }, (_request, body, done) => {
     done(null, body);
@@ -289,16 +294,19 @@ export function createServer(deps: ServerDeps): FastifyInstance {
 
   setInterval(() => events.heartbeat(), 25000).unref();
   const albumRefreshIntervalSeconds = deps.config.albumRefreshIntervalSeconds ?? 0;
-  const runAutomaticAlbumRefresh = () => {
+  const runAutomaticMediaRefresh = () => {
     void refreshAlbumCache('automatic').catch((error) => {
       markAlbumRefreshFailed(error, 'automatic');
+    });
+    void refreshPersonCache('automatic').catch((error) => {
+      markPersonRefreshFailed(error, 'automatic');
     });
   };
   let albumRefreshTimer: NodeJS.Timeout | undefined;
   const albumStartupRefreshTimer = albumRefreshIntervalSeconds > 0
     ? setTimeout(() => {
-      runAutomaticAlbumRefresh();
-      albumRefreshTimer = setInterval(runAutomaticAlbumRefresh, albumRefreshIntervalSeconds * 1000);
+      runAutomaticMediaRefresh();
+      albumRefreshTimer = setInterval(runAutomaticMediaRefresh, albumRefreshIntervalSeconds * 1000);
       albumRefreshTimer.unref();
     }, 1000)
     : undefined;
@@ -320,6 +328,13 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         stale: data.albumCache.stale,
         refreshedAt: data.albumCache.refreshedAt,
         lastError: data.albumCache.lastError,
+        refreshIntervalSeconds: albumRefreshIntervalSeconds,
+      },
+      personCache: {
+        count: data.personCache.items.length,
+        stale: data.personCache.stale,
+        refreshedAt: data.personCache.refreshedAt,
+        lastError: data.personCache.lastError,
         refreshIntervalSeconds: albumRefreshIntervalSeconds,
       },
       frames: Object.fromEntries(Object.entries(data.frames).map(([id, state]) => [id, {
@@ -361,6 +376,8 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       expiresAt: pairing.expiresAt,
       albumCount: data.albumCache.items.length,
       albumRefreshedAt: data.albumCache.refreshedAt,
+      personCount: data.personCache.items.length,
+      personRefreshedAt: data.personCache.refreshedAt,
       globalKioskPasswordConfigured: Boolean(deps.config.kioskPassword),
       frameClaims: store.getFrameClaims().map((claim) => publicFrameClaim(claim)),
       devices: Object.values(data.devices).map((candidate) => {
@@ -751,6 +768,11 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       reply.status(400).send(fail('ALBUM_NOT_FOUND', validationError));
       return;
     }
+    const personValidationError = validatePersonIds(parsed.data.activePersonIds, store.getPersonCache());
+    if (personValidationError) {
+      reply.status(400).send(fail('PERSON_NOT_FOUND', personValidationError));
+      return;
+    }
 
     const updated = store.updateFrameState(deviceId, (state) => bumpState({
       ...state,
@@ -950,6 +972,25 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     }
   });
 
+  app.get('/api/immich/people', async () => {
+    const cache = store.getPersonCache();
+    return ok(cache, {
+      refreshedAt: cache.refreshedAt,
+      stale: cache.stale,
+    });
+  });
+
+  app.post('/api/immich/people/refresh', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    try {
+      const cache = await refreshPersonCache('manual');
+      return ok(cache, { refreshedAt: cache.refreshedAt, stale: false });
+    } catch (error) {
+      const cache = markPersonRefreshFailed(error, 'manual');
+      reply.status(502).send(fail('IMMICH_REFRESH_FAILED', cache.lastError ?? 'Failed to refresh Immich people.'));
+    }
+  });
+
   app.get('/api/profiles', async () => ok({ items: store.getProfiles() }));
 
   app.put('/api/profiles/:profileId', async (request, reply) => {
@@ -963,6 +1004,11 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     const validationError = validateAlbumIds(parsed.data.albumIds, store.getAlbumCache());
     if (validationError) {
       reply.status(400).send(fail('ALBUM_NOT_FOUND', validationError));
+      return;
+    }
+    const personValidationError = validatePersonIds(parsed.data.personIds, store.getPersonCache());
+    if (personValidationError) {
+      reply.status(400).send(fail('PERSON_NOT_FOUND', personValidationError));
       return;
     }
     return ok(store.upsertProfile(parsed.data));
@@ -989,6 +1035,8 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     const updated = store.updateFrameState(deviceId, (state) => bumpState({
       ...state,
       activeAlbumIds: profile.albumIds,
+      activePersonIds: profile.personIds,
+      requireAllPeople: profile.requireAllPeople,
       activeProfileId: profile.id,
       durationSeconds: profile.durationSeconds,
       imageFit: profile.imageFit,
@@ -1175,6 +1223,40 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     };
     store.setAlbumCache(cache);
     app.log.warn({ source, error: cache.lastError }, 'Immich album cache refresh failed');
+    return cache;
+  }
+
+  async function refreshPersonCache(source: 'manual' | 'automatic'): Promise<PersonCache> {
+    if (personRefreshInFlight) return personRefreshInFlight;
+
+    personRefreshInFlight = (async () => {
+      const items = await immich.listPeople();
+      const cache: PersonCache = {
+        items,
+        refreshedAt: new Date().toISOString(),
+        stale: false,
+      };
+      store.setPersonCache(cache);
+      app.log.info({ source, count: items.length }, 'Immich person cache refreshed');
+      return cache;
+    })();
+
+    try {
+      return await personRefreshInFlight;
+    } finally {
+      personRefreshInFlight = undefined;
+    }
+  }
+
+  function markPersonRefreshFailed(error: unknown, source: 'manual' | 'automatic'): PersonCache {
+    const current = store.getPersonCache();
+    const cache: PersonCache = {
+      ...current,
+      stale: true,
+      lastError: error instanceof Error ? error.message : String(error),
+    };
+    store.setPersonCache(cache);
+    app.log.warn({ source, error: cache.lastError }, 'Immich person cache refresh failed');
     return cache;
   }
 
@@ -1919,4 +2001,11 @@ function validateAlbumIds(albumIds: string[] | undefined, cache: AlbumCache): st
   const known = new Set(cache.items.map((album) => album.id));
   const missing = albumIds.filter((albumId) => !known.has(albumId));
   return missing.length > 0 ? `Unknown album ids: ${missing.join(', ')}` : undefined;
+}
+
+function validatePersonIds(personIds: string[] | undefined, cache: PersonCache): string | undefined {
+  if (!personIds || personIds.length === 0 || cache.items.length === 0) return undefined;
+  const known = new Set(cache.items.map((person) => person.id));
+  const missing = personIds.filter((personId) => personId !== 'all' && !known.has(personId));
+  return missing.length > 0 ? `Unknown person ids: ${missing.join(', ')}` : undefined;
 }

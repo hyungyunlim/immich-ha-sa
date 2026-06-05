@@ -24,6 +24,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             ImmichFrameRefreshAlbumsButton(coordinator),
+            ImmichFrameRefreshPeopleButton(coordinator),
             ImmichFrameCommandButton(coordinator, "previous", "Previous", "previous"),
             ImmichFrameCommandButton(coordinator, "next", "Next", "next"),
             ImmichFrameCommandButton(coordinator, "play_pause", "Play/Pause", "play-pause"),
@@ -56,6 +57,19 @@ class ImmichFrameRefreshAlbumsButton(CoordinatorEntity[ImmichFrameCoordinator], 
 
     async def async_press(self) -> None:
         await self.coordinator.client.refresh_albums()
+        await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameRefreshPeopleButton(CoordinatorEntity[ImmichFrameCoordinator], ButtonEntity):
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Refresh People"
+        self._attr_unique_id = frame_unique_id(device_id, "refresh_people")
+        self._attr_device_info = frame_device_info(device_id)
+
+    async def async_press(self) -> None:
+        await self.coordinator.client.refresh_people()
         await self.coordinator.async_request_refresh()
 
 

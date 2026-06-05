@@ -1,4 +1,4 @@
-import type { AlbumCacheEntry } from './types.js';
+import type { AlbumCacheEntry, PersonCacheEntry } from './types.js';
 
 export interface ImmichClientConfig {
   baseUrl?: string;
@@ -11,6 +11,13 @@ interface RawImmichAlbum {
   albumName?: unknown;
   assetCount?: unknown;
   albumThumbnailAssetId?: unknown;
+}
+
+interface RawImmichPerson {
+  id?: unknown;
+  name?: unknown;
+  assetCount?: unknown;
+  thumbnailPath?: unknown;
 }
 
 export class ImmichClient {
@@ -53,6 +60,45 @@ export class ImmichClient {
       .filter((album): album is AlbumCacheEntry => album !== null);
   }
 
+  async listPeople(): Promise<PersonCacheEntry[]> {
+    const rawPeople: unknown[] = [];
+    let page = 1;
+    let hasNextPage = true;
+    while (hasNextPage) {
+      const response = await this.fetch(`/api/people?withHidden=false&size=1000&page=${page}`);
+      if (!response.ok) {
+        const body = await readBodySafe(response);
+        throw new Error(body ? `Immich people list failed: ${response.status} (${body})` : `Immich people list failed: ${response.status}`);
+      }
+
+      const data = await response.json() as unknown;
+      if (Array.isArray(data)) {
+        rawPeople.push(...data);
+        hasNextPage = false;
+      } else if (isRecord(data) && Array.isArray(data.people)) {
+        rawPeople.push(...data.people);
+        hasNextPage = data.hasNextPage === true;
+        page += 1;
+      } else {
+        hasNextPage = false;
+      }
+    }
+
+    const updatedAt = new Date().toISOString();
+    return rawPeople
+      .map((person): PersonCacheEntry | null => {
+        if (!isRecord(person) || typeof person.id !== 'string') return null;
+        return {
+          id: person.id,
+          name: typeof person.name === 'string' ? person.name : '',
+          assetCount: typeof person.assetCount === 'number' ? person.assetCount : undefined,
+          thumbnailPath: typeof person.thumbnailPath === 'string' ? person.thumbnailPath : undefined,
+          updatedAt,
+        };
+      })
+      .filter((person): person is PersonCacheEntry => person !== null);
+  }
+
   private async fetch(path: string): Promise<Response> {
     if (!this.config.baseUrl || !this.config.apiKey) {
       throw new Error('Immich URL or API key is not configured.');
@@ -74,6 +120,10 @@ export class ImmichClient {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object';
+}
+
 async function readBodySafe(response: Response): Promise<string | undefined> {
   try {
     const text = (await response.text()).trim();
@@ -82,4 +132,3 @@ async function readBodySafe(response: Response): Promise<string | undefined> {
     return undefined;
   }
 }
-

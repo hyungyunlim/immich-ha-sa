@@ -45,4 +45,23 @@ describe('Home Assistant integration files', () => {
     expect(numberSource).toContain('"max_video_length"');
     expect(numberSource).toContain('"excludeVideosOver"');
   });
+
+  it('exposes person filter controls and services', () => {
+    const selectSource = readFileSync(join(root, 'custom_components/immich_frame/select.py'), 'utf8');
+    const textSource = readFileSync(join(root, 'custom_components/immich_frame/text.py'), 'utf8');
+    const switchSource = readFileSync(join(root, 'custom_components/immich_frame/switch.py'), 'utf8');
+    const buttonSource = readFileSync(join(root, 'custom_components/immich_frame/button.py'), 'utf8');
+    const servicesSource = readFileSync(join(root, 'custom_components/immich_frame/services.yaml'), 'utf8');
+
+    expect(selectSource).toContain('Frame Person');
+    expect(selectSource).toContain('PERSON_OPTION_NO_FILTER = "No Person Filter"');
+    expect(selectSource).toContain('PERSON_OPTION_ALL_NAMED_PEOPLE = "All Named People"');
+    expect(textSource).toContain('Frame People');
+    expect(textSource).toContain('"activePersonIds"');
+    expect(switchSource).toContain('"require_all_people"');
+    expect(switchSource).toContain('"requireAllPeople"');
+    expect(buttonSource).toContain('"refresh_people"');
+    expect(servicesSource).toContain('set_people:');
+    expect(servicesSource).toContain('refresh_people:');
+  });
 });

@@ -120,6 +120,13 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ),
             ImmichFrameSleepSwitch(
                 coordinator,
+                "require_all_people",
+                "Require All People",
+                "requireAllPeople",
+                False,
+            ),
+            ImmichFrameSleepSwitch(
+                coordinator,
                 "show_image_rating",
                 "Show Image Rating",
                 "showImageRating",

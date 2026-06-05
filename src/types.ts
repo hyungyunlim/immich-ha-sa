@@ -38,6 +38,8 @@ export interface FrameDevice {
 export interface FrameState {
   deviceId: string;
   activeAlbumIds: string[];
+  activePersonIds: string[];
+  requireAllPeople: boolean;
   activeProfileId?: string;
   durationSeconds: number;
   imageFit: ImageFit;
@@ -113,6 +115,8 @@ export interface FrameProfile {
   id: string;
   name: string;
   albumIds: string[];
+  personIds: string[];
+  requireAllPeople: boolean;
   durationSeconds: number;
   imageFit: ImageFit;
   showTime: boolean;
@@ -188,11 +192,27 @@ export interface AlbumCache {
   lastError?: string;
 }
 
+export interface PersonCacheEntry {
+  id: string;
+  name: string;
+  assetCount?: number;
+  thumbnailPath?: string;
+  updatedAt: string;
+}
+
+export interface PersonCache {
+  items: PersonCacheEntry[];
+  refreshedAt?: string;
+  stale: boolean;
+  lastError?: string;
+}
+
 export interface StoreData {
   devices: Record<string, FrameDevice>;
   frames: Record<string, FrameState>;
   profiles: Record<string, FrameProfile>;
   albumCache: AlbumCache;
+  personCache: PersonCache;
   frameClaims: Record<string, FrameClaim>;
   auth: ControllerAuth;
 }

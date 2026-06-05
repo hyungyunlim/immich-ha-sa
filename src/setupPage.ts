@@ -5,6 +5,8 @@ interface SetupPageParams {
   expiresAt: string;
   albumCount: number;
   albumRefreshedAt?: string;
+  personCount: number;
+  personRefreshedAt?: string;
   globalKioskPasswordConfigured: boolean;
   frameClaims: SetupPageFrameClaim[];
   devices: SetupPageDevice[];
@@ -114,6 +116,9 @@ export function renderSetupPage(params: SetupPageParams): string {
   const refreshedAt = params.albumRefreshedAt
     ? new Date(params.albumRefreshedAt).toLocaleString()
     : 'Not refreshed yet';
+  const peopleRefreshedAt = params.personRefreshedAt
+    ? new Date(params.personRefreshedAt).toLocaleString()
+    : 'People not refreshed yet';
   const defaultDevice = params.devices.find((device) => device.isDefault) ?? params.devices[0];
   const inheritedLocalControllerUrl = defaultDevice?.localControllerBaseUrl ?? params.controllerUrl;
   const inheritedLocalKioskUrl = defaultDevice?.localKioskBaseUrl ?? 'http://homeassistant.local:3000';
@@ -785,9 +790,9 @@ export function renderSetupPage(params: SetupPageParams): string {
         <div class="value">${escapeHtml(params.deviceId)}</div>
       </div>
       <div class="panel metric">
-        <div class="label">Album Cache</div>
+        <div class="label">Immich Cache</div>
         <div class="value">${params.albumCount} albums</div>
-        <p class="muted">${escapeHtml(refreshedAt)}</p>
+        <p class="muted">${params.personCount} people / ${escapeHtml(refreshedAt)} / ${escapeHtml(peopleRefreshedAt)}</p>
       </div>
     </section>
 

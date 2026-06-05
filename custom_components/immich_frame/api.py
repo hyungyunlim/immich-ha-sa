@@ -31,11 +31,17 @@ class ImmichFrameClient:
     async def albums(self) -> dict[str, Any]:
         return await self._request("GET", "/api/immich/albums")
 
+    async def people(self) -> dict[str, Any]:
+        return await self._request("GET", "/api/immich/people")
+
     async def devices(self) -> dict[str, Any]:
         return await self._request("GET", "/api/integration/devices", auth=True)
 
     async def refresh_albums(self) -> dict[str, Any]:
         return await self._request("POST", "/api/immich/albums/refresh", auth=True)
+
+    async def refresh_people(self) -> dict[str, Any]:
+        return await self._request("POST", "/api/immich/people/refresh", auth=True)
 
     async def pair(self, pairing_code: str, name: str) -> dict[str, Any]:
         return await self._request(

@@ -17,6 +17,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
     async_add_entities(
         [
             ImmichFrameAlbumsText(coordinator),
+            ImmichFramePeopleText(coordinator),
             ImmichFrameStateText(coordinator, "filter_date", "Date Filter", "filterDate", 128),
             ImmichFrameStateText(coordinator, "weather_location", "Weather Location", "weatherLocation", 80),
             ImmichFrameStateText(coordinator, "date_format", "Date Format", "dateFormat", 64),
@@ -88,6 +89,98 @@ class ImmichFrameAlbumsText(CoordinatorEntity[ImmichFrameCoordinator], TextEntit
             ),
             None,
         )
+
+
+class ImmichFramePeopleText(CoordinatorEntity[ImmichFrameCoordinator], TextEntity):
+    _attr_native_max = 2048
+
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame People"
+        self._attr_unique_id = frame_unique_id(device_id, "people")
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def native_value(self) -> str | None:
+        active = self.coordinator.data.get("state", {}).get("activePersonIds", [])
+        if not active:
+            return ""
+        return ", ".join(self._label_for_person_id(person_id) for person_id in active)
+
+    async def async_set_value(self, value: str) -> None:
+        person_ids = self._parse_person_ids(value)
+        await self.coordinator.client.update_frame_state({"activePersonIds": person_ids})
+        await self.coordinator.async_request_refresh()
+
+    @property
+    def _people(self) -> list[dict[str, Any]]:
+        return self.coordinator.data.get("people", {}).get("items", [])
+
+    def _label_for_person_id(self, person_id: str) -> str:
+        if person_id == "all":
+            return "all"
+        person = next((person for person in self._people if person["id"] == person_id), None)
+        return self._label_for_person(person) if person else person_id
+
+    def _parse_person_ids(self, value: str) -> list[str]:
+        parts = [part.strip() for part in value.replace("\n", ",").split(",") if part.strip()]
+        if not parts:
+            return []
+
+        person_ids: list[str] = []
+        unknown: list[str] = []
+        for part in parts:
+            if part == "all":
+                person_ids.append(part)
+                continue
+            person = self._find_person(part)
+            if person:
+                person_ids.append(person["id"])
+            elif self._people:
+                unknown.append(part)
+            else:
+                person_ids.append(part)
+
+        if unknown:
+            raise HomeAssistantError(f"Unknown Immich person: {', '.join(unknown)}")
+
+        return list(dict.fromkeys(person_ids))
+
+    def _find_person(self, value: str) -> dict[str, Any] | None:
+        normalized = value.casefold()
+        by_id = next((person for person in self._people if person["id"] == value), None)
+        if by_id:
+            return by_id
+
+        by_label = next(
+            (person for person in self._people if self._label_for_person(person).casefold() == normalized),
+            None,
+        )
+        if by_label:
+            return by_label
+
+        by_name = [
+            person
+            for person in self._people
+            if str(person.get("name") or "").strip().casefold() == normalized
+        ]
+        if len(by_name) == 1:
+            return by_name[0]
+        if len(by_name) > 1:
+            raise HomeAssistantError(
+                f"Ambiguous Immich person name: {value}. Use the displayed label or person ID."
+            )
+        return None
+
+    def _label_for_person(self, person: dict[str, Any]) -> str:
+        name = str(person.get("name") or "").strip()
+        person_id = str(person.get("id") or "")
+        short_id = person_id[:8]
+        if not name:
+            return f"Unnamed person ({short_id})"
+        duplicate_name = sum(1 for candidate in self._people if candidate.get("name") == name) > 1
+        return f"{name} ({short_id})" if duplicate_name else name
 
 
 class ImmichFrameStateText(CoordinatorEntity[ImmichFrameCoordinator], TextEntity):

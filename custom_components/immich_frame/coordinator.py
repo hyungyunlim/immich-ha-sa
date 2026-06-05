@@ -26,6 +26,7 @@ class ImmichFrameCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_update_data(self) -> dict[str, Any]:
         state = await self.client.frame_state()
         albums = await self.client.albums()
+        people = await self.client.people()
         profiles = await self.client.profiles()
         remote_status: dict[str, Any] | None = None
         try:
@@ -35,6 +36,7 @@ class ImmichFrameCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return {
             "state": state,
             "albums": albums,
+            "people": people,
             "profiles": profiles,
             "remote_status": remote_status,
         }

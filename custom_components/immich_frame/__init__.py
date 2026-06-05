@@ -20,7 +20,9 @@ from .const import (
     DEFAULT_DEVICE_ID,
     DOMAIN,
     SERVICE_REFRESH_ALBUMS,
+    SERVICE_REFRESH_PEOPLE,
     SERVICE_SET_ALBUM,
+    SERVICE_SET_PEOPLE,
     SERVICE_SET_NETWORK_MODE,
     SERVICE_SET_PROFILE,
     SERVICE_SET_RENDERER_OPTIONS,
@@ -130,6 +132,24 @@ def _register_services(hass: HomeAssistant) -> None:
         await client.update_frame_state({"activeAlbumIds": selected_album_ids})
         await coordinator.async_request_refresh()
 
+    async def set_people(call: ServiceCall) -> None:
+        client, coordinator = _runtime_for_call(hass, call)
+        person_ids = call.data.get("person_ids")
+        person_id = call.data.get("person_id")
+        person_names = call.data.get("person_names")
+        person_name = call.data.get("person_name")
+        if person_names or person_name:
+            selected_person_ids = _person_ids_for_names(
+                coordinator.data.get("people", {}).get("items", []),
+                person_names or [person_name],
+            )
+        elif person_ids or person_id:
+            selected_person_ids = person_ids or [person_id]
+        else:
+            raise HomeAssistantError("person_id, person_ids, person_name, or person_names is required")
+        await client.update_frame_state({"activePersonIds": selected_person_ids})
+        await coordinator.async_request_refresh()
+
     async def set_profile(call: ServiceCall) -> None:
         client, coordinator = _runtime_for_call(hass, call)
         await client.apply_profile(call.data["profile_id"])
@@ -138,6 +158,11 @@ def _register_services(hass: HomeAssistant) -> None:
     async def refresh_albums(call: ServiceCall) -> None:
         client, coordinator = _runtime_for_call(hass, call)
         await client.refresh_albums()
+        await coordinator.async_request_refresh()
+
+    async def refresh_people(call: ServiceCall) -> None:
+        client, coordinator = _runtime_for_call(hass, call)
+        await client.refresh_people()
         await coordinator.async_request_refresh()
 
     async def set_renderer_options(call: ServiceCall) -> None:
@@ -177,8 +202,28 @@ def _register_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN,
+        SERVICE_SET_PEOPLE,
+        set_people,
+        schema=vol.Schema(
+            {
+                vol.Optional(CONF_DEVICE_ID): cv.string,
+                vol.Optional("person_id"): cv.string,
+                vol.Optional("person_ids"): vol.All(cv.ensure_list, [cv.string]),
+                vol.Optional("person_name"): cv.string,
+                vol.Optional("person_names"): vol.All(cv.ensure_list, [cv.string]),
+            }
+        ),
+    )
+    hass.services.async_register(
+        DOMAIN,
         SERVICE_REFRESH_ALBUMS,
         refresh_albums,
+        schema=vol.Schema({vol.Optional(CONF_DEVICE_ID): cv.string}),
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_REFRESH_PEOPLE,
+        refresh_people,
         schema=vol.Schema({vol.Optional(CONF_DEVICE_ID): cv.string}),
     )
     hass.services.async_register(
@@ -200,7 +245,10 @@ def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional("showWeather"): cv.boolean,
                 vol.Optional("weatherLocation"): cv.string,
                 vol.Optional("weatherRotationInterval"): vol.All(vol.Coerce(int), vol.Range(min=10, max=3600)),
+                vol.Optional("activePersonIds"): vol.All(cv.ensure_list, [cv.string]),
+                vol.Optional("requireAllPeople"): cv.boolean,
                 vol.Optional("showVideos"): cv.boolean,
+                vol.Optional("excludeVideosOver"): vol.All(vol.Coerce(int), vol.Range(min=0, max=86400)),
                 vol.Optional("showArchived"): cv.boolean,
                 vol.Optional("filterDate"): cv.string,
                 vol.Optional("filterNewest"): vol.All(vol.Coerce(int), vol.Range(min=0, max=50000)),
@@ -305,5 +353,37 @@ def _album_ids_for_names(albums: list[dict], names: list[str]) -> list[str]:
 
     if unknown:
         raise HomeAssistantError(f"Unknown Immich album: {', '.join(unknown)}")
+
+    return list(dict.fromkeys(selected))
+
+
+def _person_ids_for_names(people: list[dict], names: list[str]) -> list[str]:
+    selected: list[str] = []
+    unknown: list[str] = []
+    for name in names:
+        raw_name = str(name).strip()
+        if raw_name == "all":
+            selected.append(raw_name)
+            continue
+        normalized = raw_name.casefold()
+        by_id = next((person for person in people if person.get("id") == raw_name), None)
+        if by_id:
+            selected.append(by_id["id"])
+            continue
+
+        matches = [
+            person
+            for person in people
+            if str(person.get("name") or "").strip().casefold() == normalized
+        ]
+        if len(matches) == 1:
+            selected.append(matches[0]["id"])
+        elif len(matches) > 1:
+            raise HomeAssistantError(f"Ambiguous Immich person name: {raw_name}. Use person_id instead.")
+        else:
+            unknown.append(raw_name)
+
+    if unknown:
+        raise HomeAssistantError(f"Unknown Immich person: {', '.join(unknown)}")
 
     return list(dict.fromkeys(selected))

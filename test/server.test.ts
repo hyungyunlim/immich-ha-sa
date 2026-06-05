@@ -8,7 +8,7 @@ import { createServer } from '../src/server.js';
 import { JsonStore } from '../src/store.js';
 import type { AppConfig } from '../src/config.js';
 import type { ImmichClient } from '../src/immichClient.js';
-import type { AlbumCacheEntry, FrameDevice } from '../src/types.js';
+import type { AlbumCacheEntry, FrameDevice, PersonCacheEntry } from '../src/types.js';
 
 const tempDirs: string[] = [];
 
@@ -91,6 +91,30 @@ describe('controller API', () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json().error.code).toBe('ALBUM_NOT_FOUND');
+    await server.close();
+  });
+
+  it('rejects unknown person ids when cache is populated', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    const person: PersonCacheEntry = {
+      id: 'known-person',
+      name: 'Known Person',
+      updatedAt: '2026-06-02T00:00:00.000Z',
+    };
+    store.setPersonCache({ items: [person], stale: false, refreshedAt: '2026-06-02T00:00:00.000Z' });
+    const server = createTestServer({ config, store });
+
+    const response = await server.inject({
+      method: 'PUT',
+      url: '/api/frame/lenovo/state',
+      payload: { activePersonIds: ['missing-person'] },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('PERSON_NOT_FOUND');
     await server.close();
   });
 
@@ -179,7 +203,7 @@ describe('controller API', () => {
     await server.close();
   });
 
-  it('automatically refreshes the album cache from Immich', async () => {
+  it('automatically refreshes Immich media caches', async () => {
     vi.useFakeTimers();
     try {
       const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
@@ -194,15 +218,22 @@ describe('controller API', () => {
         albumName: 'Auto Album',
         updatedAt: '2026-06-04T00:00:00.000Z',
       };
+      const person: PersonCacheEntry = {
+        id: 'auto-person',
+        name: 'Auto Person',
+        updatedAt: '2026-06-04T00:00:00.000Z',
+      };
       const immichClient = {
         checkConnection: vi.fn(async () => ({ ok: true })),
         listAlbums: vi.fn(async () => [album]),
+        listPeople: vi.fn(async () => [person]),
       } as unknown as ImmichClient;
       const server = createTestServer({ config, store, immichClient });
 
       await vi.advanceTimersByTimeAsync(1000);
 
       expect(immichClient.listAlbums).toHaveBeenCalledTimes(1);
+      expect(immichClient.listPeople).toHaveBeenCalledTimes(1);
       const albums = await server.inject({
         method: 'GET',
         url: '/api/immich/albums',
@@ -210,12 +241,20 @@ describe('controller API', () => {
       expect(albums.statusCode).toBe(200);
       expect(albums.json().data.items).toEqual([album]);
       expect(albums.json().data.stale).toBe(false);
+      const people = await server.inject({
+        method: 'GET',
+        url: '/api/immich/people',
+      });
+      expect(people.statusCode).toBe(200);
+      expect(people.json().data.items).toEqual([person]);
+      expect(people.json().data.stale).toBe(false);
 
       const health = await server.inject({
         method: 'GET',
         url: '/api/health',
       });
       expect(health.json().data.albumCache.refreshIntervalSeconds).toBe(2);
+      expect(health.json().data.personCache.refreshIntervalSeconds).toBe(2);
 
       await server.close();
     } finally {

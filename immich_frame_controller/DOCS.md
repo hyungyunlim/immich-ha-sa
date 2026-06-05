@@ -96,13 +96,24 @@ For album control:
 - Use the Albums text entity for multiple albums, separated by commas. Values may be Immich album names or album IDs.
 - Use the `set_album` service with `album_ids` or `album_names` for automations.
 
+For person control:
+
+- Home Assistant reads the controller's person cache every 30 seconds.
+- The controller refreshes people from Immich on the same `album_refresh_interval_seconds` schedule as albums.
+- Use the Home Assistant Refresh People button or `immich_frame.refresh_people` service to force an immediate refresh.
+- Use the Person select entity for no filter, all named people, or quick single-person selection.
+- Use the People text entity for multiple people, separated by commas. Values may be Immich person names, person IDs, or `all` for all named people.
+- Use the Require All People switch only when multiple people are selected and you want images where all selected people appear together.
+- immich-kiosk documents `require_all_people` as incompatible with other source buckets such as albums and date ranges, so avoid combining that switch with album/date-source filtering when deterministic results matter.
+- Use the `set_people` service with `person_ids` or `person_names` for automations.
+
 For asset filters:
 
 - Use the Date Filter Preset select for common immich-kiosk `filter_date` values: Off, Today, Last 7 days, Last 30 days, Last 90 days, and Last 365 days.
 - Use the Filter Start Date and Filter End Date picker entities for custom date ranges. Setting a start date without an end date writes `YYYY-MM-DD_to_today`; setting an end date writes a fixed `YYYY-MM-DD_to_YYYY-MM-DD` range.
 - Use the Date Filter text entity for advanced/raw immich-kiosk `filter_date` values. Examples: `last-30-days`, `2021-01-01_to_today`, or an empty value to clear the filter.
 - Use the Newest Filter number entity to apply immich-kiosk `filter_newest`. Set it to `0` to disable the newest-assets filter.
-- Use `set_renderer_options` with `filterDate`, `filterNewest`, and `showArchived` for automations and scripts.
+- Use `set_renderer_options` with `filterDate`, `filterNewest`, `showArchived`, `activePersonIds`, and `requireAllPeople` for automations and scripts.
 
 The controller also exposes common immich-kiosk URL override settings for frame-specific behavior:
 

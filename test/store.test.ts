@@ -64,5 +64,6 @@ describe('JsonStore', () => {
     const store = new JsonStore(path, device);
     expect(store.getDevice('lenovo')?.localKioskBaseUrl).toBe('http://10.0.0.10:3000');
     expect(store.getFrameState('lenovo')?.deviceId).toBe('lenovo');
+    expect(store.getPersonCache()).toEqual({ items: [], stale: true });
   });
 });

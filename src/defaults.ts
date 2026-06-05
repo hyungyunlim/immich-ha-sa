@@ -1,9 +1,11 @@
-import type { AlbumCache, FrameDevice, FrameProfile, FrameState, StoreData } from './types.js';
+import type { AlbumCache, FrameDevice, FrameProfile, FrameState, PersonCache, StoreData } from './types.js';
 
 export function createDefaultFrameState(device: FrameDevice): FrameState {
   return {
     deviceId: device.id,
     activeAlbumIds: [],
+    activePersonIds: [],
+    requireAllPeople: false,
     durationSeconds: 60,
     imageFit: 'contain',
     showTime: false,
@@ -75,6 +77,8 @@ export function createDefaultProfiles(): Record<string, FrameProfile> {
       id: 'default',
       name: 'Default',
       albumIds: [],
+      personIds: [],
+      requireAllPeople: false,
       durationSeconds: 60,
       imageFit: 'contain',
       showTime: false,
@@ -144,6 +148,13 @@ export function createEmptyAlbumCache(): AlbumCache {
   };
 }
 
+export function createEmptyPersonCache(): PersonCache {
+  return {
+    items: [],
+    stale: true,
+  };
+}
+
 export function createDefaultStore(device: FrameDevice): StoreData {
   return {
     devices: {
@@ -154,6 +165,7 @@ export function createDefaultStore(device: FrameDevice): StoreData {
     },
     profiles: createDefaultProfiles(),
     albumCache: createEmptyAlbumCache(),
+    personCache: createEmptyPersonCache(),
     frameClaims: {},
     auth: {
       tokens: {},

@@ -9,6 +9,7 @@ import type {
   FrameDevice,
   FrameProfile,
   FrameState,
+  PersonCache,
   StoreData,
 } from './types.js';
 import { createDefaultFrameState, createDefaultStore } from './defaults.js';
@@ -102,6 +103,10 @@ export class JsonStore {
     return structuredClone(this.data.albumCache);
   }
 
+  getPersonCache(): PersonCache {
+    return structuredClone(this.data.personCache);
+  }
+
   getAuthTokens(): ControllerApiToken[] {
     return Object.values(this.data.auth.tokens).map((token) => structuredClone(token));
   }
@@ -174,6 +179,11 @@ export class JsonStore {
 
   setAlbumCache(albumCache: AlbumCache): void {
     this.data.albumCache = structuredClone(albumCache);
+    this.save();
+  }
+
+  setPersonCache(personCache: PersonCache): void {
+    this.data.personCache = structuredClone(personCache);
     this.save();
   }
 
@@ -261,6 +271,7 @@ export class JsonStore {
         ),
       },
       albumCache: data.albumCache ?? defaults.albumCache,
+      personCache: data.personCache ?? defaults.personCache,
       frameClaims: data.frameClaims ?? defaults.frameClaims,
       auth: {
         tokens: {

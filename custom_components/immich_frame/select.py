@@ -18,6 +18,9 @@ from .entity_helpers import frame_device_info, frame_label, frame_unique_id
 
 ALBUM_OPTION_ALL_PHOTOS = "All Photos"
 ALBUM_OPTION_MULTIPLE_ALBUMS = "Multiple Albums"
+PERSON_OPTION_NO_FILTER = "No Person Filter"
+PERSON_OPTION_ALL_NAMED_PEOPLE = "All Named People"
+PERSON_OPTION_MULTIPLE_PEOPLE = "Multiple People"
 
 
 async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
@@ -25,6 +28,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
     async_add_entities(
         [
             ImmichFrameAlbumSelect(coordinator),
+            ImmichFramePersonSelect(coordinator),
             ImmichFrameProfileSelect(coordinator),
             ImmichFrameNetworkModeSelect(coordinator),
             ImmichFrameMediaContentSelect(coordinator),
@@ -153,6 +157,84 @@ class ImmichFrameAlbumSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEn
 
     def _album_for_id(self, album_id: str) -> dict[str, Any] | None:
         return next((album for album in self._albums if album["id"] == album_id), None)
+
+
+class ImmichFramePersonSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEntity):
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Person"
+        self._attr_unique_id = frame_unique_id(device_id, "person")
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def options(self) -> list[str]:
+        active = self._active_person_ids
+        options = [PERSON_OPTION_NO_FILTER, PERSON_OPTION_ALL_NAMED_PEOPLE]
+        if len(active) > 1:
+            options.append(PERSON_OPTION_MULTIPLE_PEOPLE)
+        options.extend(self._label_for_person(person) for person in self._people)
+        if len(active) == 1 and not self._person_for_id(active[0]):
+            options.append(active[0])
+        return list(dict.fromkeys(options))
+
+    @property
+    def current_option(self) -> str | None:
+        active = self._active_person_ids
+        if not active:
+            return PERSON_OPTION_NO_FILTER
+        if active == ["all"]:
+            return PERSON_OPTION_ALL_NAMED_PEOPLE
+        if len(active) > 1:
+            return PERSON_OPTION_MULTIPLE_PEOPLE
+        person = self._person_for_id(active[0])
+        return self._label_for_person(person) if person else active[0]
+
+    async def async_select_option(self, option: str) -> None:
+        if option == PERSON_OPTION_NO_FILTER:
+            await self.coordinator.client.update_frame_state({"activePersonIds": []})
+            await self.coordinator.async_request_refresh()
+            return
+        if option == PERSON_OPTION_ALL_NAMED_PEOPLE:
+            await self.coordinator.client.update_frame_state({"activePersonIds": ["all"]})
+            await self.coordinator.async_request_refresh()
+            return
+        if option == PERSON_OPTION_MULTIPLE_PEOPLE:
+            return
+        person = self._person_for_label(option)
+        if not person:
+            person = self._person_for_id(option)
+        if not person:
+            return
+        await self.coordinator.client.update_frame_state({"activePersonIds": [person["id"]]})
+        await self.coordinator.async_request_refresh()
+
+    @property
+    def _people(self) -> list[dict[str, Any]]:
+        return self.coordinator.data.get("people", {}).get("items", [])
+
+    @property
+    def _active_person_ids(self) -> list[str]:
+        active = self.coordinator.data.get("state", {}).get("activePersonIds", [])
+        return active if isinstance(active, list) else []
+
+    def _person_for_id(self, person_id: str) -> dict[str, Any] | None:
+        return next((person for person in self._people if person["id"] == person_id), None)
+
+    def _person_for_label(self, label: str) -> dict[str, Any] | None:
+        return next(
+            (person for person in self._people if self._label_for_person(person) == label),
+            None,
+        )
+
+    def _label_for_person(self, person: dict[str, Any]) -> str:
+        name = str(person.get("name") or "").strip()
+        person_id = str(person.get("id") or "")
+        short_id = person_id[:8]
+        if not name:
+            return f"Unnamed person ({short_id})"
+        duplicate_name = sum(1 for candidate in self._people if candidate.get("name") == name) > 1
+        return f"{name} ({short_id})" if duplicate_name else name
 
 
 class ImmichFrameProfileSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEntity):

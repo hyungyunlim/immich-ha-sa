@@ -16,6 +16,8 @@ const device: FrameDevice = {
 const state: FrameState = {
   deviceId: 'lenovo',
   activeAlbumIds: ['album-1', 'album-2'],
+  activePersonIds: [],
+  requireAllPeople: false,
   activeProfileId: 'family',
   durationSeconds: 60,
   imageFit: 'contain',
@@ -241,6 +243,17 @@ describe('renderer URL generation', () => {
     });
     expect(resolved.rendererUrl).toContain('filter_date=2021-01-01_to_today');
     expect(resolved.rendererUrl).toContain('filter_newest=200');
+  });
+
+  it('adds person filter URL overrides', () => {
+    const resolved = buildRendererUrl(device, {
+      ...state,
+      activePersonIds: ['person-1', 'person-2'],
+      requireAllPeople: true,
+    });
+    expect(resolved.rendererUrl).toContain('person=person-1');
+    expect(resolved.rendererUrl).toContain('person=person-2');
+    expect(resolved.rendererUrl).toContain('require_all_people=true');
   });
 
   it('omits disabled kiosk asset filters', () => {

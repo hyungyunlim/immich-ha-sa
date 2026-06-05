@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.43
+
+- Add Immich person cache refresh alongside albums, including controller health/setup status.
+- Add Home Assistant person filtering with a single-person select, comma-separated People text entity, Refresh People button, and `immich_frame.set_people` / `immich_frame.refresh_people` services.
+- Add `require_all_people` support through the renderer URL and a Home Assistant Require All People switch for multi-person filters.
+
 ## 0.1.42
 
 - Add Home Assistant media content and orientation selects that map to immich-kiosk `show_videos` and `layout` URL overrides.
