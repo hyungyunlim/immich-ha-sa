@@ -870,7 +870,7 @@ describe('controller API', () => {
       kioskRequests.push(request.url ?? '');
       if (request.url?.startsWith('/style.css')) {
         response.setHeader('content-type', 'text/css');
-        response.end('body{background-image:url("/image")}');
+        response.end('body{background-image:url("/image")}.frame--background{position:absolute;inset:-5%}.frame--background img{width:100%;height:100%;object-fit:cover}');
         return;
       }
       if (request.url?.startsWith('/kiosk.js')) {
@@ -930,6 +930,9 @@ describe('controller API', () => {
     });
     expect(css.statusCode).toBe(200);
     expect(css.body).toContain('url("/kiosk-proxy/lenovo/image")');
+    expect(css.body).toContain('legacy Android WebView background-fill fix');
+    expect(css.body).toContain('.frame--background img');
+    expect(css.body).toContain('-webkit-transform: translateZ(0)');
 
     const javascript = await server.inject({
       method: 'GET',

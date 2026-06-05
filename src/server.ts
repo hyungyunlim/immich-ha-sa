@@ -1567,12 +1567,53 @@ function rewriteProxyText(value: string, proxyPrefix: string, contentType: strin
     return value.replace(/(["'`])\/(assets|asset)(?=[/"'`?])/g, `$1${normalizedPrefix}/$2`);
   }
   if (normalizedContentType.startsWith('text/css')) {
-    return value.replace(/url\((["']?)\/(?!\/|kiosk-proxy\/)/g, `url($1${normalizedPrefix}/`);
+    const rewritten = value.replace(/url\((["']?)\/(?!\/|kiosk-proxy\/)/g, `url($1${normalizedPrefix}/`);
+    return rewritten.includes('.frame--background') ? `${rewritten}\n${KIOSK_WEBVIEW_COMPAT_CSS}` : rewritten;
   }
   return value
     .replace(/\b(href|src|action|poster|manifest|hx-get|hx-post|hx-put|hx-patch|hx-delete)=("|')\/(?!\/|kiosk-proxy\/)/g, `$1=$2${normalizedPrefix}/`)
     .replace(/url\((["']?)\/(?!\/|kiosk-proxy\/)/g, `url($1${normalizedPrefix}/`);
 }
+
+const KIOSK_WEBVIEW_COMPAT_CSS = `
+/* Immich Frame Controller: legacy Android WebView background-fill fix. */
+.frame {
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+.frame--background {
+  top: -8% !important;
+  right: -8% !important;
+  bottom: -8% !important;
+  left: -8% !important;
+  width: auto !important;
+  height: auto !important;
+  overflow: hidden !important;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.frame--background img {
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 100% !important;
+  min-height: 100% !important;
+  object-fit: cover !important;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+`;
 
 function toControllerProxyUrl(
   device: FrameDevice,
