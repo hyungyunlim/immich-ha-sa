@@ -306,8 +306,31 @@ describe('controller API', () => {
     expect(response.body).toContain('title="Lenovo preview"');
     expect(response.body).toContain('http://10.0.0.10:18082/frame/lenovo?preview=1');
     expect(response.body).toContain('Preview Orientation');
-    expect(response.body).toContain('FreeKiosk docs');
+    expect(response.body).toContain('FreeKiosk enables Android REST controls');
+    expect(response.body).toContain('https://freekiosk.app/docs/');
+    expect(response.body).toContain('External Kiosk Renderer URL');
     expect(response.body).toContain('<details class="frame-details">');
+    await server.close();
+  });
+
+  it('explains that an external kiosk renderer URL is not the external frame URL', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    config.defaultDevice.externalControllerBaseUrl = undefined;
+    config.defaultDevice.externalKioskBaseUrl = 'https://frame.example.com';
+    const server = createTestServer({ config });
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/setup',
+      headers: { host: '10.0.0.10:18082' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('External Kiosk Renderer URL is set, but External Frame URL needs External Controller URL');
+    expect(response.body).toContain('Copy to Controller URL');
+    expect(response.body).toContain('data-use-external-kiosk-as-controller');
     await server.close();
   });
 

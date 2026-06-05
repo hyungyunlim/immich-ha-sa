@@ -236,12 +236,21 @@ export function renderSetupPage(params: SetupPageParams): string {
       display: none !important;
     }
     .url-missing {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
       border: 1px dashed #cfd8e2;
       border-radius: 7px;
       padding: 10px 12px;
       color: #697586;
       background: #fbfcfd;
       font-size: 13px;
+    }
+    .url-missing span {
+      min-width: min(440px, 100%);
+      flex: 1;
     }
     .section-title {
       display: flex;
@@ -514,8 +523,55 @@ export function renderSetupPage(params: SetupPageParams): string {
       font-size: 12px;
       text-transform: none;
     }
-    .freekiosk-help[hidden] {
-      display: none;
+    .label-with-info {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      width: fit-content;
+    }
+    .info-dot {
+      display: inline-grid;
+      width: 16px;
+      height: 16px;
+      place-items: center;
+      border: 1px solid #a8b6c5;
+      border-radius: 50%;
+      color: #087e8b;
+      background: #ffffff;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+      text-transform: none;
+      cursor: help;
+    }
+    .info-popover {
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 8px);
+      left: 0;
+      width: min(320px, 80vw);
+      border: 1px solid #cfd8e2;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #475569;
+      background: #ffffff;
+      box-shadow: 0 12px 30px rgb(24 33 44 / 16%);
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.4;
+      opacity: 0;
+      pointer-events: none;
+      text-transform: none;
+      transform: translateY(-3px);
+      transition: opacity .12s ease, transform .12s ease;
+      visibility: hidden;
+    }
+    .label-with-info:hover .info-popover,
+    .label-with-info:focus-within .info-popover {
+      opacity: 1;
+      transform: translateY(0);
+      visibility: visible;
     }
     details {
       border: 1px solid #e5ebf1;
@@ -673,11 +729,10 @@ export function renderSetupPage(params: SetupPageParams): string {
           </span>
         </label>
         <label class="field">
-          <span class="label">Remote Control <a class="inline-link" href="https://freekiosk.app/docs/" target="_blank" rel="noreferrer">FreeKiosk docs</a></span>
+          ${renderRemoteControlLabel()}
           <select name="remoteControlType">
             ${renderRemoteControlOptions(inheritedRemoteControlType)}
           </select>
-          <span class="help-text freekiosk-help" data-freekiosk-help${inheritedRemoteControlType === 'freekiosk' ? '' : ' hidden'}>FreeKiosk is the Android kiosk app used for REST controls such as next, previous, brightness, volume, and mute. See the <a href="https://github.com/RushB-fr/freekiosk" target="_blank" rel="noreferrer">GitHub project</a>.</span>
         </label>
         <label class="field full">
           <span class="label">Remote API URL</span>
@@ -716,12 +771,13 @@ export function renderSetupPage(params: SetupPageParams): string {
               <span class="label">External Controller URL</span>
               <input name="externalControllerBaseUrl" type="url" placeholder="${escapeAttribute(inheritedExternalControllerUrl ?? 'https://frame.example.com')}">
               <span class="inherited">${inheritedExternalControllerUrl ? `Blank inherits ${escapeHtml(inheritedExternalControllerUrl)}.` : 'Blank leaves external frame URL unavailable.'}</span>
-              <span class="help-text">Use a tunnel hostname that routes to this controller add-on, not the Immich server or direct immich-kiosk URL.</span>
+              <span class="help-text">Public tunnel to this controller add-on, such as https://frame.example.com. This creates the URL the frame should open.</span>
             </label>
             <label class="field full">
-              <span class="label">External Kiosk URL</span>
+              <span class="label">External Kiosk Renderer URL</span>
               <input name="externalKioskBaseUrl" type="url" placeholder="${escapeAttribute(inheritedExternalKioskUrl ?? 'https://frame.example.com/kiosk')}">
-              <span class="inherited">${inheritedExternalKioskUrl ? `Blank inherits ${escapeHtml(inheritedExternalKioskUrl)}.` : 'Blank leaves external kiosk URL unset; controller proxy still works through External Controller URL.'}</span>
+              <span class="inherited">${inheritedExternalKioskUrl ? `Blank inherits ${escapeHtml(inheritedExternalKioskUrl)}.` : 'Optional. Use only for a separate public immich-kiosk renderer URL.'}</span>
+              <span class="help-text">Do not put the controller add-on domain here unless that domain routes to immich-kiosk itself.</span>
             </label>
             <label class="field full">
               <span class="label">Remote API Key</span>
@@ -820,6 +876,20 @@ export function renderSetupPage(params: SetupPageParams): string {
       }
     }
 
+    function syncExternalFrameUrlElement(card, value, externalKioskUrl) {
+      syncFrameUrlElement(card, 'external', value);
+      const missingText = card.querySelector('[data-external-frame-missing-text]');
+      const useKiosk = card.querySelector('[data-use-external-kiosk-as-controller]');
+      if (missingText) {
+        missingText.textContent = externalKioskUrl
+          ? 'External Kiosk Renderer URL is set, but External Frame URL needs External Controller URL. If this hostname routes to the controller add-on, copy it into External Controller URL and save.'
+          : 'Set External Controller URL to show the remote frame URL.';
+      }
+      if (useKiosk) {
+        useKiosk.hidden = Boolean(value) || !externalKioskUrl;
+      }
+    }
+
     function syncDeviceCard(form) {
       const deviceId = form.getAttribute('data-device-edit');
       if (!deviceId) return;
@@ -827,8 +897,9 @@ export function renderSetupPage(params: SetupPageParams): string {
       if (!card) return;
       const localFrameUrl = buildFrameUrl(form.querySelector('[name="localControllerBaseUrl"]')?.value, deviceId);
       const externalFrameUrl = buildFrameUrl(form.querySelector('[name="externalControllerBaseUrl"]')?.value, deviceId);
+      const externalKioskUrl = String(form.querySelector('[name="externalKioskBaseUrl"]')?.value || '').trim();
       syncFrameUrlElement(card, 'local', localFrameUrl);
-      syncFrameUrlElement(card, 'external', externalFrameUrl);
+      syncExternalFrameUrlElement(card, externalFrameUrl, externalKioskUrl);
 
       const orientation = form.querySelector('[name="previewOrientation"]:checked')?.value === 'portrait' ? 'portrait' : 'landscape';
       const content = card.querySelector('.device-content');
@@ -895,25 +966,32 @@ export function renderSetupPage(params: SetupPageParams): string {
       const remoteControlType = form.querySelector('[name="remoteControlType"]');
       const localControllerUrl = form.querySelector('[name="localControllerBaseUrl"]');
       const externalControllerUrl = form.querySelector('[name="externalControllerBaseUrl"]');
-      const syncFreekioskHelp = () => {
-        const help = form.querySelector('[data-freekiosk-help]');
-        if (!help) return;
-        help.hidden = remoteControlType?.value !== 'freekiosk';
-      };
-      remoteControlType?.addEventListener('change', syncFreekioskHelp);
+      const externalKioskUrl = form.querySelector('[name="externalKioskBaseUrl"]');
       remoteApiUrl?.addEventListener('input', () => {
         if (remoteApiUrl.value.trim() && remoteControlType?.value === 'none') {
           remoteControlType.value = 'freekiosk';
         }
-        syncFreekioskHelp();
       });
       localControllerUrl?.addEventListener('input', () => syncDeviceCard(form));
       externalControllerUrl?.addEventListener('input', () => syncDeviceCard(form));
+      externalKioskUrl?.addEventListener('input', () => syncDeviceCard(form));
       for (const option of form.querySelectorAll('[name="previewOrientation"]')) {
         option.addEventListener('change', () => syncDeviceCard(form));
       }
-      syncFreekioskHelp();
       syncDeviceCard(form);
+    }
+
+    for (const button of document.querySelectorAll('[data-use-external-kiosk-as-controller]')) {
+      button.addEventListener('click', () => {
+        const card = button.closest('.device');
+        const form = card?.querySelector('[data-device-edit]');
+        const externalKioskUrl = form?.querySelector('[name="externalKioskBaseUrl"]');
+        const externalControllerUrl = form?.querySelector('[name="externalControllerBaseUrl"]');
+        if (!externalKioskUrl || !externalControllerUrl) return;
+        externalControllerUrl.value = externalKioskUrl.value.trim();
+        syncDeviceCard(form);
+        externalControllerUrl.focus();
+      });
     }
 
     for (const form of document.querySelectorAll('[data-device-create]')) {
@@ -1014,6 +1092,10 @@ function renderDeviceCard(device: SetupPageDevice): string {
     ? redactSensitiveQueryParams(device.rendererUrl)
     : 'Not resolved yet';
   const externalFrameUrl = device.externalFrameUrl ?? '';
+  const externalKioskUrl = device.externalKioskBaseUrl ?? '';
+  const externalMissingText = externalKioskUrl
+    ? 'External Kiosk Renderer URL is set, but External Frame URL needs External Controller URL. If this hostname routes to the controller add-on, copy it into External Controller URL and save.'
+    : 'Set External Controller URL to show the remote frame URL.';
   const sleepWindow = device.disableSleep
     ? 'Disabled'
     : `${device.sleepStart || 'config'} -> ${device.sleepEnd || 'config'}`;
@@ -1046,7 +1128,10 @@ function renderDeviceCard(device: SetupPageDevice): string {
           <button type="button" data-copy="${escapeAttribute(externalFrameUrl)}" data-external-frame-copy${externalFrameUrl ? '' : ' hidden'}>Copy</button>
         </div>
         <code data-external-frame-url${externalFrameUrl ? '' : ' hidden'}>${escapeHtml(externalFrameUrl)}</code>
-        <div class="url-missing" data-external-frame-missing${externalFrameUrl ? ' hidden' : ''}>Set External Controller URL to show the remote frame URL.</div>
+        <div class="url-missing" data-external-frame-missing${externalFrameUrl ? ' hidden' : ''}>
+          <span data-external-frame-missing-text>${escapeHtml(externalMissingText)}</span>
+          <button type="button" data-use-external-kiosk-as-controller${externalKioskUrl ? '' : ' hidden'}>Copy to Controller URL</button>
+        </div>
       </div>
       <div class="stack">
         <div class="row">
@@ -1122,22 +1207,22 @@ function renderDeviceCard(device: SetupPageDevice): string {
           <label class="field full">
             <span class="label">External Controller URL</span>
             <input name="externalControllerBaseUrl" type="url" value="${escapeAttribute(device.externalControllerBaseUrl ?? '')}">
-            <span class="help-text">For remote frames, point this to the controller add-on tunnel. The frame will load /frame/${escapeHtml(device.id)} from that hostname.</span>
+            <span class="help-text">Public tunnel to this controller add-on, such as https://frame.example.com. The frame should open /frame/${escapeHtml(device.id)} from this hostname.</span>
           </label>
           <label class="field full">
-            <span class="label">External Kiosk URL</span>
+            <span class="label">External Kiosk Renderer URL</span>
             <input name="externalKioskBaseUrl" type="url" value="${escapeAttribute(device.externalKioskBaseUrl ?? '')}">
+            <span class="help-text">Optional separate public immich-kiosk renderer URL. Do not put the controller add-on domain here unless that domain routes to immich-kiosk itself.</span>
           </label>
           <label class="field">
             <span class="label">Poll Interval</span>
             <input name="pollIntervalSeconds" type="number" min="5" max="300" step="1" value="${device.pollIntervalSeconds}">
           </label>
           <label class="field">
-            <span class="label">Remote Control</span>
+            ${renderRemoteControlLabel()}
             <select name="remoteControlType">
               ${renderRemoteControlOptions(device.remoteControlType ?? 'none')}
             </select>
-            <span class="help-text freekiosk-help" data-freekiosk-help${(device.remoteControlType ?? 'none') === 'freekiosk' ? '' : ' hidden'}>FreeKiosk enables Android REST controls for this frame. See the <a href="https://freekiosk.app/docs/" target="_blank" rel="noreferrer">docs</a> or <a href="https://github.com/RushB-fr/freekiosk" target="_blank" rel="noreferrer">GitHub</a>.</span>
           </label>
           <label class="field full">
             <span class="label">Remote API URL</span>
@@ -1224,6 +1309,13 @@ function renderRemoteControlOptions(value: string): string {
   return ['none', 'freekiosk']
     .map((option) => `<option value="${option}"${option === value ? ' selected' : ''}>${option}</option>`)
     .join('');
+}
+
+function renderRemoteControlLabel(): string {
+  return `<span class="label label-with-info">Remote Control
+    <span class="info-dot" tabindex="0" aria-label="FreeKiosk remote control information">i</span>
+    <span class="info-popover">FreeKiosk enables Android REST controls for this frame, including next, previous, brightness, volume, and mute. See the <a href="https://freekiosk.app/docs/" target="_blank" rel="noreferrer">docs</a> or <a href="https://github.com/RushB-fr/freekiosk" target="_blank" rel="noreferrer">GitHub</a>.</span>
+  </span>`;
 }
 
 function renderPreviewOrientationOptions(value: string): string {

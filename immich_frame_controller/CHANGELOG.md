@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.32
+
+- Clarify that External Frame URL is generated from External Controller URL, not External Kiosk Renderer URL.
+- Add an inline copy action for mistaken renderer URLs so they can be moved into External Controller URL before saving.
+- Move FreeKiosk remote-control documentation into a compact info tooltip to keep the device settings grid aligned.
+
 ## 0.1.31
 
 - Add per-device preview orientation controls for landscape and portrait frame thumbnails.
