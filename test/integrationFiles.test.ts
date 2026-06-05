@@ -23,4 +23,12 @@ describe('Home Assistant integration files', () => {
     expect(source).toContain('"imageFit"');
     expect(source).toContain('["contain", "cover", "none"]');
   });
+
+  it('exposes a FreeKiosk D-pad up command button', () => {
+    const source = readFileSync(join(root, 'custom_components/immich_frame/button.py'), 'utf8');
+
+    expect(source).toContain('"dpad_up"');
+    expect(source).toContain('"D-pad Up"');
+    expect(source).toContain('"dpad-up"');
+  });
 });

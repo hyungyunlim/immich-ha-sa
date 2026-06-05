@@ -1,5 +1,5 @@
 name: Immich Frame Controller
-version: "0.1.40"
+version: "0.1.41"
 slug: immich_frame_controller
 description: Home Assistant managed controller for Immich, immich-kiosk, and a fixed-URL digital frame.
 url: https://github.com/hyungyunlim/immich-ha-sa

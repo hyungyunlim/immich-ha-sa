@@ -703,6 +703,21 @@ describe('controller API', () => {
       apiKey: 'test-key',
     });
 
+    const dpadUp = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'dpad-up' },
+    });
+
+    expect(dpadUp.statusCode).toBe(200);
+    expect(dpadUp.json().data.endpoint).toBe('/api/remote/up');
+    expect(requests).toHaveLength(4);
+    expect(requests[3]).toMatchObject({
+      method: 'POST',
+      url: '/api/remote/up',
+      apiKey: 'test-key',
+    });
+
     const mute = await server.inject({
       method: 'POST',
       url: '/api/frames/lenovo/command',
@@ -712,8 +727,8 @@ describe('controller API', () => {
     expect(mute.statusCode).toBe(200);
     expect(mute.json().data.frameEvent).toMatchObject({ connectedClients: 0, delivered: 0 });
     expect(mute.json().data.remoteFallback.endpoint).toBe('/api/remote/up');
-    expect(requests).toHaveLength(4);
-    expect(requests[3]).toMatchObject({
+    expect(requests).toHaveLength(5);
+    expect(requests[4]).toMatchObject({
       method: 'POST',
       url: '/api/remote/up',
       apiKey: 'test-key',

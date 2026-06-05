@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.41
+
+- Add a dedicated Home Assistant D-pad Up button backed by the FreeKiosk `/api/remote/up` REST endpoint, separate from the diagnostic kiosk mute command.
+
 ## 0.1.40
 
 - Add controller-version cache busting and no-store headers for proxied immich-kiosk CSS/JS so fixed-URL Android WebView frames pick up controller-side rendering patches after an add-on update.

@@ -228,7 +228,7 @@ const DevicePatchSchema = z.object({
 });
 
 const FrameCommandSchema = z.object({
-  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'mute-toggle', 'screen-on', 'screen-off', 'volume-up', 'volume-down', 'device-mute-toggle']),
+  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'mute-toggle', 'screen-on', 'screen-off', 'volume-up', 'volume-down', 'device-mute-toggle', 'dpad-up']),
 });
 
 const RemoteLevelSchema = z.object({
@@ -1461,6 +1461,8 @@ function freeKioskEndpoint(command: FrameCommand): string {
       return '/api/remote/keyboard/volumedown';
     case 'device-mute-toggle':
       return '/api/remote/keyboard/mute';
+    case 'dpad-up':
+      return '/api/remote/up';
   }
 }
 

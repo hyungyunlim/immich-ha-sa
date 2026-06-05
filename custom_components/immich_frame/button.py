@@ -41,6 +41,7 @@ async def async_setup_entry(
             ImmichFrameCommandButton(coordinator, "volume_up", "Volume Up", "volume-up"),
             ImmichFrameCommandButton(coordinator, "volume_down", "Volume Down", "volume-down"),
             ImmichFrameCommandButton(coordinator, "device_mute_toggle", "Device Mute Toggle", "device-mute-toggle"),
+            ImmichFrameCommandButton(coordinator, "dpad_up", "D-pad Up", "dpad-up"),
         ]
     )
 
