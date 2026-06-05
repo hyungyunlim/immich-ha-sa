@@ -49,15 +49,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          provenance: false
-          build-args: |
-            BUILD_VERSION=${{ steps.package-version.outputs.version }}
-          tags: |
-            ${{ env.IMAGE_NAME }}:${{ steps.package-version.outputs.version }}
-            ${{ env.IMAGE_NAME }}:latest
+        timeout-minutes: 15
+        run: |
+          docker buildx build \
+            --progress=plain \
+            --platform linux/amd64,linux/arm64 \
+            --provenance=false \
+            --build-arg BUILD_VERSION=${{ steps.package-version.outputs.version }} \
+            --tag ${{ env.IMAGE_NAME }}:${{ steps.package-version.outputs.version }} \
+            --tag ${{ env.IMAGE_NAME }}:latest \
+            --push \
+            .
