@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.46
+
+- Stream proxied immich-kiosk video range responses instead of buffering each byte-range response in the controller.
+- Preserve upstream `Content-Length` for binary and HEAD proxy responses to improve Android WebView media playback stability.
+
 ## 0.1.45
 
 - Rename the Home Assistant Album select's no-album state from `All Photos` to `No Album Filter` so person-only filtering is explicit.

@@ -1292,16 +1292,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         reply.type(contentType || 'text/plain; charset=utf-8').send(rewriteProxyText(body.toString('utf8'), proxyPrefix, contentType));
         return;
       }
-      if (request.headers.range) {
-        reply.status(response.status);
-        forwardProxyHeaders(response, reply);
-        if (contentType) reply.type(contentType);
-        reply.send(Buffer.from(await response.arrayBuffer()));
-        return;
-      }
       if (request.method === 'HEAD' || !response.body) {
         reply.status(response.status);
-        forwardProxyHeaders(response, reply);
+        forwardProxyHeaders(response, reply, { includeContentLength: true });
         if (contentType) reply.type(contentType);
         reply.send();
         return;
@@ -1605,10 +1598,22 @@ function proxyRequestSignal(method: string): AbortSignal | undefined {
   return method === 'GET' || method === 'HEAD' ? undefined : AbortSignal.timeout(15000);
 }
 
-function forwardProxyHeaders(response: Response, reply: FastifyReply): void {
+interface ForwardProxyHeadersOptions {
+  includeContentLength?: boolean;
+}
+
+function forwardProxyHeaders(
+  response: Response,
+  reply: FastifyReply,
+  options: ForwardProxyHeadersOptions = {},
+): void {
   for (const header of PROXY_RESPONSE_HEADERS) {
     const value = response.headers.get(header);
     if (value) reply.header(header, value);
+  }
+  if (options.includeContentLength) {
+    const contentLength = response.headers.get('content-length');
+    if (contentLength) reply.header('content-length', contentLength);
   }
 }
 
@@ -1631,6 +1636,8 @@ async function streamProxyResponse(response: Response, reply: FastifyReply, cont
     const value = response.headers.get(header);
     if (value) reply.raw.setHeader(header, value);
   }
+  const contentLength = response.headers.get('content-length');
+  if (contentLength) reply.raw.setHeader('content-length', contentLength);
   await pipeline(Readable.fromWeb(response.body as NodeReadableStream<Uint8Array>), reply.raw);
 }
 

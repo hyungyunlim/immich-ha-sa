@@ -936,6 +936,7 @@ describe('controller API', () => {
         response.statusCode = request.headers.range ? 206 : 200;
         response.setHeader('accept-ranges', 'bytes');
         response.setHeader('content-range', 'bytes 0-3/8');
+        response.setHeader('content-length', '4');
         response.setHeader('content-type', 'video/mp4');
         response.end(Buffer.from([0, 1, 2, 3]));
         return;
@@ -1010,6 +1011,7 @@ describe('controller API', () => {
     expect(video.statusCode).toBe(206);
     expect(video.headers['accept-ranges']).toBe('bytes');
     expect(video.headers['content-range']).toBe('bytes 0-3/8');
+    expect(video.headers['content-length']).toBe('4');
     expect(video.headers['content-type']).toContain('video/mp4');
     expect(video.body.length).toBe(4);
 
