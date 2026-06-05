@@ -236,6 +236,7 @@ export class JsonStore {
       id: device?.id ?? fallback.id,
       name: device?.name ?? fallback.name,
       remoteControlType: device?.remoteControlType ?? fallback.remoteControlType ?? 'none',
+      previewOrientation: device?.previewOrientation ?? fallback.previewOrientation ?? 'landscape',
     };
 
     return {

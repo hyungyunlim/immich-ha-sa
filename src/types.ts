@@ -9,6 +9,7 @@ export type ProgressBarPosition = 'top' | 'bottom';
 export type KioskTimeFormat = '12' | '24';
 export type KioskClockSource = 'client' | 'server';
 export type RemoteControlType = 'none' | 'freekiosk';
+export type PreviewOrientation = 'landscape' | 'portrait';
 export type KioskArrowAction = 'none' | 'mute' | 'redirects' | 'pause' | 'more-info' | 'fullscreen';
 export type FrameCommand = 'next' | 'previous' | 'play-pause' | 'reload' | 'mute-toggle' | 'screen-on' | 'screen-off' | 'volume-up' | 'volume-down' | 'device-mute-toggle';
 
@@ -28,6 +29,7 @@ export interface FrameDevice {
   kioskPassword?: string;
   pollIntervalSeconds: number;
   remoteControlType?: RemoteControlType;
+  previewOrientation?: PreviewOrientation;
   remoteApiUrl?: string;
   remoteApiKey?: string;
 }

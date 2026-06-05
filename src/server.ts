@@ -180,6 +180,7 @@ const DeviceCreateSchema = z.object({
   id: DeviceIdSchema,
   name: DeviceNameSchema,
   networkMode: z.enum(['auto', 'local', 'external']).default('auto'),
+  previewOrientation: z.enum(['landscape', 'portrait']).default('landscape'),
   localControllerBaseUrl: OptionalUrlSchema,
   externalControllerBaseUrl: OptionalUrlSchema,
   localKioskBaseUrl: OptionalUrlSchema,
@@ -194,6 +195,7 @@ const DeviceCreateSchema = z.object({
 const DevicePatchSchema = z.object({
   name: DeviceNameSchema.optional(),
   networkMode: z.enum(['auto', 'local', 'external']).optional(),
+  previewOrientation: z.enum(['landscape', 'portrait']).optional(),
   localControllerBaseUrl: RequiredUrlSchema.optional(),
   externalControllerBaseUrl: OptionalUrlSchema,
   localKioskBaseUrl: RequiredUrlSchema.optional(),
@@ -341,6 +343,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           deviceNetworkMode: candidate.networkMode,
           pollIntervalSeconds: candidate.pollIntervalSeconds,
           remoteControlType: candidate.remoteControlType ?? 'none',
+          previewOrientation: candidate.previewOrientation ?? 'landscape',
           remoteApiUrl: candidate.remoteApiUrl,
           remoteApiKeyConfigured: Boolean(candidate.remoteApiKey),
           isDefault: candidate.id === deps.config.defaultDevice.id,
@@ -1437,6 +1440,7 @@ function createDeviceFromInput(
     id: input.id,
     name: input.name,
     networkMode: input.networkMode,
+    previewOrientation: input.previewOrientation,
     localControllerBaseUrl: trimTrailingSlash(input.localControllerBaseUrl ?? defaultDevice.localControllerBaseUrl),
     externalControllerBaseUrl: input.externalControllerBaseUrl
       ? trimTrailingSlash(input.externalControllerBaseUrl)
@@ -1458,6 +1462,7 @@ function normalizeDevicePatch(input: z.infer<typeof DevicePatchSchema>): Partial
 
   if (hasPatchKey(input, 'name')) patch.name = input.name;
   if (hasPatchKey(input, 'networkMode')) patch.networkMode = input.networkMode;
+  if (hasPatchKey(input, 'previewOrientation')) patch.previewOrientation = input.previewOrientation;
   if (hasPatchKey(input, 'localControllerBaseUrl')) {
     patch.localControllerBaseUrl = input.localControllerBaseUrl
       ? trimTrailingSlash(input.localControllerBaseUrl)

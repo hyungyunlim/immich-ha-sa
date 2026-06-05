@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import type { FrameDevice, NetworkMode } from './types.js';
+import type { FrameDevice, NetworkMode, PreviewOrientation } from './types.js';
 
 const NetworkModeSchema = z.enum(['auto', 'local', 'external']);
 const OptionalUrlSchema = z.preprocess(
@@ -59,6 +59,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       ? trimTrailingSlash(parsed.EXTERNAL_PUBLIC_KIOSK_URL)
       : undefined,
     pollIntervalSeconds: parsed.POLL_INTERVAL_SECONDS,
+    previewOrientation: 'landscape' as PreviewOrientation,
   };
 
   return {

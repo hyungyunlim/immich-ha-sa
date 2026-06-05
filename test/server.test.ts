@@ -305,6 +305,9 @@ describe('controller API', () => {
     expect(response.body).toContain('Blank inherits http://10.0.0.10:3000.');
     expect(response.body).toContain('title="Lenovo preview"');
     expect(response.body).toContain('http://10.0.0.10:18082/frame/lenovo?preview=1');
+    expect(response.body).toContain('Preview Orientation');
+    expect(response.body).toContain('FreeKiosk docs');
+    expect(response.body).toContain('<details class="frame-details">');
     await server.close();
   });
 
@@ -349,6 +352,7 @@ describe('controller API', () => {
     });
     expect(created.statusCode).toBe(200);
     expect(created.json().data.device.id).toBe('kitchen');
+    expect(created.json().data.device.previewOrientation).toBe('landscape');
     expect(created.json().data.frameUrl).toBe('http://10.0.0.10:18082/frame/kitchen');
 
     const kitchenUpdate = await server.inject({
@@ -398,6 +402,7 @@ describe('controller API', () => {
       payload: {
         name: 'Office Desk',
         networkMode: 'local',
+        previewOrientation: 'portrait',
         localControllerBaseUrl: 'http://10.0.0.11:18082/',
         localKioskBaseUrl: 'http://10.0.0.11:3000/',
         pollIntervalSeconds: 15,
@@ -405,6 +410,7 @@ describe('controller API', () => {
     });
     expect(updated.statusCode).toBe(200);
     expect(updated.json().data.device.name).toBe('Office Desk');
+    expect(updated.json().data.device.previewOrientation).toBe('portrait');
     expect(updated.json().data.device.localControllerBaseUrl).toBe('http://10.0.0.11:18082');
     expect(updated.json().data.state.networkMode).toBe('local');
 

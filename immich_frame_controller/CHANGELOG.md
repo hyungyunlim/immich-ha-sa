@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.31
+
+- Add per-device preview orientation controls for landscape and portrait frame thumbnails.
+- Make frame URL previews update immediately while editing local or external controller URLs.
+- Collapse detailed frame diagnostics into a closed-by-default Frame Details section.
+- Add FreeKiosk documentation and GitHub links near remote control settings.
+
 ## 0.1.30
 
 - Simplify the add-on device creation form so only essential fields are visible by default.

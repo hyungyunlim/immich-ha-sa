@@ -30,6 +30,7 @@ interface SetupPageDevice {
   deviceNetworkMode: string;
   pollIntervalSeconds: number;
   remoteControlType?: string;
+  previewOrientation?: string;
   remoteApiUrl?: string;
   remoteApiKeyConfigured?: boolean;
   isDefault: boolean;
@@ -106,6 +107,7 @@ export function renderSetupPage(params: SetupPageParams): string {
   const inheritedNetworkMode = defaultDevice?.networkMode ?? defaultDevice?.deviceNetworkMode ?? 'auto';
   const inheritedPollIntervalSeconds = defaultDevice?.pollIntervalSeconds ?? 20;
   const inheritedRemoteControlType = defaultDevice?.remoteControlType ?? 'none';
+  const inheritedPreviewOrientation = previewOrientation(defaultDevice);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -230,6 +232,9 @@ export function renderSetupPage(params: SetupPageParams): string {
       font-size: 12px;
       line-height: 1.35;
     }
+    [hidden] {
+      display: none !important;
+    }
     .url-missing {
       border: 1px dashed #cfd8e2;
       border-radius: 7px;
@@ -271,6 +276,9 @@ export function renderSetupPage(params: SetupPageParams): string {
       grid-template-columns: minmax(210px, 260px) minmax(0, 1fr);
       align-items: start;
     }
+    .device-content.portrait {
+      grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
+    }
     .device-preview {
       padding: 18px 0 18px 18px;
     }
@@ -283,6 +291,11 @@ export function renderSetupPage(params: SetupPageParams): string {
       border-radius: 8px;
       background: #111827;
     }
+    .preview-frame.portrait {
+      width: min(170px, 100%);
+      aspect-ratio: 10 / 16;
+      margin: 0 auto;
+    }
     .preview-frame iframe {
       width: 400%;
       height: 400%;
@@ -291,6 +304,9 @@ export function renderSetupPage(params: SetupPageParams): string {
       transform: scale(.25);
       transform-origin: top left;
       background: #111827;
+    }
+    .frame-details .kv {
+      margin-top: 12px;
     }
     .stack {
       display: grid;
@@ -447,6 +463,60 @@ export function renderSetupPage(params: SetupPageParams): string {
       outline: 2px solid rgb(8 126 139 / 22%);
       border-color: #087e8b;
     }
+    .segmented {
+      display: inline-grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(112px, 1fr);
+      gap: 4px;
+      width: 100%;
+      border: 1px solid #cfd8e2;
+      border-radius: 8px;
+      padding: 4px;
+      background: #f8fafc;
+    }
+    .segmented label {
+      display: block;
+      min-width: 0;
+    }
+    .segmented input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .segmented span {
+      display: grid;
+      min-height: 32px;
+      place-items: center;
+      border-radius: 6px;
+      color: #475569;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      pointer-events: none;
+    }
+    .segmented input:checked + span {
+      background: #ffffff;
+      color: #087e8b;
+      box-shadow: 0 1px 5px rgb(15 23 42 / 12%);
+    }
+    a {
+      color: #087e8b;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .inline-link {
+      margin-left: 8px;
+      font-size: 12px;
+      text-transform: none;
+    }
+    .freekiosk-help[hidden] {
+      display: none;
+    }
     details {
       border: 1px solid #e5ebf1;
       border-radius: 8px;
@@ -597,10 +667,17 @@ export function renderSetupPage(params: SetupPageParams): string {
           <input name="name" required maxlength="80" placeholder="Living Room Frame">
         </label>
         <label class="field">
-          <span class="label">Remote Control</span>
+          <span class="label">Preview Orientation</span>
+          <span class="segmented">
+            ${renderPreviewOrientationOptions(inheritedPreviewOrientation)}
+          </span>
+        </label>
+        <label class="field">
+          <span class="label">Remote Control <a class="inline-link" href="https://freekiosk.app/docs/" target="_blank" rel="noreferrer">FreeKiosk docs</a></span>
           <select name="remoteControlType">
             ${renderRemoteControlOptions(inheritedRemoteControlType)}
           </select>
+          <span class="help-text freekiosk-help" data-freekiosk-help${inheritedRemoteControlType === 'freekiosk' ? '' : ' hidden'}>FreeKiosk is the Android kiosk app used for REST controls such as next, previous, brightness, volume, and mute. See the <a href="https://github.com/RushB-fr/freekiosk" target="_blank" rel="noreferrer">GitHub project</a>.</span>
         </label>
         <label class="field full">
           <span class="label">Remote API URL</span>
@@ -717,6 +794,55 @@ export function renderSetupPage(params: SetupPageParams): string {
       return value ? value : undefined;
     }
 
+    function buildFrameUrl(baseUrl, deviceId) {
+      const base = String(baseUrl || '').trim().replace(/\\/+$/, '');
+      return base ? base + '/frame/' + deviceId : '';
+    }
+
+    function previewFrameUrl(frameUrl) {
+      return frameUrl ? frameUrl + (frameUrl.includes('?') ? '&' : '?') + 'preview=1' : '';
+    }
+
+    function syncFrameUrlElement(card, kind, value) {
+      const code = card.querySelector('[data-' + kind + '-frame-url]');
+      const copy = card.querySelector('[data-' + kind + '-frame-copy]');
+      const missing = card.querySelector('[data-' + kind + '-frame-missing]');
+      if (code) {
+        code.textContent = value;
+        code.hidden = !value;
+      }
+      if (copy) {
+        copy.setAttribute('data-copy', value);
+        copy.hidden = !value;
+      }
+      if (missing) {
+        missing.hidden = Boolean(value);
+      }
+    }
+
+    function syncDeviceCard(form) {
+      const deviceId = form.getAttribute('data-device-edit');
+      if (!deviceId) return;
+      const card = form.closest('.device');
+      if (!card) return;
+      const localFrameUrl = buildFrameUrl(form.querySelector('[name="localControllerBaseUrl"]')?.value, deviceId);
+      const externalFrameUrl = buildFrameUrl(form.querySelector('[name="externalControllerBaseUrl"]')?.value, deviceId);
+      syncFrameUrlElement(card, 'local', localFrameUrl);
+      syncFrameUrlElement(card, 'external', externalFrameUrl);
+
+      const orientation = form.querySelector('[name="previewOrientation"]:checked')?.value === 'portrait' ? 'portrait' : 'landscape';
+      const content = card.querySelector('.device-content');
+      const frame = card.querySelector('.preview-frame');
+      content?.classList.toggle('portrait', orientation === 'portrait');
+      content?.classList.toggle('landscape', orientation === 'landscape');
+      frame?.classList.toggle('portrait', orientation === 'portrait');
+      frame?.classList.toggle('landscape', orientation === 'landscape');
+      const preview = card.querySelector('[data-frame-preview]');
+      if (preview && localFrameUrl) {
+        preview.setAttribute('src', previewFrameUrl(localFrameUrl));
+      }
+    }
+
     function payloadFromForm(form, includeId) {
       const formData = new FormData(form);
       const remoteApiUrl = optionalValue(formData, 'remoteApiUrl');
@@ -724,6 +850,7 @@ export function renderSetupPage(params: SetupPageParams): string {
       const payload = {
         name: String(formData.get('name') || '').trim(),
         networkMode: String(formData.get('networkMode') || 'auto'),
+        previewOrientation: String(formData.get('previewOrientation') || 'landscape'),
         pollIntervalSeconds: Number(formData.get('pollIntervalSeconds') || 20),
         localControllerBaseUrl: optionalValue(formData, 'localControllerBaseUrl'),
         externalControllerBaseUrl: optionalValue(formData, 'externalControllerBaseUrl') ?? null,
@@ -763,15 +890,33 @@ export function renderSetupPage(params: SetupPageParams): string {
       return body;
     }
 
-    for (const form of document.querySelectorAll('[data-device-create]')) {
+    for (const form of document.querySelectorAll('[data-device-create], [data-device-edit]')) {
       const remoteApiUrl = form.querySelector('[name="remoteApiUrl"]');
       const remoteControlType = form.querySelector('[name="remoteControlType"]');
+      const localControllerUrl = form.querySelector('[name="localControllerBaseUrl"]');
+      const externalControllerUrl = form.querySelector('[name="externalControllerBaseUrl"]');
+      const syncFreekioskHelp = () => {
+        const help = form.querySelector('[data-freekiosk-help]');
+        if (!help) return;
+        help.hidden = remoteControlType?.value !== 'freekiosk';
+      };
+      remoteControlType?.addEventListener('change', syncFreekioskHelp);
       remoteApiUrl?.addEventListener('input', () => {
         if (remoteApiUrl.value.trim() && remoteControlType?.value === 'none') {
           remoteControlType.value = 'freekiosk';
         }
+        syncFreekioskHelp();
       });
+      localControllerUrl?.addEventListener('input', () => syncDeviceCard(form));
+      externalControllerUrl?.addEventListener('input', () => syncDeviceCard(form));
+      for (const option of form.querySelectorAll('[name="previewOrientation"]')) {
+        option.addEventListener('change', () => syncDeviceCard(form));
+      }
+      syncFreekioskHelp();
+      syncDeviceCard(form);
+    }
 
+    for (const form of document.querySelectorAll('[data-device-create]')) {
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
         setStatus(form, 'Adding device...', false);
@@ -868,9 +1013,11 @@ function renderDeviceCard(device: SetupPageDevice): string {
   const rendererUrl = device.rendererUrl
     ? redactSensitiveQueryParams(device.rendererUrl)
     : 'Not resolved yet';
+  const externalFrameUrl = device.externalFrameUrl ?? '';
   const sleepWindow = device.disableSleep
     ? 'Disabled'
     : `${device.sleepStart || 'config'} -> ${device.sleepEnd || 'config'}`;
+  const orientation = previewOrientation(device);
   return `<article class="device">
     <div class="device-head">
       <div class="stack">
@@ -879,28 +1026,27 @@ function renderDeviceCard(device: SetupPageDevice): string {
       </div>
       ${renderStatusPill(device.resolvedNetworkMode ?? device.networkMode ?? 'unknown')}
     </div>
-    <div class="device-content">
+    <div class="device-content ${escapeAttribute(orientation)}">
       <div class="device-preview">
-        <div class="preview-frame">
-          <iframe src="${escapeAttribute(framePreviewUrl(device.localFrameUrl))}" title="${escapeAttribute(`${device.name} preview`)}" loading="lazy"></iframe>
+        <div class="preview-frame ${escapeAttribute(orientation)}">
+          <iframe data-frame-preview src="${escapeAttribute(framePreviewUrl(device.localFrameUrl))}" title="${escapeAttribute(`${device.name} preview`)}" loading="lazy"></iframe>
         </div>
       </div>
       <div class="device-body">
       <div class="stack">
         <div class="row">
           <span class="label">Local Frame URL</span>
-          <button type="button" data-copy="${escapeAttribute(device.localFrameUrl)}">Copy</button>
+          <button type="button" data-copy="${escapeAttribute(device.localFrameUrl)}" data-local-frame-copy>Copy</button>
         </div>
-        <code>${escapeHtml(device.localFrameUrl)}</code>
+        <code data-local-frame-url>${escapeHtml(device.localFrameUrl)}</code>
       </div>
       <div class="stack">
         <div class="row">
           <span class="label">External Frame URL</span>
-          ${device.externalFrameUrl ? `<button type="button" data-copy="${escapeAttribute(device.externalFrameUrl)}">Copy</button>` : ''}
+          <button type="button" data-copy="${escapeAttribute(externalFrameUrl)}" data-external-frame-copy${externalFrameUrl ? '' : ' hidden'}>Copy</button>
         </div>
-        ${device.externalFrameUrl
-          ? `<code>${escapeHtml(device.externalFrameUrl)}</code>`
-          : '<div class="url-missing">Set External Controller URL to show the remote frame URL.</div>'}
+        <code data-external-frame-url${externalFrameUrl ? '' : ' hidden'}>${escapeHtml(externalFrameUrl)}</code>
+        <div class="url-missing" data-external-frame-missing${externalFrameUrl ? ' hidden' : ''}>Set External Controller URL to show the remote frame URL.</div>
       </div>
       <div class="stack">
         <div class="row">
@@ -909,7 +1055,9 @@ function renderDeviceCard(device: SetupPageDevice): string {
         </div>
         <code>${escapeHtml(rendererUrl)}</code>
       </div>
-      <dl class="kv">
+      <details class="frame-details">
+        <summary>Frame Details</summary>
+        <dl class="kv">
         ${renderKeyValue('Duration', `${device.durationSeconds ?? 'unknown'}s`)}
         ${renderKeyValue('Fit / Order', `${device.imageFit ?? 'config'} / ${device.albumOrder ?? 'config'}`)}
         ${renderKeyValue('Clock', renderClockSummary(device))}
@@ -919,6 +1067,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Frame Connection', `${device.frameEventClients} live`)}
         ${renderKeyValue('Transition', device.transition ?? 'config')}
         ${renderKeyValue('Layout', device.layout ?? 'config')}
+        ${renderKeyValue('Preview', orientation)}
         ${renderKeyValue('Image Effect', device.imageEffect ?? 'config')}
         ${renderKeyValue('Background', `${boolLabel(device.backgroundBlur)} / blur ${device.backgroundBlurAmount ?? 10} / font ${device.fontSize ?? 100}%`)}
         ${renderKeyValue('Frameless', boolLabel(device.frameless))}
@@ -933,7 +1082,8 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Burn-in', `${device.burnInInterval ?? 0}m / ${device.burnInDuration ?? 30}s / ${device.burnInOpacity ?? 30}%`)}
         ${renderKeyValue('Sleep', sleepWindow)}
         ${renderKeyValue('Remote', `${device.remoteControlType ?? 'none'}${device.remoteApiUrl ? ' / configured' : ''}`)}
-      </dl>
+        </dl>
+      </details>
       <details>
         <summary>Device Settings</summary>
         <form class="form-grid" data-device-edit="${escapeAttribute(device.id)}">
@@ -946,6 +1096,12 @@ function renderDeviceCard(device: SetupPageDevice): string {
             <select name="networkMode">
               ${renderNetworkModeOptions(device.networkMode ?? device.deviceNetworkMode)}
             </select>
+          </label>
+          <label class="field">
+            <span class="label">Preview Orientation</span>
+            <span class="segmented">
+              ${renderPreviewOrientationOptions(previewOrientation(device))}
+            </span>
           </label>
           <label class="field full">
             <span class="label">Local Controller URL</span>
@@ -981,6 +1137,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
             <select name="remoteControlType">
               ${renderRemoteControlOptions(device.remoteControlType ?? 'none')}
             </select>
+            <span class="help-text freekiosk-help" data-freekiosk-help${(device.remoteControlType ?? 'none') === 'freekiosk' ? '' : ' hidden'}>FreeKiosk enables Android REST controls for this frame. See the <a href="https://freekiosk.app/docs/" target="_blank" rel="noreferrer">docs</a> or <a href="https://github.com/RushB-fr/freekiosk" target="_blank" rel="noreferrer">GitHub</a>.</span>
           </label>
           <label class="field full">
             <span class="label">Remote API URL</span>
@@ -1067,6 +1224,19 @@ function renderRemoteControlOptions(value: string): string {
   return ['none', 'freekiosk']
     .map((option) => `<option value="${option}"${option === value ? ' selected' : ''}>${option}</option>`)
     .join('');
+}
+
+function renderPreviewOrientationOptions(value: string): string {
+  return [
+    ['landscape', 'Landscape'],
+    ['portrait', 'Portrait'],
+  ]
+    .map(([option, label]) => `<label><input name="previewOrientation" type="radio" value="${option}"${option === value ? ' checked' : ''}><span>${label}</span></label>`)
+    .join('');
+}
+
+function previewOrientation(device: Pick<SetupPageDevice, 'previewOrientation'> | undefined): 'landscape' | 'portrait' {
+  return device?.previewOrientation === 'portrait' ? 'portrait' : 'landscape';
 }
 
 function boolLabel(value: boolean | undefined): string {
