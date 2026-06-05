@@ -56,6 +56,7 @@ describe('Home Assistant integration files', () => {
     expect(selectSource).toContain('Frame Person');
     expect(selectSource).toContain('PERSON_OPTION_NO_FILTER = "No Person Filter"');
     expect(selectSource).toContain('PERSON_OPTION_ALL_NAMED_PEOPLE = "All Named People"');
+    expect(selectSource).toContain('def _selectable_people');
     expect(textSource).toContain('Frame People');
     expect(textSource).toContain('"activePersonIds"');
     expect(switchSource).toContain('"require_all_people"');

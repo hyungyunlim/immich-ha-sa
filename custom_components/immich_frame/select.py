@@ -173,7 +173,7 @@ class ImmichFramePersonSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectE
         options = [PERSON_OPTION_NO_FILTER, PERSON_OPTION_ALL_NAMED_PEOPLE]
         if len(active) > 1:
             options.append(PERSON_OPTION_MULTIPLE_PEOPLE)
-        options.extend(self._label_for_person(person) for person in self._people)
+        options.extend(self._label_for_person(person) for person in self._selectable_people)
         if len(active) == 1 and not self._person_for_id(active[0]):
             options.append(active[0])
         return list(dict.fromkeys(options))
@@ -212,6 +212,10 @@ class ImmichFramePersonSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectE
     @property
     def _people(self) -> list[dict[str, Any]]:
         return self.coordinator.data.get("people", {}).get("items", [])
+
+    @property
+    def _selectable_people(self) -> list[dict[str, Any]]:
+        return [person for person in self._people if str(person.get("name") or "").strip()]
 
     @property
     def _active_person_ids(self) -> list[str]:

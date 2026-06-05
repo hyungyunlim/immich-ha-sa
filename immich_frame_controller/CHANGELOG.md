@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.44
+
+- Keep unnamed Immich face groups out of the Home Assistant Person select while still allowing direct person IDs through the People text entity and services.
+
 ## 0.1.43
 
 - Add Immich person cache refresh alongside albums, including controller health/setup status.
