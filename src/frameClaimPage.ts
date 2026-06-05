@@ -21,24 +21,33 @@ export function renderFrameClaimPage(params: FrameClaimPageParams): string {
     html,
     body {
       width: 100%;
-      height: 100%;
+      min-height: 100%;
       margin: 0;
       overflow: hidden;
       background: #05070a;
       color: #f8fafc;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      display: grid;
+    }
     main {
       width: 100%;
-      height: 100%;
+      min-height: 100vh;
+      min-height: 100dvh;
       display: grid;
       place-items: center;
-      padding: 6vh 6vw;
+      padding: clamp(24px, 6vmin, 56px);
       text-align: center;
     }
     .stack {
       display: grid;
-      gap: 3vh;
+      width: min(100%, 1000px);
+      gap: clamp(18px, 3vmin, 36px);
+      align-content: center;
       justify-items: center;
     }
     .label {
@@ -51,10 +60,11 @@ export function renderFrameClaimPage(params: FrameClaimPageParams): string {
     .code {
       color: #ffffff;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: clamp(58px, 17vw, 170px);
+      font-size: clamp(48px, 15vmin, 150px);
       font-weight: 850;
       line-height: 1;
-      letter-spacing: .04em;
+      letter-spacing: 0;
+      white-space: nowrap;
     }
     .hint {
       max-width: 900px;

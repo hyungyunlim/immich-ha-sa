@@ -277,7 +277,7 @@ export function renderSetupPage(params: SetupPageParams): string {
     }
     .device-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      grid-template-columns: minmax(0, 1fr);
       gap: 16px;
     }
     .device {
@@ -957,11 +957,41 @@ export function renderSetupPage(params: SetupPageParams): string {
       });
     }
 
-    function setStatus(form, message, failed) {
+    function setStatus(form, message, failed, clearAfterMs) {
       const status = form.querySelector('[data-form-status]');
       if (!status) return;
+      if (status._clearTimer) {
+        clearTimeout(status._clearTimer);
+        status._clearTimer = null;
+      }
       status.textContent = message || '';
-      status.style.color = failed ? '#991b1b' : '#697586';
+      const normalizedMessage = String(message || '').toLowerCase();
+      const succeeded = !failed && (
+        normalizedMessage === 'saved'
+        || normalizedMessage.startsWith('added')
+        || normalizedMessage.startsWith('deleted')
+        || normalizedMessage.startsWith('claimed')
+      );
+      status.style.color = failed ? '#991b1b' : (succeeded ? '#047857' : '#697586');
+      if (message && clearAfterMs) {
+        status._clearTimer = setTimeout(() => {
+          status.textContent = '';
+          status.style.color = '#697586';
+          status._clearTimer = null;
+        }, clearAfterMs);
+      }
+    }
+
+    function reloadSoon() {
+      setTimeout(() => window.location.reload(), 650);
+    }
+
+    function syncDeviceHeader(form, device) {
+      const card = form.closest('.device');
+      const name = card?.querySelector('[data-device-name]');
+      if (name && device && device.name) {
+        name.textContent = device.name;
+      }
     }
 
     function optionalValue(formData, name) {
@@ -1154,7 +1184,8 @@ export function renderSetupPage(params: SetupPageParams): string {
               previewOrientation: String(formData.get('previewOrientation') || 'landscape'),
             }),
           });
-          window.location.reload();
+          setStatus(form, 'Claimed. Reloading...', false);
+          reloadSoon();
         } catch (error) {
           setStatus(form, error instanceof Error ? error.message : String(error), true);
         }
@@ -1170,7 +1201,8 @@ export function renderSetupPage(params: SetupPageParams): string {
             method: 'POST',
             body: JSON.stringify(payloadFromForm(form, true)),
           });
-          window.location.reload();
+          setStatus(form, 'Added. Reloading...', false);
+          reloadSoon();
         } catch (error) {
           setStatus(form, error instanceof Error ? error.message : String(error), true);
         }
@@ -1183,11 +1215,13 @@ export function renderSetupPage(params: SetupPageParams): string {
         const deviceId = form.getAttribute('data-device-edit') || '';
         setStatus(form, 'Saving device...', false);
         try {
-          await requestJson('/api/devices/' + encodeURIComponent(deviceId), {
+          const body = await requestJson('/api/devices/' + encodeURIComponent(deviceId), {
             method: 'PATCH',
             body: JSON.stringify(payloadFromForm(form, false)),
           });
-          window.location.reload();
+          syncDeviceCard(form);
+          syncDeviceHeader(form, body?.data?.device);
+          setStatus(form, 'Saved', false, 1800);
         } catch (error) {
           setStatus(form, error instanceof Error ? error.message : String(error), true);
         }
@@ -1202,7 +1236,8 @@ export function renderSetupPage(params: SetupPageParams): string {
         if (form) setStatus(form, 'Deleting device...', false);
         try {
           await requestJson('/api/devices/' + encodeURIComponent(deviceId), { method: 'DELETE' });
-          window.location.reload();
+          if (form) setStatus(form, 'Deleted. Reloading...', false);
+          reloadSoon();
         } catch (error) {
           if (form) setStatus(form, error instanceof Error ? error.message : String(error), true);
         }
@@ -1270,7 +1305,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
   return `<article class="device">
     <div class="device-head">
       <div class="stack">
-        <h3>${escapeHtml(device.name)}</h3>
+        <h3 data-device-name>${escapeHtml(device.name)}</h3>
         <span class="muted">${escapeHtml(device.id)}</span>
       </div>
       ${renderStatusPill(device.resolvedNetworkMode ?? device.networkMode ?? 'unknown')}

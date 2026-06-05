@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.36
+
+- Show configured frame cards as a vertical list instead of auto-fitting them into horizontal columns.
+- Keep the frame pairing code and instructions centered in portrait frame browsers.
+- Show `Saved` after device setting updates and clear the message automatically instead of immediately reloading the console.
+
 ## 0.1.35
 
 - Resolve add-on console API requests relative to the current page so device save/delete actions work under Home Assistant Ingress as well as direct controller URLs.

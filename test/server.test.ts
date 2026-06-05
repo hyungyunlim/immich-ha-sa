@@ -312,6 +312,10 @@ describe('controller API', () => {
     expect(response.body).toContain('https://freekiosk.app/docs/');
     expect(response.body).toContain('External Kiosk Renderer URL');
     expect(response.body).toContain('<details class="frame-details">');
+    expect(response.body).toContain('grid-template-columns: minmax(0, 1fr);');
+    expect(response.body).toContain("setStatus(form, 'Saved', false, 1800);");
+    expect(response.body).toContain('function reloadSoon()');
+    expect(response.body).toContain('data-device-name');
     expect(response.body).toContain('function controllerPath(path)');
     expect(response.body).toContain('fetch(controllerPath(path),');
     expect(response.body).toContain("'Request failed' + status");
@@ -388,6 +392,9 @@ describe('controller API', () => {
     });
     expect(pairing.statusCode).toBe(200);
     expect(pairing.body).toContain('Pair this frame');
+    expect(pairing.body).toContain('min-height: 100dvh;');
+    expect(pairing.body).toContain('font-size: clamp(48px, 15vmin, 150px);');
+    expect(pairing.body).toContain('white-space: nowrap;');
     const code = pairing.body.match(/<div class="code">([^<]+)<\/div>/)?.[1];
     expect(code).toMatch(/^\d{3} \d{3}$/);
 
