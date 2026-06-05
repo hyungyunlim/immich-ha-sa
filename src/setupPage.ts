@@ -6,7 +6,18 @@ interface SetupPageParams {
   albumCount: number;
   albumRefreshedAt?: string;
   globalKioskPasswordConfigured: boolean;
+  frameClaims: SetupPageFrameClaim[];
   devices: SetupPageDevice[];
+}
+
+interface SetupPageFrameClaim {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  claimedDeviceId?: string;
+  claimedAt?: string;
+  requestHost?: string;
+  status: 'pending' | 'claimed' | 'expired';
 }
 
 interface SetupPageKioskConnection {
@@ -19,6 +30,7 @@ interface SetupPageKioskConnection {
 interface SetupPageDevice {
   id: string;
   name: string;
+  alias?: string;
   localControllerBaseUrl: string;
   externalControllerBaseUrl?: string;
   localKioskBaseUrl: string;
@@ -35,7 +47,9 @@ interface SetupPageDevice {
   remoteApiKeyConfigured?: boolean;
   isDefault: boolean;
   localFrameUrl: string;
+  localStableFrameUrl: string;
   externalFrameUrl?: string;
+  externalStableFrameUrl?: string;
   rendererUrl?: string;
   networkMode?: string;
   resolvedNetworkMode?: string;
@@ -108,6 +122,8 @@ export function renderSetupPage(params: SetupPageParams): string {
   const inheritedPollIntervalSeconds = defaultDevice?.pollIntervalSeconds ?? 20;
   const inheritedRemoteControlType = defaultDevice?.remoteControlType ?? 'none';
   const inheritedPreviewOrientation = previewOrientation(defaultDevice);
+  const defaultFrameUrl = defaultDevice?.localStableFrameUrl
+    ?? `${params.controllerUrl.replace(/\/+$/, '')}/frame/${params.deviceId}`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -365,6 +381,15 @@ export function renderSetupPage(params: SetupPageParams): string {
       background: #f6f8fa;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px;
+    }
+    .form-lead code,
+    .help-text code {
+      display: inline;
+      width: auto;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      font-size: inherit;
     }
     .pill {
       display: inline-flex;
@@ -635,6 +660,24 @@ export function renderSetupPage(params: SetupPageParams): string {
       line-height: 1.45;
       margin-top: 7px;
     }
+    .claim-list {
+      display: grid;
+      gap: 8px;
+      grid-column: 1 / -1;
+    }
+    .claim-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid #e5ebf1;
+      border-radius: 7px;
+      padding: 9px 11px;
+      background: #fbfcfd;
+      color: #475569;
+      font-size: 13px;
+    }
     @media (max-width: 780px) {
       main {
         padding: 18px;
@@ -677,7 +720,7 @@ export function renderSetupPage(params: SetupPageParams): string {
       </div>
       <div class="toolbar">
         <button type="button" data-copy="${escapeAttribute(params.controllerUrl)}">Copy Controller URL</button>
-        <button type="button" data-copy="${escapeAttribute(`${params.controllerUrl.replace(/\/+$/, '')}/frame/${params.deviceId}`)}">Copy Default Frame URL</button>
+        <button type="button" data-copy="${escapeAttribute(defaultFrameUrl)}">Copy Default Frame URL</button>
       </div>
     </header>
 
@@ -708,6 +751,40 @@ export function renderSetupPage(params: SetupPageParams): string {
     </section>
 
     <div class="section-title">
+      <h2>Frame Pairing</h2>
+      <span class="pill">Short URL install</span>
+    </div>
+    <section class="panel">
+      <form class="form-grid" data-frame-claim>
+        <p class="form-lead">Open the controller root URL on a physical frame, then enter the six-digit code shown on that screen. The claimed frame gets a stable alias path like <code>/f/kitchen-frame-8k2p</code>.</p>
+        <label class="field">
+          <span class="label">Frame Code</span>
+          <input name="claimCode" required inputmode="numeric" autocomplete="one-time-code" placeholder="842 193">
+        </label>
+        <label class="field">
+          <span class="label">Name</span>
+          <input name="name" required maxlength="80" placeholder="Kitchen Frame">
+        </label>
+        <label class="field">
+          <span class="label">Alias</span>
+          <input name="alias" maxlength="80" pattern="[a-z0-9][a-z0-9-]*" placeholder="auto">
+          <span class="help-text">Optional. Blank generates a name-based alias with a short random suffix.</span>
+        </label>
+        <label class="field">
+          <span class="label">Preview Orientation</span>
+          <span class="segmented">
+            ${renderPreviewOrientationOptions(inheritedPreviewOrientation)}
+          </span>
+        </label>
+        ${renderFrameClaimRows(params.frameClaims)}
+        <div class="form-actions">
+          <span class="form-status" data-form-status></span>
+          <button type="submit" class="primary">Claim Frame</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="section-title">
       <h2>Device Management</h2>
       <span class="pill ok">Separate frame state</span>
     </div>
@@ -721,6 +798,10 @@ export function renderSetupPage(params: SetupPageParams): string {
         <label class="field">
           <span class="label">Name</span>
           <input name="name" required maxlength="80" placeholder="Living Room Frame">
+        </label>
+        <label class="field">
+          <span class="label">Alias</span>
+          <input name="alias" maxlength="80" pattern="[a-z0-9][a-z0-9-]*" placeholder="optional stable path">
         </label>
         <label class="field">
           <span class="label">Preview Orientation</span>
@@ -855,6 +936,12 @@ export function renderSetupPage(params: SetupPageParams): string {
       return base ? base + '/frame/' + deviceId : '';
     }
 
+    function buildStableFrameUrl(baseUrl, deviceId, alias) {
+      const base = String(baseUrl || '').trim().replace(/\\/+$/, '');
+      const pathName = String(alias || deviceId || '').trim().toLowerCase();
+      return base && pathName ? base + '/f/' + encodeURIComponent(pathName) : '';
+    }
+
     function previewFrameUrl(frameUrl) {
       return frameUrl ? frameUrl + (frameUrl.includes('?') ? '&' : '?') + 'preview=1' : '';
     }
@@ -895,9 +982,12 @@ export function renderSetupPage(params: SetupPageParams): string {
       if (!deviceId) return;
       const card = form.closest('.device');
       if (!card) return;
+      const alias = form.querySelector('[name="alias"]')?.value;
       const localFrameUrl = buildFrameUrl(form.querySelector('[name="localControllerBaseUrl"]')?.value, deviceId);
-      const externalFrameUrl = buildFrameUrl(form.querySelector('[name="externalControllerBaseUrl"]')?.value, deviceId);
+      const localStableFrameUrl = buildStableFrameUrl(form.querySelector('[name="localControllerBaseUrl"]')?.value, deviceId, alias);
+      const externalFrameUrl = buildStableFrameUrl(form.querySelector('[name="externalControllerBaseUrl"]')?.value, deviceId, alias);
       const externalKioskUrl = String(form.querySelector('[name="externalKioskBaseUrl"]')?.value || '').trim();
+      syncFrameUrlElement(card, 'stable', localStableFrameUrl);
       syncFrameUrlElement(card, 'local', localFrameUrl);
       syncExternalFrameUrlElement(card, externalFrameUrl, externalKioskUrl);
 
@@ -920,6 +1010,7 @@ export function renderSetupPage(params: SetupPageParams): string {
       const selectedRemoteControlType = String(formData.get('remoteControlType') || 'none');
       const payload = {
         name: String(formData.get('name') || '').trim(),
+        alias: optionalValue(formData, 'alias'),
         networkMode: String(formData.get('networkMode') || 'auto'),
         previewOrientation: String(formData.get('previewOrientation') || 'landscape'),
         pollIntervalSeconds: Number(formData.get('pollIntervalSeconds') || 20),
@@ -964,6 +1055,7 @@ export function renderSetupPage(params: SetupPageParams): string {
     for (const form of document.querySelectorAll('[data-device-create], [data-device-edit]')) {
       const remoteApiUrl = form.querySelector('[name="remoteApiUrl"]');
       const remoteControlType = form.querySelector('[name="remoteControlType"]');
+      const alias = form.querySelector('[name="alias"]');
       const localControllerUrl = form.querySelector('[name="localControllerBaseUrl"]');
       const externalControllerUrl = form.querySelector('[name="externalControllerBaseUrl"]');
       const externalKioskUrl = form.querySelector('[name="externalKioskBaseUrl"]');
@@ -972,6 +1064,7 @@ export function renderSetupPage(params: SetupPageParams): string {
           remoteControlType.value = 'freekiosk';
         }
       });
+      alias?.addEventListener('input', () => syncDeviceCard(form));
       localControllerUrl?.addEventListener('input', () => syncDeviceCard(form));
       externalControllerUrl?.addEventListener('input', () => syncDeviceCard(form));
       externalKioskUrl?.addEventListener('input', () => syncDeviceCard(form));
@@ -991,6 +1084,28 @@ export function renderSetupPage(params: SetupPageParams): string {
         externalControllerUrl.value = externalKioskUrl.value.trim();
         syncDeviceCard(form);
         externalControllerUrl.focus();
+      });
+    }
+
+    for (const form of document.querySelectorAll('[data-frame-claim]')) {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(form);
+        const code = String(formData.get('claimCode') || '').trim();
+        setStatus(form, 'Claiming frame...', false);
+        try {
+          await requestJson('/api/frame-claims/' + encodeURIComponent(code) + '/claim', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: String(formData.get('name') || '').trim(),
+              alias: optionalValue(formData, 'alias'),
+              previewOrientation: String(formData.get('previewOrientation') || 'landscape'),
+            }),
+          });
+          window.location.reload();
+        } catch (error) {
+          setStatus(form, error instanceof Error ? error.message : String(error), true);
+        }
       });
     }
 
@@ -1091,7 +1206,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
   const rendererUrl = device.rendererUrl
     ? redactSensitiveQueryParams(device.rendererUrl)
     : 'Not resolved yet';
-  const externalFrameUrl = device.externalFrameUrl ?? '';
+  const externalFrameUrl = device.externalStableFrameUrl ?? '';
   const externalKioskUrl = device.externalKioskBaseUrl ?? '';
   const externalMissingText = externalKioskUrl
     ? 'External Kiosk Renderer URL is set, but External Frame URL needs External Controller URL. If this hostname routes to the controller add-on, copy it into External Controller URL and save.'
@@ -1115,6 +1230,13 @@ function renderDeviceCard(device: SetupPageDevice): string {
         </div>
       </div>
       <div class="device-body">
+      <div class="stack">
+        <div class="row">
+          <span class="label">Stable Frame URL</span>
+          <button type="button" data-copy="${escapeAttribute(device.localStableFrameUrl)}" data-stable-frame-copy>Copy</button>
+        </div>
+        <code data-stable-frame-url>${escapeHtml(device.localStableFrameUrl)}</code>
+      </div>
       <div class="stack">
         <div class="row">
           <span class="label">Local Frame URL</span>
@@ -1177,6 +1299,10 @@ function renderDeviceCard(device: SetupPageDevice): string {
             <input name="name" required maxlength="80" value="${escapeAttribute(device.name)}">
           </label>
           <label class="field">
+            <span class="label">Alias</span>
+            <input name="alias" maxlength="80" pattern="[a-z0-9][a-z0-9-]*" value="${escapeAttribute(device.alias ?? '')}" placeholder="optional stable path">
+          </label>
+          <label class="field">
             <span class="label">Network Mode</span>
             <select name="networkMode">
               ${renderNetworkModeOptions(device.networkMode ?? device.deviceNetworkMode)}
@@ -1207,7 +1333,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
           <label class="field full">
             <span class="label">External Controller URL</span>
             <input name="externalControllerBaseUrl" type="url" value="${escapeAttribute(device.externalControllerBaseUrl ?? '')}">
-            <span class="help-text">Public tunnel to this controller add-on, such as https://frame.example.com. The frame should open /frame/${escapeHtml(device.id)} from this hostname.</span>
+            <span class="help-text">Public tunnel to this controller add-on, such as https://frame.example.com. The frame should open /f/${escapeHtml(device.alias ?? device.id)} from this hostname.</span>
           </label>
           <label class="field full">
             <span class="label">External Kiosk Renderer URL</span>
@@ -1250,6 +1376,23 @@ function renderAssetFilters(device: SetupPageDevice): string {
     device.filterNewest && device.filterNewest > 0 ? `newest ${device.filterNewest}` : '',
   ].filter(Boolean);
   return filters.length > 0 ? filters.join(' / ') : 'Off';
+}
+
+function renderFrameClaimRows(claims: SetupPageFrameClaim[]): string {
+  const activeClaims = claims
+    .filter((claim) => claim.status === 'pending')
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+  if (activeClaims.length === 0) {
+    return `<div class="claim-list"><div class="claim-row"><span>No pending frame codes. Open the controller root URL on a frame to generate one.</span></div></div>`;
+  }
+  return `<div class="claim-list">${activeClaims.map((claim) => {
+    const expiresAt = new Date(claim.expiresAt).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const host = claim.requestHost ? ` from ${claim.requestHost}` : '';
+    return `<div class="claim-row"><span>Pending frame${escapeHtml(host)}</span><span>Expires ${escapeHtml(expiresAt)}</span></div>`;
+  }).join('')}</div>`;
 }
 
 function framePreviewUrl(frameUrl: string): string {

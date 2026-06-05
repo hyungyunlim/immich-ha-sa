@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-Build a local frame-control service for an old Lenovo Smart Frame running Fully Kiosk Browser. The frame must keep a single fixed URL, while Home Assistant controls which Immich album/profile is shown in near real time.
+Build a local frame-control service for an old Lenovo Smart Frame running a kiosk browser such as FreeKiosk. The frame must keep a single short fixed URL, while Home Assistant controls which Immich album/profile is shown in near real time.
 
 The first implementation should keep the existing `immich-kiosk` container as the visual renderer because its current slideshow, clock, weather, layout, image-fit, transition, and metadata rendering are already good. This project should add a controller layer in front of `immich-kiosk` rather than forking it immediately.
 
@@ -13,7 +13,8 @@ Current environment:
 - Immich runs on the Raspberry Pi at port `2283`.
 - `immich-kiosk` runs on the Raspberry Pi at port `3000`.
 - `immich-kiosk` currently uses `/root/immich-kiosk/config/config.yaml` and environment variables.
-- The local project at `/Users/hyungyunlim/Documents/immich-ha-sa` is currently an empty Git repo.
+- The local project at `/Users/hyungyunlim/Documents/immich-ha-sa` now contains the Frame Controller, Home Assistant add-on packaging, and custom integration.
+- FreeKiosk is the preferred Android kiosk app for device-level controls such as next/previous, volume, mute, and brightness. A generic kiosk browser remains sufficient for display-only behavior.
 - Social Archiver lives at `/Users/hyungyunlim/obsidian-social-archiver` and already contains Immich upload/album logic.
 - Home Assistant is running locally and should become the user-facing control surface for frame behavior.
 
@@ -33,6 +34,8 @@ Important architectural decision:
 5. Support time-based HA automations that switch albums or display profiles.
 6. Leave Social Archiver loosely coupled as an optional source that can populate Immich albums.
 7. Support both local LAN frames and remote frames reached through a public domain such as Cloudflare Tunnel.
+8. Let a new physical frame be added without typing or copying a long tokenized URL.
+9. Provide a human-readable stable frame path based on a device alias, while keeping public paths hard to guess by default.
 
 ## 3.1 MVP Quality Bar
 
@@ -48,7 +51,7 @@ Required qualities:
 - Local frames should use LAN URLs for lower latency when possible.
 - Remote frames should use the configured public domain and must not depend on private LAN hostnames.
 - The controller must expose enough health and diagnostics to debug failures from HA or logs.
-- Browser compatibility must be verified on the real Lenovo/Fully Kiosk environment before considering MVP complete.
+- Browser compatibility must be verified on the real Lenovo kiosk-browser environment before considering MVP complete.
 - MVP code should have tests for state transitions, renderer URL generation, network-mode selection, and HA-facing API contracts.
 
 Quality tradeoff:
@@ -65,6 +68,7 @@ Quality tradeoff:
 - Do not build a cloud service.
 - Do not require the Lenovo frame to expose an API.
 - Do not require the frame URL to change after initial setup.
+- Do not require users to type long random URLs into the physical frame.
 - Do not couple Social Archiver directly into the frame runtime path.
 
 ## 5. Users and Use Cases
@@ -96,7 +100,7 @@ Frame Controller
         |
         | Generates active renderer URL
         v
-Lenovo frame fixed URL: /frame/lenovo
+Lenovo frame stable URL: /f/lenovo-frame-8k2p or /frame/lenovo
         |
         | iframe or controlled redirect
         v
@@ -112,6 +116,15 @@ The frame should load:
 ```text
 http://<rpi-host>:<controller-port>/frame/lenovo
 ```
+
+That direct device route is acceptable for advanced/manual setup, but the preferred user-facing installation URL should be shorter:
+
+```text
+https://frame.example.com
+https://frame.example.com/f/kitchen-frame-8k2p
+```
+
+The root URL is used for first-time pairing. The stable `/f/:alias` URL is the durable entry URL for an already claimed physical frame.
 
 The controller page should internally load a generated `immich-kiosk` URL, for example:
 
@@ -206,6 +219,83 @@ Rationale:
 - A remote frame cannot use private hostnames like `rpi`, `192.168.x.x`, or Docker service names.
 - The same controller API should support both deployment modes.
 
+## 6.3 Device Onboarding and Stable URL Strategy
+
+Problem:
+
+- A random one-time registration URL is difficult to type into an old digital frame.
+- A one-time token URL is fragile because the frame may reload the same URL after reboot.
+- A plain name-based URL such as `/f/kitchen` is easy to type but easy to guess on a public domain.
+
+Decision:
+
+- Support two user-facing frame entry paths:
+  - Root pairing path: `https://frame.example.com`
+  - Stable claimed path: `https://frame.example.com/f/:alias`
+- Keep the existing `/frame/:deviceId` route for internal use, debugging, and backward compatibility.
+- Existing devices without an explicit alias resolve through `/f/:deviceId`, so they also get a stable short path without migration.
+- Generate aliases from the requested frame name plus a short random suffix by default.
+
+Preferred first-time setup flow:
+
+1. User opens the add-on console and clicks `Add Frame`.
+2. Console shows a short domain to type into the physical frame, normally the external controller domain or LAN controller URL.
+3. User enters only that short URL on the frame:
+
+   ```text
+   https://frame.example.com
+   ```
+
+4. If the frame is not already claimed, the controller shows a large pairing code on the frame screen.
+5. User enters the pairing code in the add-on console.
+6. Console asks for frame name, optional alias, preview orientation, and optional remote control settings.
+7. Controller creates the device and binds the pending browser session to it.
+8. Frame automatically transitions to the claimed display route.
+9. Console shows the stable URL for future recovery:
+
+   ```text
+   https://frame.example.com/f/kitchen-frame-8k2p
+   ```
+
+Stable alias rules:
+
+- Alias is separate from display name and internal device id.
+- Display name changes must not change the stable URL.
+- Default alias format should be `<slugified-name>-<short-random-suffix>`.
+- Users may edit the alias manually, but the UI should warn when using a highly guessable public alias.
+- Alias must be globally unique within the controller.
+- Alias must not collide with any existing device id because `/f/:alias` also falls back to device ids.
+- Alias should allow lowercase letters, numbers, and hyphens only.
+- Old aliases may be retained as redirects when the alias changes, if feasible.
+
+Root pairing behavior:
+
+- On first load, the controller creates a pending frame claim and displays a short code.
+- The frame page must use only browser-safe state: a cookie/localStorage key or server-side pending id, no API secrets.
+- If storage is unavailable, the pairing code page should continue to poll by its pending claim id for the current page lifetime.
+- Pending claims should expire if not claimed, but the root page can issue a new code after expiration.
+- Pairing code display must be high contrast, large, and usable from several feet away.
+
+Claiming behavior:
+
+- Claiming a code creates or attaches a `FrameDevice`.
+- Claiming should be possible from the add-on console without HA Core restart.
+- Claiming should return the device id, display name, alias, local frame URL, external frame URL, and whether a remote control API is configured.
+- If a code was already claimed or expired, the console should show a precise error and offer to generate a new code on the frame.
+
+Recovery behavior:
+
+- If a frame loses browser storage, the stable `/f/:alias` path can still recover the same device.
+- If a user only entered the root domain and storage is lost, the frame may show a new pairing code. This is acceptable if the console clearly shows how to re-claim or rebind.
+- Existing `/frame/:deviceId` URLs must keep working during migration.
+
+Security posture:
+
+- Stable aliases are bearer-style public display URLs when exposed through a tunnel.
+- Default aliases must include enough random suffix entropy to avoid casual guessing.
+- The stable frame path must not expose Immich API keys, controller API tokens, HA tokens, or kiosk passwords.
+- Public mutation APIs remain authenticated; frame display routes are read-only and scoped to one device.
+
 ## 7. Components
 
 ### 7.1 Frame Controller Service
@@ -251,12 +341,16 @@ Production-quality MVP requirements:
 Route:
 
 ```text
+GET /
+GET /f/:alias
 GET /frame/:deviceId
 ```
 
 Responsibilities:
 
-- Render a fullscreen page suitable for Fully Kiosk Browser.
+- Render a fullscreen page suitable for the Lenovo frame's kiosk browser.
+- Show a first-time pairing screen when a physical frame opens the root URL and is not claimed.
+- Resolve stable aliases to frame devices.
 - Load the current `immich-kiosk` URL in an iframe.
 - Subscribe to controller state updates.
 - Reload or replace iframe when album/profile changes.
@@ -278,6 +372,7 @@ Frame page quality requirements:
 
 - Full viewport, black background, no visible margins.
 - Iframe must fill the screen.
+- Pairing screen must use large, high-contrast code text and avoid small setup instructions on the frame.
 - If update fails, keep the current image/slideshow visible.
 - Polling interval should be configurable.
 - State version should prevent duplicate reloads.
@@ -291,6 +386,10 @@ Initial endpoints:
 GET  /api/health
 GET  /api/frames
 GET  /api/frames/:deviceId
+GET  /api/frame-claims
+POST /api/frame-claims
+POST /api/frame-claims/:code/claim
+PATCH /api/frames/:deviceId/alias
 PUT  /api/frames/:deviceId/state
 GET  /api/frames/:deviceId/events
 GET  /api/immich/albums
@@ -304,9 +403,14 @@ MVP can start smaller:
 
 ```text
 GET /api/immich/albums
+GET /api/devices
+POST /api/devices
+PATCH /api/devices/:deviceId
 GET /api/frame/lenovo/state
 PUT /api/frame/lenovo/state
 GET /api/frame/lenovo/events
+GET /
+GET /f/lenovo-frame-8k2p
 GET /frame/lenovo
 ```
 
@@ -317,6 +421,8 @@ API quality requirements:
 - Errors include machine-readable codes for HA.
 - State responses include `version`, `updatedAt`, `networkMode`, and `rendererUrl`.
 - Album list responses include a cache timestamp and refresh status.
+- Device list responses include `id`, `name`, `alias`, `localFrameUrl`, `externalFrameUrl`, and `stableFramePath` when available.
+- Claim endpoints must reject expired, unknown, or already claimed codes with distinct error codes.
 - API must be stable enough that HA integration does not need to know renderer query details.
 
 Example response envelope:
@@ -366,6 +472,10 @@ Responsibilities:
 - Provide Add-on Store configuration UI for Immich, immich-kiosk, local URL, external URL, default frame, polling, and optional static token settings.
 - Expose the controller setup page through the add-on Web UI and Ingress.
 - Expose the fixed frame URL/API on a configurable host port, defaulting to 8082.
+- Provide an `Add Frame` or `Claim Frame` flow that pairs a physical frame by short code.
+- Show the short URL to type into the frame, not a long one-time token URL.
+- Show and copy stable frame URLs after claim, including local and external variants.
+- Let users edit the device alias with validation and collision checks.
 - Keep the Home Assistant integration as the entity/service/control surface; the add-on is the runtime packaging layer.
 - Keep standalone Docker Compose supported for users who do not run a Supervisor-based Home Assistant install.
 
@@ -414,7 +524,7 @@ HA quality requirements:
 - Time-based automations should call high-level services like `set_profile`, not construct renderer URLs.
 - Network mode should be visible and configurable for each frame where useful.
 
-### 7.5 Social Archiver Integration
+### 7.6 Social Archiver Integration
 
 Social Archiver is not in the critical display path.
 
@@ -484,6 +594,7 @@ Frame device model:
 {
   "id": "lenovo",
   "name": "Lenovo Smart Frame",
+  "alias": "lenovo-frame-8k2p",
   "networkMode": "auto",
   "localControllerBaseUrl": "http://<rpi-lan-ip>:<controller-host-port>",
   "externalControllerBaseUrl": "https://frame.example.com",
@@ -492,6 +603,42 @@ Frame device model:
   "pollIntervalSeconds": 20
 }
 ```
+
+Frame claim model:
+
+```json
+{
+  "id": "claim-id",
+  "codeHash": "hashed-code",
+  "pendingTokenHash": "hashed-browser-token",
+  "createdAt": "2026-06-05T00:00:00.000Z",
+  "expiresAt": "2026-06-05T00:10:00.000Z",
+  "claimedDeviceId": null,
+  "claimedAt": null,
+  "requestHost": "frame.example.com",
+  "userAgentHint": "old-frame-browser"
+}
+```
+
+Alias model:
+
+```json
+{
+  "alias": "kitchen-frame-8k2p",
+  "deviceId": "kitchen",
+  "createdAt": "2026-06-05T00:00:00.000Z",
+  "retiredAt": null
+}
+```
+
+Model requirements:
+
+- `FrameDevice.id` remains the stable internal identifier used by APIs and HA entities.
+- `FrameDevice.name` is display-only and can change freely.
+- `FrameDevice.alias` is the preferred user-facing stable path segment.
+- Alias changes must be explicit and validated.
+- Pending claim records must not store raw pairing codes.
+- Browser pending tokens must be hashed server-side if persisted.
 
 Album cache:
 
@@ -555,6 +702,12 @@ EXTERNAL_PUBLIC_CONTROLLER_URL
 EXTERNAL_PUBLIC_KIOSK_URL
 ```
 
+Terminology:
+
+- External Controller URL is the public entry to the controller add-on. This is what creates `https://frame.example.com/f/:alias` and `https://frame.example.com/frame/:deviceId`.
+- External Kiosk Renderer URL is optional and points to a separate public `immich-kiosk` renderer origin when the controller is not proxying kiosk traffic itself.
+- Users should not put the controller add-on domain into External Kiosk Renderer URL unless that domain actually routes to `immich-kiosk`.
+
 MVP may simplify this to:
 
 ```text
@@ -574,6 +727,8 @@ Routing rules:
 Recommended external topology:
 
 ```text
+https://frame.example.com                  -> controller root pairing page
+https://frame.example.com/f/kitchen-8k2p   -> controller stable frame path
 https://frame.example.com/frame/lenovo      -> controller /frame/lenovo
 https://frame.example.com/kiosk/...         -> reverse proxy to immich-kiosk
 https://frame.example.com/api/...           -> controller API, protected where needed
@@ -673,6 +828,8 @@ Backup and recovery:
 
 Automated tests:
 
+- Unit test alias generation, normalization, validation, and collision handling.
+- Unit test pending frame claim creation, expiration, and claim error cases.
 - Unit test renderer URL generation.
 - Unit test local/external network-mode URL selection.
 - Unit test profile-to-state expansion.
@@ -683,9 +840,12 @@ Automated tests:
 
 Manual verification:
 
+- Verify a new frame can be claimed by typing only the controller root URL and entering the displayed pairing code in the add-on console.
+- Verify a claimed frame can be reopened from `/f/:alias` after browser restart.
+- Verify a display name change does not change the stable alias path.
 - Verify `immich-kiosk` album override behavior using real album IDs.
 - Verify iframe rendering on desktop browser.
-- Verify iframe rendering on Lenovo Smart Frame/Fully Kiosk.
+- Verify iframe rendering on Lenovo Smart Frame kiosk browser.
 - Verify SSE update on desktop browser.
 - Verify polling fallback by disabling SSE or simulating disconnect.
 - Verify HA album select updates the frame.
@@ -697,7 +857,7 @@ Manual verification:
 - Verify external frame mode works through Cloudflare Tunnel domain.
 - Verify external frame mode does not leak private hostnames in browser-visible URLs.
 
-MVP cannot be considered complete until the Lenovo/Fully Kiosk manual checks pass.
+MVP cannot be considered complete until the Lenovo kiosk-browser manual checks pass.
 
 ## 13. Deployment
 
@@ -761,6 +921,25 @@ Acceptance:
 - `GET /api/health` returns OK.
 - `GET /frame/lenovo` renders fullscreen shell.
 - Restarting the controller preserves initial state.
+
+### Milestone 1.5: Frame Pairing and Stable Paths
+
+- Add root pairing page.
+- Add pending claim store with short code generation.
+- Add add-on console claim UI.
+- Add device alias generation from name plus random suffix.
+- Add `/f/:alias` stable route.
+- Keep `/frame/:deviceId` route working.
+- Add collision handling and validation for alias edits.
+
+Acceptance:
+
+- A new frame can be added by typing only the controller root URL on the physical frame.
+- The frame shows a short pairing code without exposing secrets.
+- Entering the code in the add-on console creates a device and stable alias.
+- Claimed frame transitions to the photo display without changing the frame settings.
+- Reopening `/f/:alias` always resolves to the same device.
+- Existing `/frame/:deviceId` URLs continue to work.
 
 ### Milestone 2: Immich Album Listing
 
@@ -826,7 +1005,7 @@ Acceptance:
 - Add logs.
 - Add error UI/fallback for frame page.
 - Add basic tests for URL generation and API responses.
-- Verify on the real Lenovo/Fully Kiosk browser.
+- Verify on the real Lenovo kiosk browser.
 - Verify remote mode through Cloudflare Tunnel.
 - Document rollback and recovery.
 
@@ -841,13 +1020,17 @@ Acceptance:
 
 1. What exact URL query parameters does the currently installed `immich-kiosk` version support for album override?
 2. Does the Lenovo Smart Frame browser allow iframe embedding of `immich-kiosk` reliably?
-3. Is Fully Kiosk on the Lenovo frame able to keep SSE connections stable?
+3. Is the Lenovo kiosk browser able to keep SSE connections stable?
 4. What host/IP should be canonical for the frame URL on the LAN?
 5. Should controller access support token revocation and re-pairing from the HA UI?
 6. Should profiles live only in the controller, or be represented as HA helpers too?
 7. Should external mode expose `immich-kiosk` as a separate tunnel hostname or proxy it under the controller domain?
 8. What authentication model should protect public mutation APIs when using Cloudflare Tunnel?
-9. Can the remote Lenovo/Fully Kiosk browser maintain SSE through Cloudflare, or should remote mode default to polling?
+9. Can the remote Lenovo kiosk browser maintain SSE through Cloudflare, or should remote mode default to polling?
+10. Should the root public URL always show pairing for unknown sessions, or should it redirect to a default device when one exists?
+11. How much random suffix entropy is enough for public stable aliases while keeping them typeable?
+12. Should old aliases remain as permanent redirects after a user edits an alias?
+13. Should pairing codes be numeric-only for easier reading from the frame, or mixed alphanumeric for more entropy?
 
 ## 16. Risks
 
@@ -858,6 +1041,8 @@ Acceptance:
 - Forking `immich-kiosk` introduces AGPL and maintenance obligations.
 - Cloudflare Tunnel may interrupt or buffer SSE; polling fallback is mandatory.
 - A public frame URL can expose the existence of the frame service if not protected.
+- Human-readable aliases can be guessed if no random suffix or access protection is used.
+- Root-domain pairing on a public tunnel could be discovered by outsiders if claim APIs are not protected and pairing codes are too weak.
 - External mode may add latency compared with LAN mode.
 - Mixed local/external URL generation bugs could cause blank frames if not tested.
 
@@ -865,7 +1050,9 @@ Acceptance:
 
 MVP is successful when:
 
-- Lenovo frame keeps one fixed URL.
+- Lenovo frame keeps one fixed short URL.
+- New frames can be installed by typing a short root domain or stable alias path, not a long token URL.
+- Claimed frames have stable alias URLs that survive display-name changes.
 - HA can list Immich albums.
 - HA can change the active album/profile.
 - The frame updates without manual intervention.

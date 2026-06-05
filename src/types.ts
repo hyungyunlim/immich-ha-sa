@@ -21,6 +21,7 @@ export interface FrameCommandEvent {
 export interface FrameDevice {
   id: string;
   name: string;
+  alias?: string;
   networkMode: NetworkMode;
   localControllerBaseUrl: string;
   externalControllerBaseUrl?: string;
@@ -190,7 +191,19 @@ export interface StoreData {
   frames: Record<string, FrameState>;
   profiles: Record<string, FrameProfile>;
   albumCache: AlbumCache;
+  frameClaims: Record<string, FrameClaim>;
   auth: ControllerAuth;
+}
+
+export interface FrameClaim {
+  id: string;
+  codeHash: string;
+  createdAt: string;
+  expiresAt: string;
+  claimedDeviceId?: string;
+  claimedAt?: string;
+  requestHost?: string;
+  userAgentHint?: string;
 }
 
 export interface ControllerAuth {

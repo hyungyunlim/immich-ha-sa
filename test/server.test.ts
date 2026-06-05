@@ -297,10 +297,12 @@ describe('controller API', () => {
     });
 
     expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('Stable Frame URL');
     expect(response.body).toContain('Local Frame URL');
     expect(response.body).toContain('External Frame URL');
+    expect(response.body).toContain('http://10.0.0.10:18082/f/lenovo');
+    expect(response.body).toContain('https://frame.example.com/f/lenovo');
     expect(response.body).toContain('http://10.0.0.10:18082/frame/lenovo');
-    expect(response.body).toContain('https://frame.example.com/frame/lenovo');
     expect(response.body).toContain('Advanced settings');
     expect(response.body).toContain('Blank inherits http://10.0.0.10:3000.');
     expect(response.body).toContain('title="Lenovo preview"');
@@ -357,6 +359,74 @@ describe('controller API', () => {
     expect(preview.statusCode).toBe(200);
     expect(preview.body).toContain('var previewMode = true;');
     expect(preview.body).toContain('var pollIntervalMs = 60000;');
+
+    const stable = await server.inject({
+      method: 'GET',
+      url: '/f/lenovo',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(stable.statusCode).toBe(200);
+    expect(stable.body).toContain('var deviceId = "lenovo"');
+
+    await server.close();
+  });
+
+  it('claims an external root pairing code into a stable alias frame path', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createTestServer({ config });
+
+    const pairing = await server.inject({
+      method: 'GET',
+      url: '/',
+      headers: { host: 'frame.example.com', 'x-forwarded-proto': 'https' },
+    });
+    expect(pairing.statusCode).toBe(200);
+    expect(pairing.body).toContain('Pair this frame');
+    const code = pairing.body.match(/<div class="code">([^<]+)<\/div>/)?.[1];
+    expect(code).toMatch(/^\d{3} \d{3}$/);
+
+    const pending = await server.inject({
+      method: 'GET',
+      url: '/api/frame-claims',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(pending.statusCode).toBe(200);
+    expect(pending.json().data.items).toHaveLength(1);
+    const claimId = pending.json().data.items[0].id;
+
+    const claimed = await server.inject({
+      method: 'POST',
+      url: `/api/frame-claims/${encodeURIComponent(code ?? '')}/claim`,
+      headers: { host: '10.0.0.10:18082' },
+      payload: {
+        name: 'Kitchen Frame',
+        alias: 'kitchen-frame',
+        previewOrientation: 'portrait',
+      },
+    });
+    expect(claimed.statusCode).toBe(200);
+    expect(claimed.json().data.device.alias).toBe('kitchen-frame');
+    expect(claimed.json().data.localFrameUrl).toBe('http://10.0.0.10:18082/f/kitchen-frame');
+    expect(claimed.json().data.externalFrameUrl).toBe('https://frame.example.com/f/kitchen-frame');
+
+    const status = await server.inject({
+      method: 'GET',
+      url: `/api/frame-claims/${claimId}`,
+      headers: { host: 'frame.example.com', 'x-forwarded-proto': 'https' },
+    });
+    expect(status.statusCode).toBe(200);
+    expect(status.json().data.status).toBe('claimed');
+    expect(status.json().data.framePath).toBe('/f/kitchen-frame');
+
+    const frame = await server.inject({
+      method: 'GET',
+      url: '/f/kitchen-frame',
+      headers: { host: 'frame.example.com', 'x-forwarded-proto': 'https' },
+    });
+    expect(frame.statusCode).toBe(200);
+    expect(frame.body).toContain('var deviceId = "kitchen_frame"');
 
     await server.close();
   });
@@ -424,6 +494,7 @@ describe('controller API', () => {
       headers: { host: '10.0.0.10:18082' },
       payload: {
         name: 'Office Desk',
+        alias: 'office-desk',
         networkMode: 'local',
         previewOrientation: 'portrait',
         localControllerBaseUrl: 'http://10.0.0.11:18082/',
@@ -433,7 +504,9 @@ describe('controller API', () => {
     });
     expect(updated.statusCode).toBe(200);
     expect(updated.json().data.device.name).toBe('Office Desk');
+    expect(updated.json().data.device.alias).toBe('office-desk');
     expect(updated.json().data.device.previewOrientation).toBe('portrait');
+    expect(updated.json().data.localStableFrameUrl).toBe('http://10.0.0.11:18082/f/office-desk');
     expect(updated.json().data.device.localControllerBaseUrl).toBe('http://10.0.0.11:18082');
     expect(updated.json().data.state.networkMode).toBe('local');
 

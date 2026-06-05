@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
@@ -6,13 +7,14 @@ import { z } from 'zod';
 import { ControllerAuthManager } from './auth.js';
 import type { AppConfig } from './config.js';
 import { FrameEventHub } from './events.js';
+import { renderFrameClaimPage } from './frameClaimPage.js';
 import { renderFramePage } from './framePage.js';
 import { fail, ok, requestContext } from './http.js';
 import { ImmichClient } from './immichClient.js';
 import { buildProxiedRendererUrl, buildRendererUrl, controllerBaseUrlForContext } from './rendererUrl.js';
 import { renderSetupBlockedPage, renderSetupPage } from './setupPage.js';
 import { JsonStore } from './store.js';
-import type { AlbumCache, FrameCommand, FrameDevice, FrameState } from './types.js';
+import type { AlbumCache, FrameClaim, FrameCommand, FrameDevice, FrameState } from './types.js';
 
 const FrameStatePatchSchema = z.object({
   activeAlbumIds: z.array(z.string().min(1)).optional(),
@@ -159,6 +161,22 @@ const DeviceNameSchema = z.preprocess(
   z.string().min(1).max(80),
 );
 
+const DeviceAliasSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? normalizeAlias(value) : value),
+  z.string()
+    .min(3)
+    .max(80)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'Use lowercase letters, numbers, and hyphens.'),
+);
+
+const OptionalDeviceAliasSchema = z.preprocess(
+  (value) => {
+    if (value === '' || value === null || value === undefined) return undefined;
+    return typeof value === 'string' ? normalizeAlias(value) : value;
+  },
+  DeviceAliasSchema.optional(),
+);
+
 const OptionalUrlSchema = z.preprocess(
   (value) => (value === '' || value === null ? undefined : value),
   z.string().url().optional(),
@@ -179,6 +197,7 @@ const RequiredUrlSchema = z.preprocess(
 const DeviceCreateSchema = z.object({
   id: DeviceIdSchema,
   name: DeviceNameSchema,
+  alias: OptionalDeviceAliasSchema,
   networkMode: z.enum(['auto', 'local', 'external']).default('auto'),
   previewOrientation: z.enum(['landscape', 'portrait']).default('landscape'),
   localControllerBaseUrl: OptionalUrlSchema,
@@ -194,6 +213,7 @@ const DeviceCreateSchema = z.object({
 
 const DevicePatchSchema = z.object({
   name: DeviceNameSchema.optional(),
+  alias: OptionalDeviceAliasSchema.or(z.null()).optional(),
   networkMode: z.enum(['auto', 'local', 'external']).optional(),
   previewOrientation: z.enum(['landscape', 'portrait']).optional(),
   localControllerBaseUrl: RequiredUrlSchema.optional(),
@@ -220,6 +240,20 @@ const RemoteAutoBrightnessSchema = z.object({
   min: z.number().int().min(0).max(100).optional(),
   max: z.number().int().min(0).max(100).optional(),
   offset: z.number().int().min(0).max(100).optional(),
+});
+
+const FrameClaimCodeSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? normalizeFrameClaimCode(value) : value),
+  z.string().regex(/^\d{6}$/, 'Use the six-digit code shown on the frame.'),
+);
+
+const FrameClaimCreateSchema = z.object({
+  name: DeviceNameSchema.default('New Frame'),
+  alias: OptionalDeviceAliasSchema,
+  previewOrientation: z.enum(['landscape', 'portrait']).default('landscape'),
+  remoteControlType: z.enum(['none', 'freekiosk']).default('none'),
+  remoteApiUrl: OptionalUrlSchema,
+  remoteApiKey: OptionalSecretSchema,
 });
 
 export interface ServerDeps {
@@ -326,12 +360,14 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       albumCount: data.albumCache.items.length,
       albumRefreshedAt: data.albumCache.refreshedAt,
       globalKioskPasswordConfigured: Boolean(deps.config.kioskPassword),
+      frameClaims: store.getFrameClaims().map((claim) => publicFrameClaim(claim)),
       devices: Object.values(data.devices).map((candidate) => {
         const frameState = store.getFrameState(candidate.id);
         const resolved = frameState ? resolveFrameForRequest(candidate.id, request) : null;
         return {
           id: candidate.id,
           name: candidate.name,
+          alias: candidate.alias,
           localControllerBaseUrl: candidate.localControllerBaseUrl,
           externalControllerBaseUrl: candidate.externalControllerBaseUrl,
           localKioskBaseUrl: candidate.localKioskBaseUrl,
@@ -348,8 +384,12 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           remoteApiKeyConfigured: Boolean(candidate.remoteApiKey),
           isDefault: candidate.id === deps.config.defaultDevice.id,
           localFrameUrl: buildFrameUrl(candidate.localControllerBaseUrl, candidate.id),
+          localStableFrameUrl: buildStableFrameUrl(candidate.localControllerBaseUrl, candidate),
           externalFrameUrl: candidate.externalControllerBaseUrl
             ? buildFrameUrl(candidate.externalControllerBaseUrl, candidate.id)
+            : undefined,
+          externalStableFrameUrl: candidate.externalControllerBaseUrl
+            ? buildStableFrameUrl(candidate.externalControllerBaseUrl, candidate)
             : undefined,
           rendererUrl: resolved?.rendererUrl,
           networkMode: frameState?.networkMode ?? candidate.networkMode,
@@ -412,10 +452,110 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     }));
   };
 
-  app.get('/', setupHandler);
+  const frameClaimEntryHandler = async (request: FastifyRequest, reply: FastifyReply) => {
+    const context = requestContext(request);
+    const { claim, code } = createFrameClaimForRequest(request);
+    const setupUrl = `${controllerBaseUrlForContext(context, deps.config.defaultDevice.localControllerBaseUrl)}/setup`;
+    reply.type('text/html; charset=utf-8').send(renderFrameClaimPage({
+      claimId: claim.id,
+      code,
+      expiresAt: claim.expiresAt,
+      setupUrl,
+    }));
+  };
+
+  app.get('/', async (request, reply) => {
+    const device = store.getDevice(deps.config.defaultDevice.id) ?? deps.config.defaultDevice;
+    if (isExternalSetupRequest(device.externalControllerBaseUrl, request)) {
+      await frameClaimEntryHandler(request, reply);
+      return;
+    }
+    await setupHandler(request, reply);
+  });
   app.get('//', setupHandler);
   app.get('/setup', setupHandler);
   app.get('//setup', setupHandler);
+  app.get('/pair', frameClaimEntryHandler);
+
+  app.get('/f/:alias', async (request, reply) => {
+    const { alias } = request.params as { alias: string };
+    const query = request.query as { preview?: string };
+    const device = store.getDeviceByAlias(normalizeAlias(alias));
+    if (!device) {
+      reply.status(404).send('Unknown frame');
+      return;
+    }
+    reply.type('text/html; charset=utf-8').send(renderFramePage(device, { preview: query.preview === '1' }));
+  });
+
+  app.get('/api/frame-claims', async (request, reply) => {
+    if (!requireLocalConsoleAccess(request, reply)) return;
+    return ok({
+      items: store.getFrameClaims().map((claim) => publicFrameClaim(claim)),
+    });
+  });
+
+  app.post('/api/frame-claims/:code/claim', async (request, reply) => {
+    if (!requireLocalConsoleAccess(request, reply)) return;
+    const { code } = request.params as { code: string };
+    const parsedCode = FrameClaimCodeSchema.safeParse(code);
+    if (!parsedCode.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsedCode.error.errors[0]?.message ?? 'Invalid frame claim code.'));
+      return;
+    }
+    const claim = store.findFrameClaimByCodeHash(hashSecret(parsedCode.data));
+    if (!claim) {
+      reply.status(404).send(fail('FRAME_CLAIM_NOT_FOUND', 'Frame claim code was not found or has expired.'));
+      return;
+    }
+    const parsed = FrameClaimCreateSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid frame claim.'));
+      return;
+    }
+    const device = createDeviceFromClaim(parsed.data, deps.config.defaultDevice);
+    const created = store.createDevice(device);
+    if (!created) {
+      reply.status(409).send(fail('DEVICE_EXISTS', `Device or alias already exists: ${device.id}`));
+      return;
+    }
+    store.markFrameClaimClaimed(claim.id, created.id);
+    return ok({
+      claim: publicFrameClaim(store.getFrameClaim(claim.id) ?? claim),
+      device: publicDevice(created),
+      state: store.getFrameState(created.id),
+      localFrameUrl: buildStableFrameUrl(created.localControllerBaseUrl, created),
+      externalFrameUrl: created.externalControllerBaseUrl
+        ? buildStableFrameUrl(created.externalControllerBaseUrl, created)
+        : undefined,
+      framePath: stableFramePath(created),
+    });
+  });
+
+  app.get('/api/frame-claims/:claimId', async (request, reply) => {
+    const { claimId } = request.params as { claimId: string };
+    const claim = store.getFrameClaim(claimId);
+    if (!claim) {
+      reply.status(404).send(fail('FRAME_CLAIM_NOT_FOUND', 'Frame claim was not found or has expired.'));
+      return;
+    }
+    if (claim.claimedDeviceId) {
+      const device = store.getDevice(claim.claimedDeviceId);
+      return ok({
+        status: 'claimed',
+        deviceId: claim.claimedDeviceId,
+        framePath: device ? stableFramePath(device) : `/frame/${encodeURIComponent(claim.claimedDeviceId)}`,
+      });
+    }
+    if (Date.parse(claim.expiresAt) <= Date.now()) {
+      reply.status(410).send(fail('FRAME_CLAIM_EXPIRED', 'Frame claim has expired.'));
+      return;
+    }
+    return ok({
+      status: 'pending',
+      expiresAt: claim.expiresAt,
+    });
+  });
 
   app.get('/api/pairing/status', async () => ok(auth.status()));
 
@@ -442,8 +582,12 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         kioskPasswordSource: kioskPasswordSource(device, deps.config.kioskPassword),
         frameUrl: buildFrameUrl(device.localControllerBaseUrl, device.id),
         localFrameUrl: buildFrameUrl(device.localControllerBaseUrl, device.id),
+        localStableFrameUrl: buildStableFrameUrl(device.localControllerBaseUrl, device),
         externalFrameUrl: device.externalControllerBaseUrl
           ? buildFrameUrl(device.externalControllerBaseUrl, device.id)
+          : undefined,
+        externalStableFrameUrl: device.externalControllerBaseUrl
+          ? buildStableFrameUrl(device.externalControllerBaseUrl, device)
           : undefined,
         frameEventClients: events.connectedClientCount(device.id),
         hasState: Boolean(data.frames[device.id]),
@@ -461,8 +605,12 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         name: device.name,
         networkMode: device.networkMode,
         localFrameUrl: buildFrameUrl(device.localControllerBaseUrl, device.id),
+        localStableFrameUrl: buildStableFrameUrl(device.localControllerBaseUrl, device),
         externalFrameUrl: device.externalControllerBaseUrl
           ? buildFrameUrl(device.externalControllerBaseUrl, device.id)
+          : undefined,
+        externalStableFrameUrl: device.externalControllerBaseUrl
+          ? buildStableFrameUrl(device.externalControllerBaseUrl, device)
           : undefined,
         remoteControlType: device.remoteControlType ?? 'none',
         remoteApiConfigured: Boolean(device.remoteApiUrl),
@@ -490,8 +638,12 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       state: store.getFrameState(created.id),
       frameUrl: buildFrameUrl(created.localControllerBaseUrl, created.id),
       localFrameUrl: buildFrameUrl(created.localControllerBaseUrl, created.id),
+      localStableFrameUrl: buildStableFrameUrl(created.localControllerBaseUrl, created),
       externalFrameUrl: created.externalControllerBaseUrl
         ? buildFrameUrl(created.externalControllerBaseUrl, created.id)
+        : undefined,
+      externalStableFrameUrl: created.externalControllerBaseUrl
+        ? buildStableFrameUrl(created.externalControllerBaseUrl, created)
         : undefined,
     });
   });
@@ -523,8 +675,12 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       state,
       frameUrl: buildFrameUrl(updated.localControllerBaseUrl, updated.id),
       localFrameUrl: buildFrameUrl(updated.localControllerBaseUrl, updated.id),
+      localStableFrameUrl: buildStableFrameUrl(updated.localControllerBaseUrl, updated),
       externalFrameUrl: updated.externalControllerBaseUrl
         ? buildFrameUrl(updated.externalControllerBaseUrl, updated.id)
+        : undefined,
+      externalStableFrameUrl: updated.externalControllerBaseUrl
+        ? buildStableFrameUrl(updated.externalControllerBaseUrl, updated)
         : undefined,
     });
   });
@@ -904,6 +1060,58 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     }
     return ok(resolved, { version: resolved.version, updatedAt: resolved.updatedAt });
   });
+
+  function createFrameClaimForRequest(request: FastifyRequest): { claim: FrameClaim; code: string } {
+    const code = generateFrameClaimCode();
+    const now = Date.now();
+    const context = requestContext(request);
+    const claim = store.createFrameClaim({
+      id: randomBytes(10).toString('base64url'),
+      codeHash: hashSecret(normalizeFrameClaimCode(code)),
+      createdAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 10 * 60 * 1000).toISOString(),
+      requestHost: context.host,
+      userAgentHint: request.headers['user-agent']?.slice(0, 120),
+    });
+    return { claim, code };
+  }
+
+  function createDeviceFromClaim(
+    input: z.infer<typeof FrameClaimCreateSchema>,
+    defaultDevice: FrameDevice,
+  ): FrameDevice {
+    const alias = input.alias ?? generateUniqueAlias(input.name);
+    const id = generateUniqueDeviceId(alias);
+    return {
+      ...defaultDevice,
+      id,
+      name: input.name,
+      alias,
+      previewOrientation: input.previewOrientation,
+      remoteControlType: input.remoteControlType,
+      remoteApiUrl: input.remoteApiUrl ? trimTrailingSlash(input.remoteApiUrl) : undefined,
+      remoteApiKey: input.remoteApiKey,
+    };
+  }
+
+  function generateUniqueAlias(name: string): string {
+    const base = normalizeAlias(name) || 'frame';
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      const alias = `${base}-${randomAliasSuffix()}`;
+      if (!store.aliasExists(alias)) return alias;
+    }
+    return `${base}-${Date.now().toString(36)}`;
+  }
+
+  function generateUniqueDeviceId(alias: string): string {
+    const base = alias.replace(/-/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '') || 'frame';
+    if (!store.getDevice(base)) return base;
+    for (let index = 2; index < 100; index += 1) {
+      const candidate = `${base}_${index}`;
+      if (!store.getDevice(candidate)) return candidate;
+    }
+    return `${base}_${Date.now().toString(36)}`;
+  }
 
   function requireLocalConsoleAccess(request: FastifyRequest, reply: FastifyReply): boolean {
     const device = store.getDevice(deps.config.defaultDevice.id) ?? deps.config.defaultDevice;
@@ -1393,6 +1601,17 @@ function publicDevice(device: FrameDevice): Omit<FrameDevice, 'remoteApiKey' | '
   };
 }
 
+function publicFrameClaim(claim: FrameClaim): Omit<FrameClaim, 'codeHash'> & {
+  status: 'pending' | 'claimed' | 'expired';
+} {
+  const { codeHash: _codeHash, ...publicFields } = claim;
+  const expired = !claim.claimedDeviceId && Date.parse(claim.expiresAt) <= Date.now();
+  return {
+    ...publicFields,
+    status: claim.claimedDeviceId ? 'claimed' : expired ? 'expired' : 'pending',
+  };
+}
+
 function controllerUrlForRequest(request: Parameters<typeof requestContext>[0], fallback: string): string {
   const context = requestContext(request);
   if (!context.host) return fallback;
@@ -1439,6 +1658,7 @@ function createDeviceFromInput(
     ...defaultDevice,
     id: input.id,
     name: input.name,
+    alias: input.alias,
     networkMode: input.networkMode,
     previewOrientation: input.previewOrientation,
     localControllerBaseUrl: trimTrailingSlash(input.localControllerBaseUrl ?? defaultDevice.localControllerBaseUrl),
@@ -1461,6 +1681,7 @@ function normalizeDevicePatch(input: z.infer<typeof DevicePatchSchema>): Partial
   const patch: Partial<FrameDevice> = {};
 
   if (hasPatchKey(input, 'name')) patch.name = input.name;
+  if (hasPatchKey(input, 'alias')) patch.alias = input.alias ?? undefined;
   if (hasPatchKey(input, 'networkMode')) patch.networkMode = input.networkMode;
   if (hasPatchKey(input, 'previewOrientation')) patch.previewOrientation = input.previewOrientation;
   if (hasPatchKey(input, 'localControllerBaseUrl')) {
@@ -1504,8 +1725,48 @@ function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
 
+function normalizeAlias(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+}
+
+function randomAliasSuffix(): string {
+  const alphabet = '23456789abcdefghjkmnpqrstuvwxyz';
+  let value = '';
+  const bytes = randomBytes(4);
+  for (let index = 0; index < 4; index += 1) {
+    value += alphabet[bytes[index] % alphabet.length];
+  }
+  return value;
+}
+
+function generateFrameClaimCode(): string {
+  const digits = String(randomBytes(4).readUInt32BE(0) % 1000000).padStart(6, '0');
+  return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+}
+
+function normalizeFrameClaimCode(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+function hashSecret(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
 function buildFrameUrl(controllerBaseUrl: string, deviceId: string): string {
   return `${trimTrailingSlash(controllerBaseUrl)}/frame/${deviceId}`;
+}
+
+function stableFramePath(device: FrameDevice): string {
+  return `/f/${encodeURIComponent(device.alias ?? device.id)}`;
+}
+
+function buildStableFrameUrl(controllerBaseUrl: string, device: FrameDevice): string {
+  return `${trimTrailingSlash(controllerBaseUrl)}${stableFramePath(device)}`;
 }
 
 function kioskPasswordForDevice(device: FrameDevice, globalKioskPassword: string | undefined): string | undefined {

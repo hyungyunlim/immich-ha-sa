@@ -152,6 +152,7 @@ export function createDefaultStore(device: FrameDevice): StoreData {
     },
     profiles: createDefaultProfiles(),
     albumCache: createEmptyAlbumCache(),
+    frameClaims: {},
     auth: {
       tokens: {},
     },

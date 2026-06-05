@@ -5,6 +5,7 @@ import type {
   AlbumCache,
   ControllerApiToken,
   ControllerPairingState,
+  FrameClaim,
   FrameDevice,
   FrameProfile,
   FrameState,
@@ -30,12 +31,29 @@ export class JsonStore {
     return structuredClone(this.data.devices[deviceId]);
   }
 
+  getDeviceByAlias(alias: string): FrameDevice | undefined {
+    const normalized = alias.trim().toLowerCase();
+    const device = Object.values(this.data.devices).find((candidate) => (
+      candidate.alias === normalized || candidate.id === normalized
+    ));
+    return device ? structuredClone(device) : undefined;
+  }
+
+  aliasExists(alias: string, exceptDeviceId?: string): boolean {
+    const normalized = alias.trim().toLowerCase();
+    return Object.values(this.data.devices).some((candidate) => (
+      candidate.id !== exceptDeviceId
+      && (candidate.alias === normalized || candidate.id === normalized)
+    ));
+  }
+
   getFrameState(deviceId: string): FrameState | undefined {
     return structuredClone(this.data.frames[deviceId]);
   }
 
   createDevice(device: FrameDevice): FrameDevice | undefined {
     if (this.data.devices[device.id]) return undefined;
+    if (device.alias && this.aliasExists(device.alias)) return undefined;
     this.data.devices[device.id] = structuredClone(device);
     this.data.frames[device.id] = createDefaultFrameState(device);
     this.save();
@@ -45,6 +63,7 @@ export class JsonStore {
   updateDevice(deviceId: string, patch: Partial<FrameDevice>): FrameDevice | undefined {
     const current = this.data.devices[deviceId];
     if (!current) return undefined;
+    if (patch.alias && this.aliasExists(patch.alias, deviceId)) return undefined;
     const next = {
       ...current,
       ...patch,
@@ -89,6 +108,46 @@ export class JsonStore {
 
   getPairingState(): ControllerPairingState | undefined {
     return this.data.auth.pairing ? structuredClone(this.data.auth.pairing) : undefined;
+  }
+
+  getFrameClaim(claimId: string): FrameClaim | undefined {
+    const claim = this.data.frameClaims[claimId];
+    return claim ? structuredClone(claim) : undefined;
+  }
+
+  getFrameClaims(): FrameClaim[] {
+    this.pruneExpiredFrameClaims();
+    return Object.values(this.data.frameClaims).map((claim) => structuredClone(claim));
+  }
+
+  createFrameClaim(claim: FrameClaim): FrameClaim {
+    this.pruneExpiredFrameClaims();
+    this.data.frameClaims[claim.id] = structuredClone(claim);
+    this.save();
+    return structuredClone(claim);
+  }
+
+  findFrameClaimByCodeHash(codeHash: string): FrameClaim | undefined {
+    this.pruneExpiredFrameClaims();
+    const claim = Object.values(this.data.frameClaims).find((candidate) => (
+      !candidate.claimedDeviceId
+      && candidate.codeHash === codeHash
+      && Date.parse(candidate.expiresAt) > Date.now()
+    ));
+    return claim ? structuredClone(claim) : undefined;
+  }
+
+  markFrameClaimClaimed(claimId: string, deviceId: string): FrameClaim | undefined {
+    const claim = this.data.frameClaims[claimId];
+    if (!claim) return undefined;
+    const next = {
+      ...claim,
+      claimedDeviceId: deviceId,
+      claimedAt: new Date().toISOString(),
+    };
+    this.data.frameClaims[claimId] = next;
+    this.save();
+    return structuredClone(next);
   }
 
   setPairingState(pairing: ControllerPairingState | undefined): void {
@@ -202,6 +261,7 @@ export class JsonStore {
         ),
       },
       albumCache: data.albumCache ?? defaults.albumCache,
+      frameClaims: data.frameClaims ?? defaults.frameClaims,
       auth: {
         tokens: {
           ...defaults.auth.tokens,
@@ -253,5 +313,17 @@ export class JsonStore {
     const tempPath = `${this.filePath}.tmp`;
     writeFileSync(tempPath, `${JSON.stringify(data, null, 2)}\n`);
     renameSync(tempPath, this.filePath);
+  }
+
+  private pruneExpiredFrameClaims(): void {
+    const now = Date.now();
+    let changed = false;
+    for (const [claimId, claim] of Object.entries(this.data.frameClaims ?? {})) {
+      if (!claim.claimedDeviceId && Date.parse(claim.expiresAt) <= now) {
+        delete this.data.frameClaims[claimId];
+        changed = true;
+      }
+    }
+    if (changed) this.save();
   }
 }

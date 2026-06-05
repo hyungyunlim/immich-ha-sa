@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.33
+
+- Add physical frame pairing from the controller root URL on external hosts and `/pair` on local hosts.
+- Add short-code claim APIs and add-on console UI for creating a device from the code shown on the frame.
+- Add stable `/f/:alias` frame paths with alias support on devices while keeping `/frame/:deviceId` compatibility.
+
 ## 0.1.32
 
 - Clarify that External Frame URL is generated from External Controller URL, not External Kiosk Renderer URL.
