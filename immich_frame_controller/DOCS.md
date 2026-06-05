@@ -92,8 +92,9 @@ For album control:
 - Home Assistant reads the controller's album cache every 30 seconds.
 - The controller refreshes that cache from Immich every `album_refresh_interval_seconds` seconds.
 - Use the Home Assistant Refresh Albums button or `immich_frame.refresh_albums` service to force an immediate refresh.
-- Use the Album select entity for quick single-album selection. `All Photos` clears the album filter.
-- Use the Albums text entity for multiple albums, separated by commas. Values may be Immich album names or album IDs.
+- Use the Album select entity for quick single-album selection. `No Album Filter` clears the album filter and leaves immich-kiosk without an `album` URL parameter.
+- Use `No Album Filter` before choosing a person when you want person-only source selection instead of combining album and person source buckets.
+- Use the Albums text entity for multiple albums, separated by commas. Values may be Immich album names or album IDs. Leave it blank, or enter `none`, to clear the album filter.
 - Use the `set_album` service with `album_ids` or `album_names` for automations.
 
 For person control:

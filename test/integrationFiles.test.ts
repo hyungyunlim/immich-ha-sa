@@ -5,14 +5,17 @@ import { describe, expect, it } from 'vitest';
 const root = process.cwd();
 
 describe('Home Assistant integration files', () => {
-  it('shows an explicit all-photos state for the album select entity', () => {
+  it('shows an explicit no-filter state for the album select entity', () => {
     const source = readFileSync(join(root, 'custom_components/immich_frame/select.py'), 'utf8');
+    const textSource = readFileSync(join(root, 'custom_components/immich_frame/text.py'), 'utf8');
 
-    expect(source).toContain('ALBUM_OPTION_ALL_PHOTOS = "All Photos"');
+    expect(source).toContain('ALBUM_OPTION_NO_FILTER = "No Album Filter"');
+    expect(source).toContain('ALBUM_OPTION_ALL_PHOTOS_LEGACY = "All Photos"');
     expect(source).toContain('ALBUM_OPTION_MULTIPLE_ALBUMS = "Multiple Albums"');
-    expect(source).toContain('return ALBUM_OPTION_ALL_PHOTOS');
+    expect(source).toContain('return ALBUM_OPTION_NO_FILTER');
     expect(source).toContain('return ALBUM_OPTION_MULTIPLE_ALBUMS');
     expect(source).toContain('update_frame_state({"activeAlbumIds": []})');
+    expect(textSource).toContain('"no album filter"');
   });
 
   it('exposes image fit as a Home Assistant select entity', () => {

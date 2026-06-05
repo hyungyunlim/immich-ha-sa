@@ -16,7 +16,8 @@ from .date_filter import (
 )
 from .entity_helpers import frame_device_info, frame_label, frame_unique_id
 
-ALBUM_OPTION_ALL_PHOTOS = "All Photos"
+ALBUM_OPTION_NO_FILTER = "No Album Filter"
+ALBUM_OPTION_ALL_PHOTOS_LEGACY = "All Photos"
 ALBUM_OPTION_MULTIPLE_ALBUMS = "Multiple Albums"
 PERSON_OPTION_NO_FILTER = "No Person Filter"
 PERSON_OPTION_ALL_NAMED_PEOPLE = "All Named People"
@@ -117,7 +118,7 @@ class ImmichFrameAlbumSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEn
     @property
     def options(self) -> list[str]:
         active = self._active_album_ids
-        options = [ALBUM_OPTION_ALL_PHOTOS]
+        options = [ALBUM_OPTION_NO_FILTER]
         if len(active) > 1:
             options.append(ALBUM_OPTION_MULTIPLE_ALBUMS)
         options.extend(album["albumName"] for album in self._albums)
@@ -129,14 +130,14 @@ class ImmichFrameAlbumSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEn
     def current_option(self) -> str | None:
         active = self._active_album_ids
         if not active:
-            return ALBUM_OPTION_ALL_PHOTOS
+            return ALBUM_OPTION_NO_FILTER
         if len(active) > 1:
             return ALBUM_OPTION_MULTIPLE_ALBUMS
         album = self._album_for_id(active[0])
         return album["albumName"] if album else active[0]
 
     async def async_select_option(self, option: str) -> None:
-        if option == ALBUM_OPTION_ALL_PHOTOS:
+        if option in (ALBUM_OPTION_NO_FILTER, ALBUM_OPTION_ALL_PHOTOS_LEGACY):
             await self.coordinator.client.update_frame_state({"activeAlbumIds": []})
             await self.coordinator.async_request_refresh()
             return

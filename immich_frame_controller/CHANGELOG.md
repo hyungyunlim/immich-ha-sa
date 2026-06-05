@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.45
+
+- Rename the Home Assistant Album select's no-album state from `All Photos` to `No Album Filter` so person-only filtering is explicit.
+- Allow the Albums text entity to clear album selection with `none`, `no filter`, `no album filter`, or `all photos`.
+
 ## 0.1.44
 
 - Keep unnamed Immich face groups out of the Home Assistant Person select while still allowing direct person IDs through the People text entity and services.

@@ -59,6 +59,9 @@ class ImmichFrameAlbumsText(CoordinatorEntity[ImmichFrameCoordinator], TextEntit
         return album["albumName"] if album else album_id
 
     def _parse_album_ids(self, value: str) -> list[str]:
+        if value.strip().casefold() in {"none", "no filter", "no album filter", "all photos"}:
+            return []
+
         parts = [part.strip() for part in value.replace("\n", ",").split(",") if part.strip()]
         if not parts:
             return []
