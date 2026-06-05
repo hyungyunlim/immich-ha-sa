@@ -58,6 +58,13 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ),
             ImmichFrameStateSelect(
                 coordinator,
+                "image_fit",
+                "Image Fit",
+                "imageFit",
+                ["contain", "cover", "none"],
+            ),
+            ImmichFrameStateSelect(
+                coordinator,
                 "image_effect",
                 "Image Effect",
                 "imageEffect",

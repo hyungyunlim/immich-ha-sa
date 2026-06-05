@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.38
+
+- Add a Home Assistant Image Fit select so each frame can switch immich-kiosk between `contain`, `cover`, and `none` from the device UI.
+
 ## 0.1.37
 
 - Show `All Photos` in the Home Assistant Album select when no album filter is active instead of leaving the entity as unknown.
