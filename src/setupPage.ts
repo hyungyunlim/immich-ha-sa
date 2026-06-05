@@ -497,43 +497,81 @@ export function renderSetupPage(params: SetupPageParams): string {
       outline: 2px solid rgb(8 126 139 / 22%);
       border-color: #087e8b;
     }
-    .segmented {
-      display: inline-grid;
-      grid-auto-flow: column;
-      grid-auto-columns: minmax(112px, 1fr);
-      gap: 4px;
+    .orientation-picker {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
       width: 100%;
-      border: 1px solid #cfd8e2;
-      border-radius: 8px;
-      padding: 4px;
-      background: #f8fafc;
     }
-    .segmented label {
+    .orientation-picker label {
       display: block;
+      position: relative;
       min-width: 0;
     }
-    .segmented input {
+    .orientation-picker input {
       position: absolute;
       width: 1px;
       height: 1px;
       opacity: 0;
       pointer-events: none;
     }
-    .segmented span {
+    .orientation-option {
       display: grid;
-      min-height: 32px;
-      place-items: center;
-      border-radius: 6px;
-      color: #475569;
-      font-size: 13px;
+      grid-template-columns: 52px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      min-height: 68px;
+      border: 1px solid #cfd8e2;
+      border-radius: 8px;
+      padding: 8px;
+      background: #ffffff;
+      color: #314254;
       font-weight: 700;
       cursor: pointer;
-      pointer-events: none;
     }
-    .segmented input:checked + span {
-      background: #ffffff;
+    .orientation-picker input:checked + .orientation-option {
+      border-color: #087e8b;
+      background: #eefafa;
       color: #087e8b;
-      box-shadow: 0 1px 5px rgb(15 23 42 / 12%);
+      box-shadow: 0 1px 6px rgb(15 23 42 / 12%);
+    }
+    .orientation-picker input:focus-visible + .orientation-option {
+      outline: 2px solid rgb(8 126 139 / 22%);
+      outline-offset: 2px;
+    }
+    .orientation-frame {
+      display: grid;
+      width: 52px;
+      height: 52px;
+      place-items: center;
+      border-radius: 7px;
+      background: #f8fafc;
+    }
+    .orientation-screen {
+      display: block;
+      border: 2px solid #4b5563;
+      border-radius: 5px;
+      background:
+        linear-gradient(135deg, rgb(8 126 139 / 22%), rgb(244 168 62 / 18%)),
+        #ffffff;
+      box-shadow: inset 0 0 0 2px rgb(255 255 255 / 72%);
+    }
+    .orientation-screen.landscape {
+      width: 44px;
+      height: 28px;
+    }
+    .orientation-screen.portrait {
+      width: 28px;
+      height: 44px;
+    }
+    .orientation-picker input:checked + .orientation-option .orientation-screen {
+      border-color: #087e8b;
+    }
+    .orientation-text {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-size: 13px;
+      line-height: 1.2;
     }
     a {
       color: #087e8b;
@@ -772,7 +810,7 @@ export function renderSetupPage(params: SetupPageParams): string {
         </label>
         <label class="field">
           <span class="label">Preview Orientation</span>
-          <span class="segmented">
+          <span class="orientation-picker">
             ${renderPreviewOrientationOptions(inheritedPreviewOrientation)}
           </span>
         </label>
@@ -805,7 +843,7 @@ export function renderSetupPage(params: SetupPageParams): string {
         </label>
         <label class="field">
           <span class="label">Preview Orientation</span>
-          <span class="segmented">
+          <span class="orientation-picker">
             ${renderPreviewOrientationOptions(inheritedPreviewOrientation)}
           </span>
         </label>
@@ -1310,7 +1348,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
           </label>
           <label class="field">
             <span class="label">Preview Orientation</span>
-            <span class="segmented">
+            <span class="orientation-picker">
               ${renderPreviewOrientationOptions(previewOrientation(device))}
             </span>
           </label>
@@ -1466,7 +1504,7 @@ function renderPreviewOrientationOptions(value: string): string {
     ['landscape', 'Landscape'],
     ['portrait', 'Portrait'],
   ]
-    .map(([option, label]) => `<label><input name="previewOrientation" type="radio" value="${option}"${option === value ? ' checked' : ''}><span>${label}</span></label>`)
+    .map(([option, label]) => `<label><input name="previewOrientation" type="radio" value="${option}"${option === value ? ' checked' : ''}><span class="orientation-option"><span class="orientation-frame" aria-hidden="true"><span class="orientation-screen ${option}"></span></span><span class="orientation-text">${label}</span></span></label>`)
     .join('');
 }
 

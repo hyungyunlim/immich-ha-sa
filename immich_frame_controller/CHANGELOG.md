@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.34
+
+- Replace preview orientation text toggles with visual frame-shape choices for landscape and portrait.
+- Keep the same `previewOrientation` form values so existing device and claim flows continue to work unchanged.
+
 ## 0.1.33
 
 - Add physical frame pairing from the controller root URL on external hosts and `/pair` on local hosts.
