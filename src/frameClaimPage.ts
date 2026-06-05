@@ -80,8 +80,12 @@ export function renderFrameClaimPage(params: FrameClaimPageParams): string {
   <script>
     (function () {
       var claimId = ${JSON.stringify(params.claimId)};
+      function controllerPath(path) {
+        var cleanPath = String(path).replace(/^\\/+/, '');
+        return new URL(cleanPath, new URL('.', window.location.href)).toString();
+      }
       function poll() {
-        fetch('/api/frame-claims/' + encodeURIComponent(claimId), { cache: 'no-store' })
+        fetch(controllerPath('/api/frame-claims/' + encodeURIComponent(claimId)), { cache: 'no-store' })
           .then(function (response) { return response.json(); })
           .then(function (payload) {
             if (payload && payload.success && payload.data && payload.data.status === 'claimed' && payload.data.framePath) {

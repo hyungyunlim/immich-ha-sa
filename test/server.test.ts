@@ -312,6 +312,10 @@ describe('controller API', () => {
     expect(response.body).toContain('https://freekiosk.app/docs/');
     expect(response.body).toContain('External Kiosk Renderer URL');
     expect(response.body).toContain('<details class="frame-details">');
+    expect(response.body).toContain('function controllerPath(path)');
+    expect(response.body).toContain('fetch(controllerPath(path),');
+    expect(response.body).toContain("'Request failed' + status");
+    expect(response.body).not.toContain('fetch(path,');
     await server.close();
   });
 

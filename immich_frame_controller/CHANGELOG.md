@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.35
+
+- Resolve add-on console API requests relative to the current page so device save/delete actions work under Home Assistant Ingress as well as direct controller URLs.
+- Show the HTTP status when a console API request receives a non-JSON response instead of only showing a generic `Request failed` message.
+
 ## 0.1.34
 
 - Replace preview orientation text toggles with visual frame-shape choices for landscape and portrait.

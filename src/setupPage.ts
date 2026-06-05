@@ -1075,17 +1075,31 @@ export function renderSetupPage(params: SetupPageParams): string {
       return payload;
     }
 
+    function controllerPath(path) {
+      const cleanPath = String(path).replace(/^\\/+/, '');
+      return new URL(cleanPath, new URL('.', window.location.href)).toString();
+    }
+
     async function requestJson(path, options) {
-      const response = await fetch(path, {
+      const response = await fetch(controllerPath(path), {
         ...options,
         headers: {
           'content-type': 'application/json',
           ...(options && options.headers ? options.headers : {}),
         },
       });
-      const body = await response.json().catch(() => null);
+      const text = await response.text().catch(() => '');
+      let body = null;
+      if (text) {
+        try {
+          body = JSON.parse(text);
+        } catch (error) {
+          body = null;
+        }
+      }
       if (!response.ok || !body || body.success === false) {
-        throw new Error(body && body.error ? body.error.message : 'Request failed');
+        const status = response.status ? ' (' + response.status + (response.statusText ? ' ' + response.statusText : '') + ')' : '';
+        throw new Error(body && body.error ? body.error.message : 'Request failed' + status);
       }
       return body;
     }
