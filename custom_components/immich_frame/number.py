@@ -97,6 +97,16 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ),
             ImmichFrameNumber(
                 coordinator,
+                "max_video_length",
+                "Max Video Length",
+                "excludeVideosOver",
+                0,
+                86400,
+                5,
+                "s",
+            ),
+            ImmichFrameNumber(
+                coordinator,
                 "burn_in_interval",
                 "Burn-in Interval",
                 "burnInInterval",

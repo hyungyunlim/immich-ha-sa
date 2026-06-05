@@ -52,6 +52,7 @@ export interface FrameState {
   weatherLocation: string;
   weatherRotationInterval: number;
   showVideos: boolean;
+  excludeVideosOver: number;
   showArchived: boolean;
   filterDate: string;
   filterNewest: number;
@@ -125,6 +126,7 @@ export interface FrameProfile {
   weatherLocation: string;
   weatherRotationInterval: number;
   showVideos: boolean;
+  excludeVideosOver: number;
   showArchived: boolean;
   filterDate: string;
   filterNewest: number;

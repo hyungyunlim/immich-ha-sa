@@ -77,6 +77,7 @@ interface SetupPageDevice {
   hideCursor?: boolean;
   showProgressBar?: boolean;
   showVideos?: boolean;
+  excludeVideosOver?: number;
   showArchived?: boolean;
   showImageRating?: boolean;
   showOwner?: boolean;
@@ -1370,7 +1371,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Navigation', device.disableNavigation ? 'Disabled' : 'Enabled')}
         ${renderKeyValue('Cursor', device.hideCursor ? 'Hidden' : 'Visible')}
         ${renderKeyValue('Progress Bar', `${boolLabel(device.showProgressBar)} / ${device.progressBarPosition ?? 'top'}`)}
-        ${renderKeyValue('Videos', boolLabel(device.showVideos))}
+        ${renderKeyValue('Media', renderMediaSummary(device))}
         ${renderKeyValue('Archived Assets', boolLabel(device.showArchived))}
         ${renderKeyValue('Metadata', renderMetadataSummary(device))}
         ${renderKeyValue('Asset Filters', renderAssetFilters(device))}
@@ -1465,6 +1466,14 @@ function renderAssetFilters(device: SetupPageDevice): string {
     device.filterNewest && device.filterNewest > 0 ? `newest ${device.filterNewest}` : '',
   ].filter(Boolean);
   return filters.length > 0 ? filters.join(' / ') : 'Off';
+}
+
+function renderMediaSummary(device: SetupPageDevice): string {
+  const content = device.showVideos ? 'images + videos' : 'images only';
+  const videoLimit = device.excludeVideosOver && device.excludeVideosOver > 0
+    ? ` / max video ${device.excludeVideosOver}s`
+    : '';
+  return `${content}${videoLimit}`;
 }
 
 function renderFrameClaimRows(claims: SetupPageFrameClaim[]): string {

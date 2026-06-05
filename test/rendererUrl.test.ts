@@ -30,6 +30,7 @@ const state: FrameState = {
   weatherLocation: '',
   weatherRotationInterval: 60,
   showVideos: false,
+  excludeVideosOver: 0,
   showArchived: false,
   filterDate: '',
   filterNewest: 0,
@@ -149,6 +150,7 @@ describe('renderer URL generation', () => {
       weatherLocation: 'rotate',
       weatherRotationInterval: 120,
       transition: 'fade',
+      excludeVideosOver: 45,
       showArchived: true,
       fadeTransitionDuration: 1.5,
       layout: 'splitview',
@@ -199,6 +201,7 @@ describe('renderer URL generation', () => {
     expect(resolved.rendererUrl).toContain('weather=rotate');
     expect(resolved.rendererUrl).toContain('rotation_interval=120');
     expect(resolved.rendererUrl).toContain('show_videos=true');
+    expect(resolved.rendererUrl).toContain('exclude_videos_over=45');
     expect(resolved.rendererUrl).toContain('show_archived=true');
     expect(resolved.rendererUrl).toContain('background_blur=false');
     expect(resolved.rendererUrl).toContain('background_blur_amount=18');

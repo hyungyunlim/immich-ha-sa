@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.42
+
+- Add Home Assistant media content and orientation selects that map to immich-kiosk `show_videos` and `layout` URL overrides.
+- Add a Max Video Length number entity backed by the immich-kiosk `exclude_videos_over` URL override.
+
 ## 0.1.41
 
 - Add a dedicated Home Assistant D-pad Up button backed by the FreeKiosk `/api/remote/up` REST endpoint, separate from the diagnostic kiosk mute command.

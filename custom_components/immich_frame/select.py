@@ -27,6 +27,8 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ImmichFrameAlbumSelect(coordinator),
             ImmichFrameProfileSelect(coordinator),
             ImmichFrameNetworkModeSelect(coordinator),
+            ImmichFrameMediaContentSelect(coordinator),
+            ImmichFrameOrientationSelect(coordinator),
             ImmichFrameDateFilterPresetSelect(coordinator),
             ImmichFrameStateSelect(
                 coordinator,
@@ -222,6 +224,53 @@ class ImmichFrameDateFilterPresetSelect(CoordinatorEntity[ImmichFrameCoordinator
         if option == DATE_FILTER_CUSTOM:
             return
         await self.coordinator.client.update_frame_state({"filterDate": DATE_FILTER_PRESETS[option]})
+        await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameMediaContentSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEntity):
+    _attr_options = ["Images only", "Images + Videos"]
+
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Media Content"
+        self._attr_unique_id = frame_unique_id(device_id, "media_content")
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def current_option(self) -> str | None:
+        return "Images + Videos" if self.coordinator.data.get("state", {}).get("showVideos") else "Images only"
+
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.client.update_frame_state({"showVideos": option == "Images + Videos"})
+        await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameOrientationSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEntity):
+    _OPTION_TO_LAYOUT = {
+        "Any": "single",
+        "Portrait only": "portrait",
+        "Landscape only": "landscape",
+        "Portrait pair": "splitview",
+        "Landscape pair": "splitview-landscape",
+    }
+    _LAYOUT_TO_OPTION = {value: key for key, value in _OPTION_TO_LAYOUT.items()}
+    _attr_options = list(_OPTION_TO_LAYOUT.keys())
+
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Orientation"
+        self._attr_unique_id = frame_unique_id(device_id, "orientation")
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def current_option(self) -> str | None:
+        layout = self.coordinator.data.get("state", {}).get("layout")
+        return self._LAYOUT_TO_OPTION.get(layout, "Any")
+
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.client.update_frame_state({"layout": self._OPTION_TO_LAYOUT[option]})
         await self.coordinator.async_request_refresh()
 
 

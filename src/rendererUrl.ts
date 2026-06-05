@@ -81,6 +81,10 @@ export function buildRendererUrl(
   }
   url.searchParams.set('rotation_interval', String(state.weatherRotationInterval));
   url.searchParams.set('show_videos', String(state.showVideos));
+  url.searchParams.delete('exclude_videos_over');
+  if (state.excludeVideosOver > 0) {
+    url.searchParams.set('exclude_videos_over', String(state.excludeVideosOver));
+  }
   url.searchParams.set('show_archived', String(state.showArchived));
   url.searchParams.delete('filter_date');
   if (state.filterDate.trim()) {

@@ -31,4 +31,18 @@ describe('Home Assistant integration files', () => {
     expect(source).toContain('"D-pad Up"');
     expect(source).toContain('"dpad-up"');
   });
+
+  it('exposes friendly media content and orientation controls', () => {
+    const selectSource = readFileSync(join(root, 'custom_components/immich_frame/select.py'), 'utf8');
+    const numberSource = readFileSync(join(root, 'custom_components/immich_frame/number.py'), 'utf8');
+
+    expect(selectSource).toContain('Frame Media Content');
+    expect(selectSource).toContain('"Images + Videos"');
+    expect(selectSource).toContain('{"showVideos": option == "Images + Videos"}');
+    expect(selectSource).toContain('Frame Orientation');
+    expect(selectSource).toContain('"Portrait only": "portrait"');
+    expect(selectSource).toContain('"Landscape only": "landscape"');
+    expect(numberSource).toContain('"max_video_length"');
+    expect(numberSource).toContain('"excludeVideosOver"');
+  });
 });
