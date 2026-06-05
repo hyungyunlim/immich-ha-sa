@@ -301,6 +301,37 @@ describe('controller API', () => {
     expect(response.body).toContain('External Frame URL');
     expect(response.body).toContain('http://10.0.0.10:18082/frame/lenovo');
     expect(response.body).toContain('https://frame.example.com/frame/lenovo');
+    expect(response.body).toContain('Advanced settings');
+    expect(response.body).toContain('Blank inherits http://10.0.0.10:3000.');
+    expect(response.body).toContain('title="Lenovo preview"');
+    expect(response.body).toContain('http://10.0.0.10:18082/frame/lenovo?preview=1');
+    await server.close();
+  });
+
+  it('renders frame preview mode without event client behavior', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createTestServer({ config });
+
+    const normal = await server.inject({
+      method: 'GET',
+      url: '/frame/lenovo',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(normal.statusCode).toBe(200);
+    expect(normal.body).toContain('var previewMode = false;');
+    expect(normal.body).toContain('var pollIntervalMs = 20000;');
+
+    const preview = await server.inject({
+      method: 'GET',
+      url: '/frame/lenovo?preview=1',
+      headers: { host: '10.0.0.10:18082' },
+    });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.body).toContain('var previewMode = true;');
+    expect(preview.body).toContain('var pollIntervalMs = 60000;');
+
     await server.close();
   });
 

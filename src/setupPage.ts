@@ -98,6 +98,14 @@ export function renderSetupPage(params: SetupPageParams): string {
   const refreshedAt = params.albumRefreshedAt
     ? new Date(params.albumRefreshedAt).toLocaleString()
     : 'Not refreshed yet';
+  const defaultDevice = params.devices.find((device) => device.isDefault) ?? params.devices[0];
+  const inheritedLocalControllerUrl = defaultDevice?.localControllerBaseUrl ?? params.controllerUrl;
+  const inheritedLocalKioskUrl = defaultDevice?.localKioskBaseUrl ?? 'http://homeassistant.local:3000';
+  const inheritedExternalControllerUrl = defaultDevice?.externalControllerBaseUrl;
+  const inheritedExternalKioskUrl = defaultDevice?.externalKioskBaseUrl;
+  const inheritedNetworkMode = defaultDevice?.networkMode ?? defaultDevice?.deviceNetworkMode ?? 'auto';
+  const inheritedPollIntervalSeconds = defaultDevice?.pollIntervalSeconds ?? 20;
+  const inheritedRemoteControlType = defaultDevice?.remoteControlType ?? 'none';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -258,6 +266,32 @@ export function renderSetupPage(params: SetupPageParams): string {
       gap: 16px;
       padding: 18px;
     }
+    .device-content {
+      display: grid;
+      grid-template-columns: minmax(210px, 260px) minmax(0, 1fr);
+      align-items: start;
+    }
+    .device-preview {
+      padding: 18px 0 18px 18px;
+    }
+    .preview-frame {
+      position: sticky;
+      top: 18px;
+      overflow: hidden;
+      aspect-ratio: 16 / 10;
+      border: 1px solid #d8e0e8;
+      border-radius: 8px;
+      background: #111827;
+    }
+    .preview-frame iframe {
+      width: 400%;
+      height: 400%;
+      border: 0;
+      pointer-events: none;
+      transform: scale(.25);
+      transform-origin: top left;
+      background: #111827;
+    }
     .stack {
       display: grid;
       gap: 8px;
@@ -369,6 +403,13 @@ export function renderSetupPage(params: SetupPageParams): string {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
     }
+    .form-lead {
+      grid-column: 1 / -1;
+      max-width: 760px;
+      color: #5d6877;
+      font-size: 13px;
+      line-height: 1.45;
+    }
     .field {
       display: grid;
       gap: 6px;
@@ -412,10 +453,30 @@ export function renderSetupPage(params: SetupPageParams): string {
       background: #ffffff;
       padding: 12px;
     }
+    details.full {
+      grid-column: 1 / -1;
+    }
     summary {
       cursor: pointer;
       color: #263241;
       font-weight: 700;
+    }
+    .summary-hint {
+      color: #697586;
+      font-size: 12px;
+      font-weight: 500;
+      margin-left: 6px;
+    }
+    .advanced-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .inherited {
+      color: #697586;
+      font-size: 12px;
+      line-height: 1.35;
     }
     .form-actions {
       display: flex;
@@ -462,7 +523,19 @@ export function renderSetupPage(params: SetupPageParams): string {
       .kv {
         grid-template-columns: 1fr;
       }
+      .device-content {
+        grid-template-columns: 1fr;
+      }
+      .device-preview {
+        padding: 14px 14px 0;
+      }
+      .preview-frame {
+        position: static;
+      }
       .form-grid {
+        grid-template-columns: 1fr;
+      }
+      .advanced-grid {
         grid-template-columns: 1fr;
       }
     }
@@ -514,63 +587,71 @@ export function renderSetupPage(params: SetupPageParams): string {
     </div>
     <section class="panel">
       <form class="form-grid" data-device-create>
+        <p class="form-lead">Add a frame with a stable device ID and display name. Leave inherited URL fields blank unless this frame needs a different route than the add-on defaults.</p>
         <label class="field">
           <span class="label">Device ID</span>
-          <input name="id" required pattern="[a-z0-9][a-z0-9_-]*" maxlength="64" placeholder="kitchen">
+          <input name="id" required pattern="[a-z0-9][a-z0-9_-]*" maxlength="64" placeholder="livingroom">
         </label>
         <label class="field">
           <span class="label">Name</span>
-          <input name="name" required maxlength="80" placeholder="Kitchen Frame">
-        </label>
-        <label class="field">
-          <span class="label">Network Mode</span>
-          <select name="networkMode">
-            <option value="auto">auto</option>
-            <option value="local">local</option>
-            <option value="external">external</option>
-          </select>
-        </label>
-        <label class="field">
-          <span class="label">Poll Interval</span>
-          <input name="pollIntervalSeconds" type="number" min="5" max="300" step="1" value="20">
+          <input name="name" required maxlength="80" placeholder="Living Room Frame">
         </label>
         <label class="field">
           <span class="label">Remote Control</span>
           <select name="remoteControlType">
-            <option value="none">none</option>
-            <option value="freekiosk">freekiosk</option>
+            ${renderRemoteControlOptions(inheritedRemoteControlType)}
           </select>
-        </label>
-        <label class="field full">
-          <span class="label">Local Controller URL</span>
-          <input name="localControllerBaseUrl" type="url" placeholder="${escapeAttribute(params.controllerUrl)}">
-        </label>
-        <label class="field full">
-          <span class="label">Local Kiosk URL</span>
-          <input name="localKioskBaseUrl" type="url" placeholder="http://homeassistant.local:3000">
-        </label>
-        <label class="field full">
-          <span class="label">Kiosk Password Override</span>
-          <input name="kioskPassword" type="password" autocomplete="new-password" placeholder="optional; inherits global kiosk_password when blank">
-          <span class="help-text">Use only when this device's immich-kiosk password differs from the add-on global kiosk_password.</span>
-        </label>
-        <label class="field full">
-          <span class="label">External Controller URL</span>
-          <input name="externalControllerBaseUrl" type="url" placeholder="https://frame.example.com">
-          <span class="help-text">Use a tunnel hostname that routes to this controller add-on, not the Immich server or direct immich-kiosk URL.</span>
-        </label>
-        <label class="field full">
-          <span class="label">External Kiosk URL</span>
-          <input name="externalKioskBaseUrl" type="url" placeholder="https://frame.example.com/kiosk">
         </label>
         <label class="field full">
           <span class="label">Remote API URL</span>
           <input name="remoteApiUrl" type="url" placeholder="http://192.168.1.160:8080">
+          <span class="help-text">FreeKiosk REST API address for this physical frame. Leave blank if this frame only needs photo display.</span>
         </label>
-        <label class="field full">
-          <span class="label">Remote API Key</span>
-          <input name="remoteApiKey" type="password" autocomplete="new-password" placeholder="optional">
-        </label>
+        <details class="full">
+          <summary>Advanced settings <span class="summary-hint">inherited URLs, external access, and password overrides</span></summary>
+          <div class="advanced-grid">
+            <label class="field">
+              <span class="label">Network Mode</span>
+              <select name="networkMode">
+                ${renderNetworkModeOptions(inheritedNetworkMode)}
+              </select>
+            </label>
+            <label class="field">
+              <span class="label">Poll Interval</span>
+              <input name="pollIntervalSeconds" type="number" min="5" max="300" step="1" value="${inheritedPollIntervalSeconds}">
+            </label>
+            <label class="field full">
+              <span class="label">Local Controller URL</span>
+              <input name="localControllerBaseUrl" type="url" placeholder="${escapeAttribute(inheritedLocalControllerUrl)}">
+              <span class="inherited">Blank inherits ${escapeHtml(inheritedLocalControllerUrl)}.</span>
+            </label>
+            <label class="field full">
+              <span class="label">Local Kiosk URL</span>
+              <input name="localKioskBaseUrl" type="url" placeholder="${escapeAttribute(inheritedLocalKioskUrl)}">
+              <span class="inherited">Blank inherits ${escapeHtml(inheritedLocalKioskUrl)}.</span>
+            </label>
+            <label class="field full">
+              <span class="label">Kiosk Password Override</span>
+              <input name="kioskPassword" type="password" autocomplete="new-password" placeholder="optional">
+              <span class="help-text">Use only when this device's immich-kiosk password differs from the add-on global kiosk_password.</span>
+            </label>
+            <label class="field full">
+              <span class="label">External Controller URL</span>
+              <input name="externalControllerBaseUrl" type="url" placeholder="${escapeAttribute(inheritedExternalControllerUrl ?? 'https://frame.example.com')}">
+              <span class="inherited">${inheritedExternalControllerUrl ? `Blank inherits ${escapeHtml(inheritedExternalControllerUrl)}.` : 'Blank leaves external frame URL unavailable.'}</span>
+              <span class="help-text">Use a tunnel hostname that routes to this controller add-on, not the Immich server or direct immich-kiosk URL.</span>
+            </label>
+            <label class="field full">
+              <span class="label">External Kiosk URL</span>
+              <input name="externalKioskBaseUrl" type="url" placeholder="${escapeAttribute(inheritedExternalKioskUrl ?? 'https://frame.example.com/kiosk')}">
+              <span class="inherited">${inheritedExternalKioskUrl ? `Blank inherits ${escapeHtml(inheritedExternalKioskUrl)}.` : 'Blank leaves external kiosk URL unset; controller proxy still works through External Controller URL.'}</span>
+            </label>
+            <label class="field full">
+              <span class="label">Remote API Key</span>
+              <input name="remoteApiKey" type="password" autocomplete="new-password" placeholder="optional">
+            </label>
+          </div>
+        </details>
         <div class="form-actions">
           <span class="form-status" data-form-status></span>
           <button type="submit" class="primary">Add Device</button>
@@ -638,6 +719,8 @@ export function renderSetupPage(params: SetupPageParams): string {
 
     function payloadFromForm(form, includeId) {
       const formData = new FormData(form);
+      const remoteApiUrl = optionalValue(formData, 'remoteApiUrl');
+      const selectedRemoteControlType = String(formData.get('remoteControlType') || 'none');
       const payload = {
         name: String(formData.get('name') || '').trim(),
         networkMode: String(formData.get('networkMode') || 'auto'),
@@ -646,8 +729,8 @@ export function renderSetupPage(params: SetupPageParams): string {
         externalControllerBaseUrl: optionalValue(formData, 'externalControllerBaseUrl') ?? null,
         localKioskBaseUrl: optionalValue(formData, 'localKioskBaseUrl'),
         externalKioskBaseUrl: optionalValue(formData, 'externalKioskBaseUrl') ?? null,
-        remoteControlType: String(formData.get('remoteControlType') || 'none'),
-        remoteApiUrl: optionalValue(formData, 'remoteApiUrl'),
+        remoteControlType: remoteApiUrl && selectedRemoteControlType === 'none' ? 'freekiosk' : selectedRemoteControlType,
+        remoteApiUrl,
       };
       const kioskPassword = optionalValue(formData, 'kioskPassword');
       if (!includeId && formData.get('clearKioskPassword') === 'on') {
@@ -681,6 +764,14 @@ export function renderSetupPage(params: SetupPageParams): string {
     }
 
     for (const form of document.querySelectorAll('[data-device-create]')) {
+      const remoteApiUrl = form.querySelector('[name="remoteApiUrl"]');
+      const remoteControlType = form.querySelector('[name="remoteControlType"]');
+      remoteApiUrl?.addEventListener('input', () => {
+        if (remoteApiUrl.value.trim() && remoteControlType?.value === 'none') {
+          remoteControlType.value = 'freekiosk';
+        }
+      });
+
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
         setStatus(form, 'Adding device...', false);
@@ -788,7 +879,13 @@ function renderDeviceCard(device: SetupPageDevice): string {
       </div>
       ${renderStatusPill(device.resolvedNetworkMode ?? device.networkMode ?? 'unknown')}
     </div>
-    <div class="device-body">
+    <div class="device-content">
+      <div class="device-preview">
+        <div class="preview-frame">
+          <iframe src="${escapeAttribute(framePreviewUrl(device.localFrameUrl))}" title="${escapeAttribute(`${device.name} preview`)}" loading="lazy"></iframe>
+        </div>
+      </div>
+      <div class="device-body">
       <div class="stack">
         <div class="row">
           <span class="label">Local Frame URL</span>
@@ -900,6 +997,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
           </div>
         </form>
       </details>
+      </div>
     </div>
   </article>`;
 }
@@ -910,6 +1008,10 @@ function renderAssetFilters(device: SetupPageDevice): string {
     device.filterNewest && device.filterNewest > 0 ? `newest ${device.filterNewest}` : '',
   ].filter(Boolean);
   return filters.length > 0 ? filters.join(' / ') : 'Off';
+}
+
+function framePreviewUrl(frameUrl: string): string {
+  return `${frameUrl}${frameUrl.includes('?') ? '&' : '?'}preview=1`;
 }
 
 function renderClockSummary(device: SetupPageDevice): string {

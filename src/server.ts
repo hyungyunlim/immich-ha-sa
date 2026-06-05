@@ -547,12 +547,13 @@ export function createServer(deps: ServerDeps): FastifyInstance {
 
   app.get('/frame/:deviceId', async (request, reply) => {
     const { deviceId } = request.params as { deviceId: string };
+    const query = request.query as { preview?: string };
     const device = store.getDevice(deviceId);
     if (!device) {
       reply.status(404).send('Unknown frame');
       return;
     }
-    reply.type('text/html; charset=utf-8').send(renderFramePage(device));
+    reply.type('text/html; charset=utf-8').send(renderFramePage(device, { preview: query.preview === '1' }));
   });
 
   app.all('/kiosk-proxy/:deviceId', proxyKioskRequest);

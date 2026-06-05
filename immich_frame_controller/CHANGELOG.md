@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.30
+
+- Simplify the add-on device creation form so only essential fields are visible by default.
+- Move inherited URL, external URL, password override, and polling controls into an advanced section with explicit inherited defaults.
+- Add lazy frame thumbnails to the device list using each frame's local controller URL.
+- Automatically use FreeKiosk remote control when a Remote API URL is provided from the console form.
+
 ## 0.1.29
 
 - Add an authenticated read-only integration device list endpoint.

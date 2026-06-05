@@ -1,7 +1,12 @@
 import type { FrameDevice } from './types.js';
 
-export function renderFramePage(device: FrameDevice): string {
+interface FramePageOptions {
+  preview?: boolean;
+}
+
+export function renderFramePage(device: FrameDevice, options: FramePageOptions = {}): string {
   const escapedDeviceId = escapeHtml(device.id);
+  const previewMode = Boolean(options.preview);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -51,10 +56,11 @@ export function renderFramePage(device: FrameDevice): string {
       var stateUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/state';
       var eventsUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/events';
       var iframe = document.getElementById('renderer');
+      var previewMode = ${JSON.stringify(previewMode)};
       var lastVersion = 0;
       var lastRendererUrl = '';
       var pollTimer = null;
-      var pollIntervalMs = ${Math.max(5, device.pollIntervalSeconds) * 1000};
+      var pollIntervalMs = ${Math.max(previewMode ? 60 : 5, device.pollIntervalSeconds) * 1000};
       var frameVideoMuted = true;
       var keyMap = {
         next: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
@@ -199,10 +205,12 @@ export function renderFramePage(device: FrameDevice): string {
       }
 
       iframe.addEventListener('load', function () {
+        if (previewMode) return;
         try { iframe.contentWindow && iframe.contentWindow.focus(); } catch (error) {}
       });
 
       document.addEventListener('keyup', function (event) {
+        if (previewMode) return;
         if (event.key === 'ArrowRight') {
           if (triggerKioskCommand('next')) event.preventDefault();
         } else if (event.key === 'ArrowLeft') {
@@ -227,6 +235,10 @@ export function renderFramePage(device: FrameDevice): string {
       }
 
       function startEvents() {
+        if (previewMode) {
+          startPolling();
+          return;
+        }
         if (!window.EventSource) {
           startPolling();
           return;
