@@ -918,17 +918,19 @@ describe('controller API', () => {
       headers: { host: '10.0.0.10:18082' },
     });
     expect(html.statusCode).toBe(200);
-    expect(html.body).toContain('href="/kiosk-proxy/lenovo/style.css"');
-    expect(html.body).toContain('src="/kiosk-proxy/lenovo/kiosk.js"');
+    expect(html.headers['cache-control']).toBe('no-store, max-age=0');
+    expect(html.body).toContain('href="/kiosk-proxy/lenovo/style.css?_ifc=');
+    expect(html.body).toContain('src="/kiosk-proxy/lenovo/kiosk.js?_ifc=');
     expect(html.body).toContain('hx-post="/kiosk-proxy/lenovo/asset/new"');
     expect(html.body).toContain('src="/kiosk-proxy/lenovo/image"');
 
     const css = await server.inject({
       method: 'GET',
-      url: '/kiosk-proxy/lenovo/style.css',
+      url: '/kiosk-proxy/lenovo/style.css?_ifc=test',
       headers: { host: '10.0.0.10:18082' },
     });
     expect(css.statusCode).toBe(200);
+    expect(css.headers['cache-control']).toBe('no-store, max-age=0');
     expect(css.body).toContain('url("/kiosk-proxy/lenovo/image")');
     expect(css.body).toContain('legacy Android WebView background-fill fix');
     expect(css.body).toContain('.frame--background img');
@@ -936,10 +938,11 @@ describe('controller API', () => {
 
     const javascript = await server.inject({
       method: 'GET',
-      url: '/kiosk-proxy/lenovo/kiosk.js',
+      url: '/kiosk-proxy/lenovo/kiosk.js?_ifc=test',
       headers: { host: '10.0.0.10:18082' },
     });
     expect(javascript.statusCode).toBe(200);
+    expect(javascript.headers['cache-control']).toBe('no-store, max-age=0');
     expect(javascript.body).toContain('const dataAttr = /^data-[\\w]+$/;');
     expect(javascript.body).toContain('register("/kiosk-proxy/lenovo/assets/js/sw.js")');
     expect(javascript.body).toContain('startsWith("/kiosk-proxy/lenovo/asset/")');
@@ -966,8 +969,8 @@ describe('controller API', () => {
     expect(image.body).toBe('GIF89a');
 
     expect(kioskRequests).toContain('/?duration=60');
-    expect(kioskRequests).toContain('/style.css');
-    expect(kioskRequests).toContain('/kiosk.js');
+    expect(kioskRequests).toContain('/style.css?_ifc=test');
+    expect(kioskRequests).toContain('/kiosk.js?_ifc=test');
     expect(kioskRequests).toContain('/video/asset-1');
     expect(kioskRequests).toContain('/image');
 

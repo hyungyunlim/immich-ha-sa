@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.40
+
+- Add controller-version cache busting and no-store headers for proxied immich-kiosk CSS/JS so fixed-URL Android WebView frames pick up controller-side rendering patches after an add-on update.
+
 ## 0.1.39
 
 - Add a proxied immich-kiosk CSS compatibility patch so legacy Android WebView devices keep the blurred background layer filling the whole frame when `image_fit=contain`.

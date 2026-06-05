@@ -1202,6 +1202,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         const body = Buffer.from(await response.arrayBuffer());
         reply.status(response.status);
         forwardProxyHeaders(response, reply);
+        disableProxyTextCache(reply);
         reply.type(contentType || 'text/plain; charset=utf-8').send(rewriteProxyText(body.toString('utf8'), proxyPrefix, contentType));
         return;
       }
@@ -1523,6 +1524,12 @@ function forwardProxyHeaders(response: Response, reply: FastifyReply): void {
   }
 }
 
+function disableProxyTextCache(reply: FastifyReply): void {
+  reply.header('cache-control', 'no-store, max-age=0');
+  reply.header('pragma', 'no-cache');
+  reply.header('expires', '0');
+}
+
 async function streamProxyResponse(response: Response, reply: FastifyReply, contentType: string): Promise<void> {
   if (!response.body) {
     reply.status(response.status).send();
@@ -1570,9 +1577,29 @@ function rewriteProxyText(value: string, proxyPrefix: string, contentType: strin
     const rewritten = value.replace(/url\((["']?)\/(?!\/|kiosk-proxy\/)/g, `url($1${normalizedPrefix}/`);
     return rewritten.includes('.frame--background') ? `${rewritten}\n${KIOSK_WEBVIEW_COMPAT_CSS}` : rewritten;
   }
-  return value
+  const rewritten = value
     .replace(/\b(href|src|action|poster|manifest|hx-get|hx-post|hx-put|hx-patch|hx-delete)=("|')\/(?!\/|kiosk-proxy\/)/g, `$1=$2${normalizedPrefix}/`)
     .replace(/url\((["']?)\/(?!\/|kiosk-proxy\/)/g, `url($1${normalizedPrefix}/`);
+  return appendProxyCacheBuster(rewritten, normalizedPrefix);
+}
+
+function appendProxyCacheBuster(value: string, proxyPrefix: string): string {
+  const escapedPrefix = escapeRegExp(proxyPrefix);
+  const version = encodeURIComponent(process.env.BUILD_VERSION ?? process.env.npm_package_version ?? 'dev');
+  const proxyAssetPattern = new RegExp(
+    `\\b(href|src)=("|')(${escapedPrefix}/[^"'?#]+\\.(?:css|js))(\\?[^"']*)?\\2`,
+    'g',
+  );
+
+  return value.replace(proxyAssetPattern, (match, attribute: string, quote: string, path: string, query?: string) => {
+    if (query?.includes('_ifc=')) return match;
+    const separator = query ? '&' : '?';
+    return `${attribute}=${quote}${path}${query ?? ''}${separator}_ifc=${version}${quote}`;
+  });
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 const KIOSK_WEBVIEW_COMPAT_CSS = `

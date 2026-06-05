@@ -16,6 +16,7 @@ ARG BUILD_VERSION=0.1.0
 ARG BUILD_ARCH=amd64
 WORKDIR /app
 ENV NODE_ENV=production
+ENV BUILD_VERSION="${BUILD_VERSION}"
 LABEL \
   io.hass.version="${BUILD_VERSION}" \
   io.hass.type="app" \
