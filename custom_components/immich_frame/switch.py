@@ -7,6 +7,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DATA_COORDINATOR, DOMAIN
 from .coordinator import ImmichFrameCoordinator
 from .entity_helpers import frame_device_info, frame_label, frame_unique_id
+from .remote_status import remote_effective_muted, remote_effective_muted_source, remote_status_bool
 
 
 async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
@@ -230,6 +231,25 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 "showMoreInfo",
                 True,
             ),
+            ImmichFrameRemoteCommandSwitch(
+                coordinator,
+                "remote_screen",
+                "Screen",
+                "screen-on",
+                "screen-off",
+                "mdi:monitor",
+                lambda data: remote_status_bool(data, ["screen", "on"]),
+            ),
+            ImmichFrameRemoteCommandSwitch(
+                coordinator,
+                "remote_device_mute",
+                "Device Mute",
+                "device-mute-toggle",
+                "device-mute-toggle",
+                "mdi:volume-mute",
+                remote_effective_muted,
+                remote_effective_muted_source,
+            ),
         ]
     )
 
@@ -264,4 +284,56 @@ class ImmichFrameSleepSwitch(CoordinatorEntity[ImmichFrameCoordinator], SwitchEn
 
     async def _set_enabled(self, enabled: bool) -> None:
         await self.coordinator.client.update_frame_state({self._patch_key: enabled})
+        await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameRemoteCommandSwitch(CoordinatorEntity[ImmichFrameCoordinator], SwitchEntity):
+    def __init__(
+        self,
+        coordinator: ImmichFrameCoordinator,
+        key: str,
+        label: str,
+        turn_on_command: str,
+        turn_off_command: str,
+        icon: str,
+        state_getter,
+        source_getter=None,
+    ) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._turn_on_command = turn_on_command
+        self._turn_off_command = turn_off_command
+        self._state_getter = state_getter
+        self._source_getter = source_getter
+        self._attr_name = f"{frame_label(device_id)} Frame {label}"
+        self._attr_unique_id = frame_unique_id(device_id, key)
+        self._attr_device_info = frame_device_info(device_id)
+        self._attr_icon = icon
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.is_on is not None
+
+    @property
+    def is_on(self) -> bool | None:
+        return self._state_getter(self.coordinator.data)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        if not self._source_getter:
+            return None
+        source = self._source_getter(self.coordinator.data)
+        return {"source": source} if source else None
+
+    async def async_turn_on(self, **kwargs) -> None:
+        await self._set_target(True)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self._set_target(False)
+
+    async def _set_target(self, target: bool) -> None:
+        if self.is_on is target:
+            return
+        command = self._turn_on_command if target else self._turn_off_command
+        await self.coordinator.client.send_command(command)
         await self.coordinator.async_request_refresh()

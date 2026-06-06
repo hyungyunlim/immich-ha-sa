@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.47
+
+- Add Home Assistant FreeKiosk screen and device-mute status binary sensors.
+- Add Home Assistant Screen and Device Mute switches backed by FreeKiosk remote status and commands.
+- Keep Media Volume as a stateful number entity while reporting device mute from `audio.muted` when available, falling back to `audio.volume == 0`.
+
 ## 0.1.46
 
 - Stream proxied immich-kiosk video range responses instead of buffering each byte-range response in the controller.

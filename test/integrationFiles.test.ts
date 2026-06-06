@@ -35,6 +35,25 @@ describe('Home Assistant integration files', () => {
     expect(source).toContain('"dpad-up"');
   });
 
+  it('exposes FreeKiosk screen and audio status controls', () => {
+    const binarySensorSource = readFileSync(join(root, 'custom_components/immich_frame/binary_sensor.py'), 'utf8');
+    const switchSource = readFileSync(join(root, 'custom_components/immich_frame/switch.py'), 'utf8');
+    const remoteStatusSource = readFileSync(join(root, 'custom_components/immich_frame/remote_status.py'), 'utf8');
+    const numberSource = readFileSync(join(root, 'custom_components/immich_frame/number.py'), 'utf8');
+
+    expect(binarySensorSource).toContain('"remote_screen_on"');
+    expect(binarySensorSource).toContain('Frame Screen On');
+    expect(binarySensorSource).toContain('"remote_device_muted"');
+    expect(binarySensorSource).toContain('Frame Device Muted');
+    expect(switchSource).toContain('"remote_screen"');
+    expect(switchSource).toContain('"screen-on"');
+    expect(switchSource).toContain('"screen-off"');
+    expect(switchSource).toContain('"remote_device_mute"');
+    expect(switchSource).toContain('"device-mute-toggle"');
+    expect(remoteStatusSource).toContain('audio.volume_zero');
+    expect(numberSource).toContain('"remote_volume"');
+  });
+
   it('exposes friendly media content and orientation controls', () => {
     const selectSource = readFileSync(join(root, 'custom_components/immich_frame/select.py'), 'utf8');
     const numberSource = readFileSync(join(root, 'custom_components/immich_frame/number.py'), 'utf8');
