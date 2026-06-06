@@ -11,7 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DATA_COORDINATOR, DOMAIN
 from .coordinator import ImmichFrameCoordinator
 from .entity_helpers import frame_device_info, frame_label, frame_unique_id
-from .remote_status import remote_status_bool
+from .remote_status import remote_effective_muted, remote_status_bool, remote_status_value
 
 
 async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
@@ -28,6 +28,8 @@ class ImmichFrameSlideshowMediaPlayer(
         | MediaPlayerEntityFeature.PAUSE
         | MediaPlayerEntityFeature.NEXT_TRACK
         | MediaPlayerEntityFeature.PREVIOUS_TRACK
+        | MediaPlayerEntityFeature.VOLUME_MUTE
+        | MediaPlayerEntityFeature.VOLUME_SET
     )
     _attr_icon = "mdi:image-multiple"
     _attr_media_content_type = "image"
@@ -47,6 +49,17 @@ class ImmichFrameSlideshowMediaPlayer(
             return MediaPlayerState.OFF
         return MediaPlayerState.PLAYING
 
+    @property
+    def volume_level(self) -> float | None:
+        volume = remote_status_value(self.coordinator.data, ["audio", "volume"])
+        if not isinstance(volume, (int, float)):
+            return None
+        return max(0, min(100, float(volume))) / 100
+
+    @property
+    def is_volume_muted(self) -> bool | None:
+        return remote_effective_muted(self.coordinator.data)
+
     async def async_media_next_track(self) -> None:
         await self._send_command("next")
 
@@ -61,6 +74,17 @@ class ImmichFrameSlideshowMediaPlayer(
 
     async def async_media_play_pause(self) -> None:
         await self._send_command("play-pause")
+
+    async def async_set_volume_level(self, volume: float) -> None:
+        percent = round(max(0, min(1, volume)) * 100)
+        await self.coordinator.client.set_remote_volume(percent)
+        await self.coordinator.async_request_refresh()
+
+    async def async_mute_volume(self, mute: bool) -> None:
+        current = self.is_volume_muted
+        if current is mute:
+            return
+        await self._send_command("device-mute-toggle")
 
     async def _send_command(self, command: str) -> None:
         await self.coordinator.client.send_command(command)

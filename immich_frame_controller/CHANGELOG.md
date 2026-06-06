@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.51
+
+- Add mute and volume support to the Home Assistant Slideshow media player entity.
+
 ## 0.1.50
 
 - Add a Home Assistant Slideshow media player entity that groups previous, play/pause, and next controls for each frame.

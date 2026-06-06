@@ -56,7 +56,12 @@ describe('Home Assistant integration files', () => {
     expect(mediaPlayerSource).toContain('Frame Slideshow');
     expect(mediaPlayerSource).toContain('"slideshow_media_player"');
     expect(mediaPlayerSource).toContain('MediaPlayerEntityFeature.NEXT_TRACK');
+    expect(mediaPlayerSource).toContain('MediaPlayerEntityFeature.PREVIOUS_TRACK');
+    expect(mediaPlayerSource).toContain('MediaPlayerEntityFeature.VOLUME_MUTE');
+    expect(mediaPlayerSource).toContain('MediaPlayerEntityFeature.VOLUME_SET');
     expect(mediaPlayerSource).toContain('async_media_play_pause');
+    expect(mediaPlayerSource).toContain('async_mute_volume');
+    expect(mediaPlayerSource).toContain('async_set_volume_level');
     expect(switchSource).toContain('"remote_screen"');
     expect(switchSource).toContain('"screen-on"');
     expect(switchSource).toContain('"screen-off"');
