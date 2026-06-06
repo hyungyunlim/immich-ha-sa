@@ -204,6 +204,8 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         return triggerKioskApi(command) || clickKioskControl(command) || dispatchKioskKey(command);
       }
 
+      window.__immichFrameCommand = triggerKioskCommand;
+
       iframe.addEventListener('load', function () {
         if (previewMode) return;
         try { iframe.contentWindow && iframe.contentWindow.focus(); } catch (error) {}

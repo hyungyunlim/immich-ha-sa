@@ -1336,6 +1336,28 @@ async function sendRemoteCommand(
   statusCode: number;
   result: unknown;
 }> {
+  const script = freeKioskJavaScriptCommand(command);
+  if (script) {
+    try {
+      const remote = await sendRemoteRequest(device, '/api/js', {
+        method: 'POST',
+        body: { code: script },
+      });
+      return {
+        provider: 'freekiosk',
+        command,
+        endpoint: remote.endpoint,
+        statusCode: remote.statusCode,
+        result: {
+          strategy: 'webview-js',
+          result: remote.result,
+        },
+      };
+    } catch {
+      // Older FreeKiosk builds or non-controller pages can still be driven by the native key endpoints.
+    }
+  }
+
   const endpoint = freeKioskEndpoint(command);
   const remote = await sendRemoteRequest(device, endpoint, { method: 'POST' });
   return {
@@ -1345,6 +1367,99 @@ async function sendRemoteCommand(
     statusCode: remote.statusCode,
     result: remote.result,
   };
+}
+
+function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
+  if (
+    command !== 'next'
+    && command !== 'previous'
+    && command !== 'play-pause'
+    && command !== 'mute-toggle'
+  ) {
+    return null;
+  }
+
+  return `
+(function () {
+  var command = ${JSON.stringify(command)};
+  function callController() {
+    var handler = window.__immichFrameCommand;
+    if (typeof handler !== 'function') return false;
+    try {
+      return handler(command) !== false;
+    } catch (error) {
+      return false;
+    }
+  }
+  function iframeWindow() {
+    var iframe = document.getElementById('renderer');
+    try {
+      return iframe && iframe.contentWindow;
+    } catch (error) {
+      return null;
+    }
+  }
+  function iframeDocument() {
+    var win = iframeWindow();
+    try {
+      return win && win.document;
+    } catch (error) {
+      return null;
+    }
+  }
+  function triggerKioskApi() {
+    var win = iframeWindow();
+    try {
+      if (command === 'next' && win && win.kiosk && typeof win.kiosk.triggerNewAsset === 'function') {
+        win.kiosk.triggerNewAsset();
+        return true;
+      }
+    } catch (error) {}
+    return false;
+  }
+  function clickControl() {
+    var doc = iframeDocument();
+    if (!doc) return false;
+    var selector = null;
+    if (command === 'next') selector = '.navigation--next-asset, [aria-label="Next"], [title="Next"]';
+    if (command === 'previous') selector = '.navigation--prev-asset, [aria-label="Previous"], [title="Previous"]';
+    if (command === 'mute-toggle') selector = '.navigation--mute, [aria-label="Mute"], [aria-label="Unmute"], [title="Mute"], [title="Unmute"], .mute, .unmute';
+    if (!selector) return false;
+    var control = doc.querySelector(selector);
+    if (!control || typeof control.click !== 'function') return false;
+    control.click();
+    return true;
+  }
+  function dispatchKey() {
+    var map = {
+      next: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
+      previous: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
+      'play-pause': { key: ' ', code: 'Space', keyCode: 32 },
+      'mute-toggle': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 }
+    };
+    var target = map[command];
+    if (!target) return false;
+    var doc = iframeDocument();
+    var win = iframeWindow();
+    var eventInit = {
+      key: target.key,
+      code: target.code,
+      keyCode: target.keyCode,
+      which: target.keyCode,
+      bubbles: true,
+      cancelable: true
+    };
+    var nodes = [document.body, document.documentElement, document, window];
+    if (doc) nodes.push(doc.body, doc.documentElement, doc);
+    if (win) nodes.push(win);
+    nodes.filter(Boolean).forEach(function (node) {
+      node.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+      node.dispatchEvent(new KeyboardEvent('keyup', eventInit));
+    });
+    return true;
+  }
+  return callController() || triggerKioskApi() || clickControl() || dispatchKey();
+})();`.trim();
 }
 
 async function getRemoteStatus(device: FrameDevice): Promise<{

@@ -675,15 +675,22 @@ describe('controller API', () => {
   it('sends FreeKiosk remote commands for configured frames', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
-    const requests: Array<{ method?: string; url?: string; apiKey?: string | string[] }> = [];
+    const requests: Array<{ method?: string; url?: string; body?: unknown; apiKey?: string | string[] }> = [];
     const remote = createHttpServer((request, response) => {
-      requests.push({
-        method: request.method,
-        url: request.url,
-        apiKey: request.headers['x-api-key'],
+      let raw = '';
+      request.on('data', (chunk) => {
+        raw += String(chunk);
       });
-      response.setHeader('content-type', 'application/json');
-      response.end(JSON.stringify({ success: true, data: { executed: true, command: 'remoteKey' } }));
+      request.on('end', () => {
+        requests.push({
+          method: request.method,
+          url: request.url,
+          body: raw ? JSON.parse(raw) : undefined,
+          apiKey: request.headers['x-api-key'],
+        });
+        response.setHeader('content-type', 'application/json');
+        response.end(JSON.stringify({ success: true, data: { executed: true, command: 'remoteKey' } }));
+      });
     });
     await new Promise<void>((resolve) => remote.listen(0, '127.0.0.1', resolve));
 
@@ -765,12 +772,16 @@ describe('controller API', () => {
 
     expect(mute.statusCode).toBe(200);
     expect(mute.json().data.frameEvent).toMatchObject({ connectedClients: 0, delivered: 0 });
-    expect(mute.json().data.remoteFallback.endpoint).toBe('/api/remote/up');
+    expect(mute.json().data.remoteFallback.endpoint).toBe('/api/js');
+    expect(mute.json().data.remoteFallback.result.strategy).toBe('webview-js');
     expect(requests).toHaveLength(5);
     expect(requests[4]).toMatchObject({
       method: 'POST',
-      url: '/api/remote/up',
+      url: '/api/js',
       apiKey: 'test-key',
+    });
+    expect(requests[4].body).toMatchObject({
+      code: expect.stringContaining('mute-toggle'),
     });
 
     await server.close();
