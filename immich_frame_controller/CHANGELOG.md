@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.50
+
+- Add a Home Assistant Slideshow media player entity that groups previous, play/pause, and next controls for each frame.
+
 ## 0.1.49
 
 - Add a Home Assistant Display light entity for FreeKiosk frames, combining screen on/off and display brightness control.

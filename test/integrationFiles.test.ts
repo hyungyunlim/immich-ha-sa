@@ -39,11 +39,13 @@ describe('Home Assistant integration files', () => {
     const initSource = readFileSync(join(root, 'custom_components/immich_frame/__init__.py'), 'utf8');
     const binarySensorSource = readFileSync(join(root, 'custom_components/immich_frame/binary_sensor.py'), 'utf8');
     const lightSource = readFileSync(join(root, 'custom_components/immich_frame/light.py'), 'utf8');
+    const mediaPlayerSource = readFileSync(join(root, 'custom_components/immich_frame/media_player.py'), 'utf8');
     const switchSource = readFileSync(join(root, 'custom_components/immich_frame/switch.py'), 'utf8');
     const remoteStatusSource = readFileSync(join(root, 'custom_components/immich_frame/remote_status.py'), 'utf8');
     const numberSource = readFileSync(join(root, 'custom_components/immich_frame/number.py'), 'utf8');
 
     expect(initSource).toContain('Platform.LIGHT');
+    expect(initSource).toContain('Platform.MEDIA_PLAYER');
     expect(binarySensorSource).toContain('"remote_screen_on"');
     expect(binarySensorSource).toContain('Frame Screen On');
     expect(binarySensorSource).toContain('"remote_device_muted"');
@@ -51,6 +53,10 @@ describe('Home Assistant integration files', () => {
     expect(lightSource).toContain('Frame Display');
     expect(lightSource).toContain('"remote_display_light"');
     expect(lightSource).toContain('set_remote_brightness');
+    expect(mediaPlayerSource).toContain('Frame Slideshow');
+    expect(mediaPlayerSource).toContain('"slideshow_media_player"');
+    expect(mediaPlayerSource).toContain('MediaPlayerEntityFeature.NEXT_TRACK');
+    expect(mediaPlayerSource).toContain('async_media_play_pause');
     expect(switchSource).toContain('"remote_screen"');
     expect(switchSource).toContain('"screen-on"');
     expect(switchSource).toContain('"screen-off"');

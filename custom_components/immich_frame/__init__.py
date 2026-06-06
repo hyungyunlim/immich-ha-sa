@@ -36,6 +36,7 @@ PLATFORMS = [
     Platform.BUTTON,
     Platform.DATE,
     Platform.LIGHT,
+    Platform.MEDIA_PLAYER,
     Platform.SENSOR,
     Platform.SWITCH,
     Platform.TEXT,
