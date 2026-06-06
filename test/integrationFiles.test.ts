@@ -70,6 +70,7 @@ describe('Home Assistant integration files', () => {
 
   it('exposes person filter controls and services', () => {
     const selectSource = readFileSync(join(root, 'custom_components/immich_frame/select.py'), 'utf8');
+    const sensorSource = readFileSync(join(root, 'custom_components/immich_frame/sensor.py'), 'utf8');
     const textSource = readFileSync(join(root, 'custom_components/immich_frame/text.py'), 'utf8');
     const switchSource = readFileSync(join(root, 'custom_components/immich_frame/switch.py'), 'utf8');
     const buttonSource = readFileSync(join(root, 'custom_components/immich_frame/button.py'), 'utf8');
@@ -79,6 +80,9 @@ describe('Home Assistant integration files', () => {
     expect(selectSource).toContain('PERSON_OPTION_NO_FILTER = "No Person Filter"');
     expect(selectSource).toContain('PERSON_OPTION_ALL_NAMED_PEOPLE = "All Named People"');
     expect(selectSource).toContain('def _selectable_people');
+    expect(sensorSource).toContain('Frame Current People');
+    expect(sensorSource).toContain('"current_people"');
+    expect(sensorSource).toContain('"person_ids"');
     expect(textSource).toContain('Frame People');
     expect(textSource).toContain('"activePersonIds"');
     expect(switchSource).toContain('"require_all_people"');

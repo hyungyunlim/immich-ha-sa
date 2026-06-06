@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.48
+
+- Add a Home Assistant Current People sensor that mirrors the active Immich person filter and exposes the selected person IDs as attributes.
+
 ## 0.1.47
 
 - Add Home Assistant FreeKiosk screen and device-mute status binary sensors.

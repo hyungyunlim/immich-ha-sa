@@ -20,6 +20,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
     async_add_entities(
         [
             ImmichFrameCurrentAlbumSensor(coordinator),
+            ImmichFrameCurrentPeopleSensor(coordinator),
             ImmichFrameRendererUrlSensor(coordinator),
             ImmichFrameResolvedNetworkModeSensor(coordinator),
             ImmichFrameRemoteLightSensor(coordinator),
@@ -51,6 +52,54 @@ class ImmichFrameCurrentAlbumSensor(CoordinatorEntity[ImmichFrameCoordinator], S
     def extra_state_attributes(self) -> dict[str, list[str]] | None:
         active = self.coordinator.data.get("state", {}).get("activeAlbumIds", [])
         return {"album_ids": active}
+
+
+class ImmichFrameCurrentPeopleSensor(CoordinatorEntity[ImmichFrameCoordinator], SensorEntity):
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Current People"
+        self._attr_unique_id = frame_unique_id(device_id, "current_people")
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def native_value(self) -> str | None:
+        active = self._active_person_ids
+        if not active:
+            return None
+        if active == ["all"]:
+            return "All Named People"
+
+        labels = []
+        for person_id in active:
+            person = self._person_for_id(person_id)
+            labels.append(self._label_for_person(person) if person else person_id)
+        return ", ".join(labels)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, list[str]] | None:
+        return {"person_ids": self._active_person_ids}
+
+    @property
+    def _active_person_ids(self) -> list[str]:
+        active = self.coordinator.data.get("state", {}).get("activePersonIds", [])
+        return active if isinstance(active, list) else []
+
+    @property
+    def _people(self) -> list[dict[str, Any]]:
+        return self.coordinator.data.get("people", {}).get("items", [])
+
+    def _person_for_id(self, person_id: str) -> dict[str, Any] | None:
+        return next((person for person in self._people if person["id"] == person_id), None)
+
+    def _label_for_person(self, person: dict[str, Any]) -> str:
+        name = str(person.get("name") or "").strip()
+        person_id = str(person.get("id") or "")
+        short_id = person_id[:8]
+        if not name:
+            return f"Unnamed person ({short_id})"
+        duplicate_name = sum(1 for candidate in self._people if candidate.get("name") == name) > 1
+        return f"{name} ({short_id})" if duplicate_name else name
 
 
 class ImmichFrameRendererUrlSensor(CoordinatorEntity[ImmichFrameCoordinator], SensorEntity):
