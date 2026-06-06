@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.49
+
+- Add a Home Assistant Display light entity for FreeKiosk frames, combining screen on/off and display brightness control.
+
 ## 0.1.48
 
 - Add a Home Assistant Current People sensor that mirrors the active Immich person filter and exposes the selected person IDs as attributes.

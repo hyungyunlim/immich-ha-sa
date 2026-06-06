@@ -36,15 +36,21 @@ describe('Home Assistant integration files', () => {
   });
 
   it('exposes FreeKiosk screen and audio status controls', () => {
+    const initSource = readFileSync(join(root, 'custom_components/immich_frame/__init__.py'), 'utf8');
     const binarySensorSource = readFileSync(join(root, 'custom_components/immich_frame/binary_sensor.py'), 'utf8');
+    const lightSource = readFileSync(join(root, 'custom_components/immich_frame/light.py'), 'utf8');
     const switchSource = readFileSync(join(root, 'custom_components/immich_frame/switch.py'), 'utf8');
     const remoteStatusSource = readFileSync(join(root, 'custom_components/immich_frame/remote_status.py'), 'utf8');
     const numberSource = readFileSync(join(root, 'custom_components/immich_frame/number.py'), 'utf8');
 
+    expect(initSource).toContain('Platform.LIGHT');
     expect(binarySensorSource).toContain('"remote_screen_on"');
     expect(binarySensorSource).toContain('Frame Screen On');
     expect(binarySensorSource).toContain('"remote_device_muted"');
     expect(binarySensorSource).toContain('Frame Device Muted');
+    expect(lightSource).toContain('Frame Display');
+    expect(lightSource).toContain('"remote_display_light"');
+    expect(lightSource).toContain('set_remote_brightness');
     expect(switchSource).toContain('"remote_screen"');
     expect(switchSource).toContain('"screen-on"');
     expect(switchSource).toContain('"screen-off"');
