@@ -1065,7 +1065,7 @@ describe('controller API', () => {
           request.url === '/api/screen/off'
           || request.url === '/api/screen/on'
           || request.url === '/api/brightness'
-          || request.url === '/api/remote/keyboard/mute'
+          || request.url === '/api/volume'
         ) {
           response.end(JSON.stringify({ success: true, data: { executed: true } }));
           return;
@@ -1104,7 +1104,7 @@ describe('controller API', () => {
       action: 'mute',
       muted: true,
       changed: true,
-      endpoint: '/api/remote/keyboard/mute',
+      endpoint: '/api/volume',
     });
     expect(store.getDevice('lenovo')?.remoteBrightnessRestoreValue).toBe(37);
 
@@ -1125,7 +1125,7 @@ describe('controller API', () => {
 
     expect(requests).toEqual([
       { method: 'GET', url: '/api/status', body: undefined, apiKey: 'test-key' },
-      { method: 'POST', url: '/api/remote/keyboard/mute', body: undefined, apiKey: 'test-key' },
+      { method: 'POST', url: '/api/volume', body: { value: 0 }, apiKey: 'test-key' },
       { method: 'POST', url: '/api/screen/off', body: undefined, apiKey: 'test-key' },
       { method: 'POST', url: '/api/screen/on', body: undefined, apiKey: 'test-key' },
       { method: 'POST', url: '/api/brightness', body: { value: 37 }, apiKey: 'test-key' },

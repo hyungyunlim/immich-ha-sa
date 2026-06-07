@@ -887,6 +887,14 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         ? await prepareRemoteScreenOff(store, device)
         : undefined;
       const result = await sendRemoteCommand(device, parsed.data.command);
+      app.log.info({
+        deviceId,
+        command: parsed.data.command,
+        endpoint: result.endpoint,
+        baseUrl: result.baseUrl,
+        source: result.source,
+        screenOffPreparation,
+      }, 'FreeKiosk command completed');
       if (parsed.data.command === 'screen-on') {
         return ok({
           ...result,
@@ -1647,7 +1655,7 @@ async function ensureRemoteDeviceMutedFromStatus(
   }
 
   try {
-    const result = await sendRemoteCommand(device, 'device-mute-toggle');
+    const result = await setRemoteLevel(device, 'volume', 0);
     return {
       action: 'mute',
       muted: true,
