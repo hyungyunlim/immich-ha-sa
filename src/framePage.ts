@@ -59,6 +59,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       var previewMode = ${JSON.stringify(previewMode)};
       var lastVersion = 0;
       var lastRendererUrl = '';
+      var desiredVideoMuted = null;
       var pollTimer = null;
       var pollIntervalMs = ${Math.max(previewMode ? 60 : 5, device.pollIntervalSeconds) * 1000};
       var frameVideoMuted = true;
@@ -73,8 +74,10 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         if (!state || !state.rendererUrl) return;
         if (state.version && state.version < lastVersion) return;
         if (state.version) lastVersion = state.version;
+        desiredVideoMuted = state.kioskVideoMuted !== false;
         if (state.rendererUrl === lastRendererUrl) {
           document.body.className = '';
+          scheduleVideoMutedSync();
           return;
         }
         lastRendererUrl = state.rendererUrl;
@@ -144,17 +147,37 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         var doc = iframeDocument();
         if (!doc) return false;
         var videos = Array.prototype.slice.call(doc.querySelectorAll('video'));
-        if (videos.length === 0) return false;
+        var control = doc.querySelector('.navigation--mute');
+        if (control && control.classList && control.classList.contains('is-muted') !== muted && typeof control.click === 'function') {
+          control.click();
+        }
+        var win = iframeWindow();
+        try {
+          if (win && win.localStorage) {
+            win.localStorage.setItem('kioskVideoIsMuted', JSON.stringify(muted));
+          }
+        } catch (error) {}
         videos.forEach(function (video) {
           video.muted = muted;
           if (!muted) video.volume = 1;
         });
         frameVideoMuted = muted;
-        return true;
+        return Boolean(control || videos.length);
       }
 
       function syncVideoMutedFromKiosk() {
         return applyVideoMutedState(readKioskMutedState());
+      }
+
+      function scheduleVideoMutedSync() {
+        if (desiredVideoMuted === null) return;
+        var attempts = 0;
+        function attempt() {
+          attempts += 1;
+          if (applyVideoMutedState(desiredVideoMuted) || attempts >= 12) return;
+          setTimeout(attempt, 250);
+        }
+        setTimeout(attempt, 0);
       }
 
       function toggleVideoMutedDirectly() {
@@ -209,6 +232,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       iframe.addEventListener('load', function () {
         if (previewMode) return;
         try { iframe.contentWindow && iframe.contentWindow.focus(); } catch (error) {}
+        scheduleVideoMutedSync();
       });
 
       document.addEventListener('keyup', function (event) {

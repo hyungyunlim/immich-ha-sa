@@ -250,6 +250,7 @@ def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional("activePersonIds"): vol.All(cv.ensure_list, [cv.string]),
                 vol.Optional("requireAllPeople"): cv.boolean,
                 vol.Optional("showVideos"): cv.boolean,
+                vol.Optional("kioskVideoMuted"): cv.boolean,
                 vol.Optional("excludeVideosOver"): vol.All(vol.Coerce(int), vol.Range(min=0, max=86400)),
                 vol.Optional("showArchived"): cv.boolean,
                 vol.Optional("filterDate"): cv.string,

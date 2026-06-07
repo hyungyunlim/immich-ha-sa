@@ -58,6 +58,7 @@ export interface FrameState {
   weatherLocation: string;
   weatherRotationInterval: number;
   showVideos: boolean;
+  kioskVideoMuted: boolean;
   excludeVideosOver: number;
   showArchived: boolean;
   filterDate: string;

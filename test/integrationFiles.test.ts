@@ -27,12 +27,25 @@ describe('Home Assistant integration files', () => {
     expect(source).toContain('["contain", "cover", "none"]');
   });
 
-  it('exposes a FreeKiosk D-pad up command button', () => {
+  it('does not expose the unreliable FreeKiosk D-pad up command button', () => {
     const source = readFileSync(join(root, 'custom_components/immich_frame/button.py'), 'utf8');
 
-    expect(source).toContain('"dpad_up"');
-    expect(source).toContain('"D-pad Up"');
-    expect(source).toContain('"dpad-up"');
+    expect(source).not.toContain('"dpad_up"');
+    expect(source).not.toContain('"D-pad Up"');
+    expect(source).not.toContain('"dpad-up"');
+  });
+
+  it('exposes kiosk video mute as a regular switch', () => {
+    const buttonSource = readFileSync(join(root, 'custom_components/immich_frame/button.py'), 'utf8');
+    const switchSource = readFileSync(join(root, 'custom_components/immich_frame/switch.py'), 'utf8');
+    const initSource = readFileSync(join(root, 'custom_components/immich_frame/__init__.py'), 'utf8');
+
+    expect(buttonSource).not.toContain('"kiosk_mute_toggle"');
+    expect(switchSource).toContain('"kiosk_video_mute"');
+    expect(switchSource).toContain('"Kiosk Video Mute"');
+    expect(switchSource).toContain('"kioskVideoMuted"');
+    expect(switchSource).not.toContain('EntityCategory.DIAGNOSTIC');
+    expect(initSource).toContain('"kioskVideoMuted"');
   });
 
   it('exposes FreeKiosk screen and audio status controls', () => {

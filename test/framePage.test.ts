@@ -17,6 +17,8 @@ describe('frame page', () => {
 
     expect(html).toContain('.navigation--mute');
     expect(html).toContain('toggleVideoMutedDirectly');
+    expect(html).toContain('kioskVideoMuted');
+    expect(html).toContain('applyVideoMutedState(desiredVideoMuted)');
     expect(html).toContain("if (command === 'mute-toggle')");
   });
 });

@@ -114,6 +114,14 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ),
             ImmichFrameSleepSwitch(
                 coordinator,
+                "kiosk_video_mute",
+                "Kiosk Video Mute",
+                "kioskVideoMuted",
+                True,
+                "mdi:volume-off",
+            ),
+            ImmichFrameSleepSwitch(
+                coordinator,
                 "show_archived",
                 "Show Archived",
                 "showArchived",
@@ -262,6 +270,7 @@ class ImmichFrameSleepSwitch(CoordinatorEntity[ImmichFrameCoordinator], SwitchEn
         label: str,
         patch_key: str,
         default: bool,
+        icon: str | None = None,
     ) -> None:
         super().__init__(coordinator)
         device_id = coordinator.client.device_id
@@ -271,6 +280,8 @@ class ImmichFrameSleepSwitch(CoordinatorEntity[ImmichFrameCoordinator], SwitchEn
         self._attr_name = f"{frame_label(device_id)} Frame {label}"
         self._attr_unique_id = frame_unique_id(device_id, key)
         self._attr_device_info = frame_device_info(device_id)
+        if icon is not None:
+            self._attr_icon = icon
 
     @property
     def is_on(self) -> bool:

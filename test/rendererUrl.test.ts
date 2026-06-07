@@ -32,6 +32,7 @@ const state: FrameState = {
   weatherLocation: '',
   weatherRotationInterval: 60,
   showVideos: false,
+  kioskVideoMuted: true,
   excludeVideosOver: 0,
   showArchived: false,
   filterDate: '',
