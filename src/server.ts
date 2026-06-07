@@ -841,7 +841,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         connectedClients: events.connectedClientCount(deviceId),
         delivered,
       };
-      if (delivered === 0 && remoteFallbackAvailable(device, parsed.data.command)) {
+      if ((delivered === 0 || commandNeedsRemoteReconciliation(parsed.data.command)) && remoteFallbackAvailable(device, parsed.data.command)) {
         try {
           const remoteFallback = await sendRemoteCommand(device, parsed.data.command);
           return ok({
@@ -1922,6 +1922,10 @@ function commandUsesFrameEvents(command: FrameCommand): boolean {
     || command === 'mute-toggle'
     || command === 'mute-on'
     || command === 'mute-off';
+}
+
+function commandNeedsRemoteReconciliation(command: FrameCommand): boolean {
+  return command === 'mute-on' || command === 'mute-off';
 }
 
 function remoteFallbackAvailable(device: FrameDevice, command: FrameCommand): boolean {

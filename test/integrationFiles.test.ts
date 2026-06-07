@@ -88,6 +88,14 @@ describe('Home Assistant integration files', () => {
     expect(numberSource).toContain('"remote_volume"');
   });
 
+  it('keeps explicit kiosk mute commands reconciled through FreeKiosk', () => {
+    const serverSource = readFileSync(join(root, 'src/server.ts'), 'utf8');
+
+    expect(serverSource).toContain('commandNeedsRemoteReconciliation(parsed.data.command)');
+    expect(serverSource).toContain("command === 'mute-on' || command === 'mute-off'");
+    expect(serverSource).toContain("'REMOTE_EXPLICIT_MUTE_UNAVAILABLE'");
+  });
+
   it('exposes friendly media content and orientation controls', () => {
     const selectSource = readFileSync(join(root, 'custom_components/immich_frame/select.py'), 'utf8');
     const numberSource = readFileSync(join(root, 'custom_components/immich_frame/number.py'), 'utf8');
