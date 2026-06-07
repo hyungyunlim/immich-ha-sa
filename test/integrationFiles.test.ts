@@ -90,6 +90,7 @@ describe('Home Assistant integration files', () => {
 
     expect(serverSource).toContain('commandPrefersRemotePress(parsed.data.command)');
     expect(serverSource).toContain("return command === 'mute-toggle'");
+    expect(serverSource).toContain("if (command === 'mute-toggle') return false;");
     expect(serverSource).toContain("if (command === 'mute-toggle') selector");
     expect(serverSource).not.toContain('commandNeedsRemoteReconciliation');
     expect(serverSource).not.toContain("'REMOTE_EXPLICIT_MUTE_UNAVAILABLE'");

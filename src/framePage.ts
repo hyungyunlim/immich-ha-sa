@@ -121,9 +121,6 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         var control = doc.querySelector(selector);
         if (!control || typeof control.click !== 'function') return false;
         control.click();
-        if (command === 'mute-toggle') {
-          setTimeout(syncVideoMutedFromKiosk, 0);
-        }
         return true;
       }
 

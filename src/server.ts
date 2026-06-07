@@ -1610,6 +1610,7 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
 (function () {
   var command = ${JSON.stringify(command)};
   function callController() {
+    if (command === 'mute-toggle') return false;
     var handler = window.__immichFrameCommand;
     if (typeof handler !== 'function') return false;
     try {
