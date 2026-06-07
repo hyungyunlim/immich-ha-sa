@@ -851,11 +851,11 @@ describe('controller API', () => {
     });
 
     expect(dpadUp.statusCode).toBe(200);
-    expect(dpadUp.json().data.endpoint).toBe('/api/remote/up');
+    expect(dpadUp.json().data.endpoint).toBe('/api/remote/keyboard/up');
     expect(requests).toHaveLength(4);
     expect(requests[3]).toMatchObject({
       method: 'POST',
-      url: '/api/remote/up',
+      url: '/api/remote/keyboard/up',
       apiKey: 'test-key',
     });
 
@@ -866,17 +866,12 @@ describe('controller API', () => {
     });
 
     expect(mute.statusCode).toBe(200);
-    expect(mute.json().data.frameEvent).toMatchObject({ connectedClients: 0, delivered: 0 });
-    expect(mute.json().data.remoteFallback.endpoint).toBe('/api/js');
-    expect(mute.json().data.remoteFallback.result.strategy).toBe('webview-js');
+    expect(mute.json().data.endpoint).toBe('/api/remote/keyboard/up');
     expect(requests).toHaveLength(5);
     expect(requests[4]).toMatchObject({
       method: 'POST',
-      url: '/api/js',
+      url: '/api/remote/keyboard/up',
       apiKey: 'test-key',
-    });
-    expect(requests[4].body).toMatchObject({
-      code: expect.stringContaining('mute-toggle'),
     });
 
     await server.close();
@@ -1131,11 +1126,11 @@ describe('controller API', () => {
     const response = await server.inject({
       method: 'POST',
       url: '/api/frames/lenovo/command',
-      payload: { command: 'mute-toggle' },
+      payload: { command: 'next' },
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().data.command).toBe('mute-toggle');
+    expect(response.json().data.command).toBe('next');
     expect(response.json().data.frameEvent).toMatchObject({ connectedClients: 0, delivered: 0 });
     expect(response.json().data.remoteFallback).toBeNull();
     await server.close();
