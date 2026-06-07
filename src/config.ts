@@ -60,6 +60,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       : undefined,
     pollIntervalSeconds: parsed.POLL_INTERVAL_SECONDS,
     previewOrientation: 'landscape' as PreviewOrientation,
+    remoteApiAutoPort: 8080,
   };
 
   return {

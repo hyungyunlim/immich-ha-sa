@@ -422,6 +422,36 @@ describe('controller API', () => {
     await server.close();
   });
 
+  it('records last-seen local frame IP from non-preview frame requests', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    const server = createTestServer({ config, store });
+
+    const preview = await server.inject({
+      method: 'GET',
+      url: '/frame/lenovo?preview=1',
+      headers: { host: '10.0.0.10:18082' },
+      remoteAddress: '10.0.0.40',
+    });
+    expect(preview.statusCode).toBe(200);
+    expect(store.getDevice('lenovo')?.lastSeenIp).toBeUndefined();
+
+    const frame = await server.inject({
+      method: 'GET',
+      url: '/frame/lenovo',
+      headers: { host: '10.0.0.10:18082' },
+      remoteAddress: '10.0.0.44',
+    });
+
+    expect(frame.statusCode).toBe(200);
+    const device = store.getDevice('lenovo');
+    expect(device?.lastSeenIp).toBe('10.0.0.44');
+    expect(device?.lastSeenAt).toBeTruthy();
+    await server.close();
+  });
+
   it('claims an external root pairing code into a stable alias frame path', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
@@ -786,6 +816,50 @@ describe('controller API', () => {
 
     await server.close();
     await new Promise<void>((resolve) => remote.close(() => resolve()));
+  });
+
+  it('falls back to the last-seen auto FreeKiosk endpoint when the manual URL fails', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    store.updateDevice('lenovo', {
+      remoteControlType: 'freekiosk',
+      remoteApiUrl: 'http://10.0.0.99:8080',
+      remoteApiAutoPort: 8080,
+      lastSeenIp: '10.0.0.44',
+      lastSeenAt: '2026-06-07T00:00:00.000Z',
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.startsWith('http://10.0.0.99:8080')) {
+        throw new Error('manual endpoint down');
+      }
+      if (url === 'http://10.0.0.44:8080/api/screen/on') {
+        return new Response(JSON.stringify({ success: true, data: { executed: true } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    });
+    const server = createTestServer({ config, store });
+
+    try {
+      const response = await server.inject({
+        method: 'POST',
+        url: '/api/frames/lenovo/command',
+        payload: { command: 'screen-on' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data.baseUrl).toBe('http://10.0.0.44:8080');
+      expect(response.json().data.source).toBe('auto');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      fetchMock.mockRestore();
+      await server.close();
+    }
   });
 
   it('proxies FreeKiosk status, brightness, and volume controls', async () => {

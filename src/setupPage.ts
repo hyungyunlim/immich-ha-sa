@@ -46,6 +46,13 @@ interface SetupPageDevice {
   remoteControlType?: string;
   previewOrientation?: string;
   remoteApiUrl?: string;
+  remoteApiAutoPort?: number;
+  remoteApiAutoUrl?: string;
+  remoteApiEffectiveUrl?: string;
+  remoteApiEffectiveSource?: string;
+  remoteApiConfigured?: boolean;
+  lastSeenIp?: string;
+  lastSeenAt?: string;
   remoteApiKeyConfigured?: boolean;
   isDefault: boolean;
   localFrameUrl: string;
@@ -861,10 +868,15 @@ export function renderSetupPage(params: SetupPageParams): string {
             ${renderRemoteControlOptions(inheritedRemoteControlType)}
           </select>
         </label>
+        <label class="field">
+          <span class="label">Auto REST Port</span>
+          <input name="remoteApiAutoPort" type="number" min="1" max="65535" step="1" value="8080">
+          <span class="help-text">Used with the frame's last-seen local IP when manual URL is blank or unreachable.</span>
+        </label>
         <label class="field full">
-          <span class="label">Remote API URL</span>
+          <span class="label">Manual Remote API URL</span>
           <input name="remoteApiUrl" type="url" placeholder="http://192.168.1.160:8080">
-          <span class="help-text">FreeKiosk REST API address for this physical frame. Leave blank if this frame only needs photo display.</span>
+          <span class="help-text">Optional FreeKiosk REST API address. Leave blank to use auto discovery from the frame's last-seen local IP and Auto REST Port.</span>
         </label>
         <details class="full">
           <summary>Advanced settings <span class="summary-hint">inherited URLs, external access, and password overrides</span></summary>
@@ -1096,6 +1108,7 @@ export function renderSetupPage(params: SetupPageParams): string {
         externalKioskBaseUrl: optionalValue(formData, 'externalKioskBaseUrl') ?? null,
         remoteControlType: remoteApiUrl && selectedRemoteControlType === 'none' ? 'freekiosk' : selectedRemoteControlType,
         remoteApiUrl,
+        remoteApiAutoPort: Number(formData.get('remoteApiAutoPort') || 8080),
       };
       const kioskPassword = optionalValue(formData, 'kioskPassword');
       if (!includeId && formData.get('clearKioskPassword') === 'on') {
@@ -1383,7 +1396,8 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Arrow Actions', `${device.upArrowAction ?? 'none'} / ${device.downArrowAction ?? 'none'}`)}
         ${renderKeyValue('Burn-in', `${device.burnInInterval ?? 0}m / ${device.burnInDuration ?? 30}s / ${device.burnInOpacity ?? 30}%`)}
         ${renderKeyValue('Sleep', sleepWindow)}
-        ${renderKeyValue('Remote', `${device.remoteControlType ?? 'none'}${device.remoteApiUrl ? ' / configured' : ''}`)}
+        ${renderKeyValue('Remote', renderRemoteSummary(device))}
+        ${renderKeyValue('Remote Endpoint', renderRemoteEndpointSummary(device))}
         </dl>
       </details>
       <details>
@@ -1445,9 +1459,15 @@ function renderDeviceCard(device: SetupPageDevice): string {
               ${renderRemoteControlOptions(device.remoteControlType ?? 'none')}
             </select>
           </label>
+          <label class="field">
+            <span class="label">Auto REST Port</span>
+            <input name="remoteApiAutoPort" type="number" min="1" max="65535" step="1" value="${device.remoteApiAutoPort ?? 8080}">
+          </label>
           <label class="field full">
-            <span class="label">Remote API URL</span>
+            <span class="label">Manual Remote API URL</span>
             <input name="remoteApiUrl" type="url" value="${escapeAttribute(device.remoteApiUrl ?? '')}" placeholder="http://192.168.1.160:8080">
+            <span class="help-text">Optional. Manual URL is tried first; if it is blank or unreachable, the controller tries the auto endpoint from last-seen local IP.</span>
+            <span class="help-text">${escapeHtml(renderRemoteEndpointHelp(device))}</span>
           </label>
           <label class="field full">
             <span class="label">Remote API Key</span>
@@ -1534,6 +1554,50 @@ function renderMetadataSummary(device: SetupPageDevice): string {
     device.showUser ? 'user' : '',
   ].filter(Boolean);
   return fields.length > 0 ? fields.join(', ') : 'Off';
+}
+
+function renderRemoteSummary(device: SetupPageDevice): string {
+  const type = device.remoteControlType ?? 'none';
+  if (type !== 'freekiosk') return type;
+  const source = device.remoteApiEffectiveSource ?? 'none';
+  if (source === 'manual') return 'freekiosk / manual';
+  if (source === 'auto') return 'freekiosk / auto';
+  return 'freekiosk / waiting for frame IP';
+}
+
+function renderRemoteEndpointSummary(device: SetupPageDevice): string {
+  if ((device.remoteControlType ?? 'none') !== 'freekiosk') return 'Off';
+  if (device.remoteApiEffectiveUrl) {
+    return `${device.remoteApiEffectiveUrl} (${device.remoteApiEffectiveSource ?? 'unknown'})`;
+  }
+  if (device.lastSeenIp) {
+    return `${device.lastSeenIp}:${device.remoteApiAutoPort ?? 8080} pending`;
+  }
+  return 'No last-seen local IP yet';
+}
+
+function renderRemoteEndpointHelp(device: SetupPageDevice): string {
+  const parts = [];
+  if (device.remoteApiEffectiveUrl) {
+    parts.push(`Effective endpoint: ${device.remoteApiEffectiveUrl} (${device.remoteApiEffectiveSource ?? 'unknown'}).`);
+  } else {
+    parts.push('Effective endpoint: unavailable until a manual URL is set or the frame opens its local frame URL.');
+  }
+  if (device.remoteApiAutoUrl) {
+    parts.push(`Auto endpoint: ${device.remoteApiAutoUrl}.`);
+  }
+  if (device.lastSeenIp && device.lastSeenAt) {
+    parts.push(`Last seen: ${device.lastSeenIp} at ${formatTimestamp(device.lastSeenAt)}.`);
+  } else {
+    parts.push('Last seen: not recorded yet.');
+  }
+  return parts.join(' ');
+}
+
+function formatTimestamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
 }
 
 function renderKeyValue(label: string, value: string): string {

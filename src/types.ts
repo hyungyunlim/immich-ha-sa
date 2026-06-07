@@ -32,6 +32,9 @@ export interface FrameDevice {
   remoteControlType?: RemoteControlType;
   previewOrientation?: PreviewOrientation;
   remoteApiUrl?: string;
+  remoteApiAutoPort?: number;
+  lastSeenIp?: string;
+  lastSeenAt?: string;
   remoteApiKey?: string;
 }
 

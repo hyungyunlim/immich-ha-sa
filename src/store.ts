@@ -16,6 +16,7 @@ import { createDefaultFrameState, createDefaultStore } from './defaults.js';
 
 export class JsonStore {
   private data: StoreData;
+  private readonly deviceSeenWriteIntervalMs = 5 * 60 * 1000;
 
   constructor(
     private readonly filePath: string,
@@ -79,6 +80,29 @@ export class JsonStore {
         updatedAt: new Date().toISOString(),
       };
     }
+    this.save();
+    return structuredClone(next);
+  }
+
+  markDeviceSeen(deviceId: string, ip: string, seenAt = new Date()): FrameDevice | undefined {
+    const current = this.data.devices[deviceId];
+    if (!current) return undefined;
+
+    const nextSeenAt = seenAt.toISOString();
+    const previousSeenAtMs = current.lastSeenAt ? Date.parse(current.lastSeenAt) : 0;
+    const shouldSave = current.lastSeenIp !== ip
+      || !current.lastSeenAt
+      || Number.isNaN(previousSeenAtMs)
+      || seenAt.getTime() - previousSeenAtMs >= this.deviceSeenWriteIntervalMs;
+
+    if (!shouldSave) return structuredClone(current);
+
+    const next = {
+      ...current,
+      lastSeenIp: ip,
+      lastSeenAt: nextSeenAt,
+    };
+    this.data.devices[deviceId] = next;
     this.save();
     return structuredClone(next);
   }
@@ -308,6 +332,7 @@ export class JsonStore {
       name: device?.name ?? fallback.name,
       remoteControlType: device?.remoteControlType ?? fallback.remoteControlType ?? 'none',
       previewOrientation: device?.previewOrientation ?? fallback.previewOrientation ?? 'landscape',
+      remoteApiAutoPort: device?.remoteApiAutoPort ?? fallback.remoteApiAutoPort ?? 8080,
     };
 
     return {

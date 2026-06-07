@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { isIP } from 'node:net';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
@@ -214,6 +215,7 @@ const DeviceCreateSchema = z.object({
   pollIntervalSeconds: z.number().int().min(5).max(300).default(20),
   remoteControlType: z.enum(['none', 'freekiosk']).default('none'),
   remoteApiUrl: OptionalUrlSchema,
+  remoteApiAutoPort: z.number().int().min(1).max(65535).default(8080),
   remoteApiKey: OptionalSecretSchema,
 });
 
@@ -230,6 +232,7 @@ const DevicePatchSchema = z.object({
   pollIntervalSeconds: z.number().int().min(5).max(300).optional(),
   remoteControlType: z.enum(['none', 'freekiosk']).optional(),
   remoteApiUrl: OptionalUrlSchema,
+  remoteApiAutoPort: z.number().int().min(1).max(65535).optional(),
   remoteApiKey: OptionalSecretSchema,
 });
 
@@ -259,6 +262,7 @@ const FrameClaimCreateSchema = z.object({
   previewOrientation: z.enum(['landscape', 'portrait']).default('landscape'),
   remoteControlType: z.enum(['none', 'freekiosk']).default('none'),
   remoteApiUrl: OptionalUrlSchema,
+  remoteApiAutoPort: z.number().int().min(1).max(65535).default(8080),
   remoteApiKey: OptionalSecretSchema,
 });
 
@@ -349,7 +353,8 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         localKioskBaseUrl: device.localKioskBaseUrl,
         externalKioskBaseUrl: device.externalKioskBaseUrl,
         remoteControlType: device.remoteControlType ?? 'none',
-        remoteApiConfigured: Boolean(device.remoteApiUrl),
+        remoteApiConfigured: remoteEndpointSummary(device).configured,
+        remoteApiEffectiveSource: remoteEndpointSummary(device).effectiveSource,
       }])),
       auth: auth.status(),
     });
@@ -400,6 +405,12 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           remoteControlType: candidate.remoteControlType ?? 'none',
           previewOrientation: candidate.previewOrientation ?? 'landscape',
           remoteApiUrl: candidate.remoteApiUrl,
+          remoteApiAutoPort: candidate.remoteApiAutoPort ?? 8080,
+          remoteApiAutoUrl: remoteEndpointSummary(candidate).autoUrl,
+          remoteApiEffectiveUrl: remoteEndpointSummary(candidate).effectiveUrl,
+          remoteApiEffectiveSource: remoteEndpointSummary(candidate).effectiveSource,
+          lastSeenIp: candidate.lastSeenIp,
+          lastSeenAt: candidate.lastSeenAt,
           remoteApiKeyConfigured: Boolean(candidate.remoteApiKey),
           isDefault: candidate.id === deps.config.defaultDevice.id,
           localFrameUrl: buildFrameUrl(candidate.localControllerBaseUrl, candidate.id),
@@ -504,6 +515,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     if (!device) {
       reply.status(404).send('Unknown frame');
       return;
+    }
+    if (query.preview !== '1') {
+      rememberFrameClient(device, request);
     }
     reply.type('text/html; charset=utf-8').send(renderFramePage(device, { preview: query.preview === '1' }));
   });
@@ -633,7 +647,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           ? buildStableFrameUrl(device.externalControllerBaseUrl, device)
           : undefined,
         remoteControlType: device.remoteControlType ?? 'none',
-        remoteApiConfigured: Boolean(device.remoteApiUrl),
+        remoteApiConfigured: remoteEndpointSummary(device).configured,
         frameEventClients: events.connectedClientCount(device.id),
         isDefault: device.id === deps.config.defaultDevice.id,
       })),
@@ -731,6 +745,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     if (!device) {
       reply.status(404).send('Unknown frame');
       return;
+    }
+    if (query.preview !== '1') {
+      rememberFrameClient(device, request);
     }
     reply.type('text/html; charset=utf-8').send(renderFramePage(device, { preview: query.preview === '1' }));
   });
@@ -1142,6 +1159,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       previewOrientation: input.previewOrientation,
       remoteControlType: input.remoteControlType,
       remoteApiUrl: input.remoteApiUrl ? trimTrailingSlash(input.remoteApiUrl) : undefined,
+      remoteApiAutoPort: input.remoteApiAutoPort,
       remoteApiKey: input.remoteApiKey,
     };
   }
@@ -1260,6 +1278,13 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return cache;
   }
 
+  function rememberFrameClient(device: FrameDevice, request: FastifyRequest): void {
+    if (!isLocalControllerRequest(device, request) || isPreviewRequest(request)) return;
+    const ip = requestClientIp(request);
+    if (!ip || !isAutoRemoteCandidateIp(ip)) return;
+    store.markDeviceSeen(device.id, ip);
+  }
+
   async function proxyKioskRequest(request: FastifyRequest, reply: FastifyReply) {
     const { deviceId } = request.params as { deviceId: string };
     const device = store.getDevice(deviceId);
@@ -1267,6 +1292,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
       return;
     }
+    rememberFrameClient(device, request);
 
     const incomingUrl = new URL(request.url, 'http://controller.local');
     const proxyPrefix = `/kiosk-proxy/${encodeURIComponent(device.id)}`;
@@ -1322,6 +1348,8 @@ type RemoteRequestMethod = 'GET' | 'POST';
 
 interface RemoteRequestResult {
   endpoint: string;
+  baseUrl: string;
+  source: 'manual' | 'auto';
   statusCode: number;
   result: unknown;
 }
@@ -1333,6 +1361,8 @@ async function sendRemoteCommand(
   provider: 'freekiosk';
   command: FrameCommand;
   endpoint: string;
+  baseUrl: string;
+  source: 'manual' | 'auto';
   statusCode: number;
   result: unknown;
 }> {
@@ -1347,6 +1377,8 @@ async function sendRemoteCommand(
         provider: 'freekiosk',
         command,
         endpoint: remote.endpoint,
+        baseUrl: remote.baseUrl,
+        source: remote.source,
         statusCode: remote.statusCode,
         result: {
           strategy: 'webview-js',
@@ -1364,6 +1396,8 @@ async function sendRemoteCommand(
     provider: 'freekiosk',
     command,
     endpoint,
+    baseUrl: remote.baseUrl,
+    source: remote.source,
     statusCode: remote.statusCode,
     result: remote.result,
   };
@@ -1465,6 +1499,8 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
 async function getRemoteStatus(device: FrameDevice): Promise<{
   provider: 'freekiosk';
   endpoint: string;
+  baseUrl: string;
+  source: 'manual' | 'auto';
   statusCode: number;
   status: unknown;
   capabilities: ReturnType<typeof inferFreeKioskCapabilities>;
@@ -1474,6 +1510,8 @@ async function getRemoteStatus(device: FrameDevice): Promise<{
   return {
     provider: 'freekiosk',
     endpoint: remote.endpoint,
+    baseUrl: remote.baseUrl,
+    source: remote.source,
     statusCode: remote.statusCode,
     status: remote.result,
     capabilities,
@@ -1489,6 +1527,8 @@ async function setRemoteLevel(
   property: 'brightness' | 'volume';
   value: number;
   endpoint: string;
+  baseUrl: string;
+  source: 'manual' | 'auto';
   statusCode: number;
   result: unknown;
 }> {
@@ -1502,6 +1542,8 @@ async function setRemoteLevel(
     property,
     value,
     endpoint,
+    baseUrl: remote.baseUrl,
+    source: remote.source,
     statusCode: remote.statusCode,
     result: remote.result,
   };
@@ -1514,6 +1556,8 @@ async function setRemoteAutoBrightness(
   provider: 'freekiosk';
   enabled: boolean;
   endpoint: string;
+  baseUrl: string;
+  source: 'manual' | 'auto';
   statusCode: number;
   result: unknown;
 }> {
@@ -1527,6 +1571,8 @@ async function setRemoteAutoBrightness(
     provider: 'freekiosk',
     enabled: options.enabled,
     endpoint,
+    baseUrl: remote.baseUrl,
+    source: remote.source,
     statusCode: remote.statusCode,
     result: remote.result,
   };
@@ -1543,11 +1589,11 @@ async function sendRemoteRequest(
   if ((device.remoteControlType ?? 'none') !== 'freekiosk') {
     throw new RemoteCommandError('REMOTE_NOT_CONFIGURED', `Frame ${device.id} is not configured for FreeKiosk remote control.`, 400);
   }
-  if (!device.remoteApiUrl) {
-    throw new RemoteCommandError('REMOTE_NOT_CONFIGURED', `Frame ${device.id} is missing remoteApiUrl.`, 400);
+  const candidates = remoteEndpointCandidates(device);
+  if (candidates.length === 0) {
+    throw new RemoteCommandError('REMOTE_NOT_CONFIGURED', `Frame ${device.id} is missing a manual remoteApiUrl and has no last-seen local IP for auto discovery.`, 400);
   }
 
-  const url = `${trimTrailingSlash(device.remoteApiUrl)}${endpoint}`;
   const headers: Record<string, string> = {};
   if (device.remoteApiKey) {
     headers['X-Api-Key'] = device.remoteApiKey;
@@ -1556,26 +1602,44 @@ async function sendRemoteRequest(
     headers['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(url, {
-    method: options.method,
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-    signal: AbortSignal.timeout(7000),
-  });
-  const text = await response.text();
-  const payload = parseJsonOrText(text);
+  let lastError: RemoteCommandError | undefined;
+  for (const candidate of candidates) {
+    try {
+      const url = `${candidate.baseUrl}${endpoint}`;
+      const response = await fetch(url, {
+        method: options.method,
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        signal: AbortSignal.timeout(7000),
+      });
+      const text = await response.text();
+      const payload = parseJsonOrText(text);
 
-  if (!response.ok || (isRecord(payload) && payload.success === false)) {
-    const message = remoteErrorMessage(payload, response.status);
-    const code = response.status === 404 ? 'REMOTE_UNSUPPORTED' : 'REMOTE_COMMAND_FAILED';
-    throw new RemoteCommandError(code, message, response.status === 404 ? 404 : 502);
+      if (!response.ok || (isRecord(payload) && payload.success === false)) {
+        const message = remoteErrorMessage(payload, response.status);
+        const code = response.status === 404 ? 'REMOTE_UNSUPPORTED' : 'REMOTE_COMMAND_FAILED';
+        throw new RemoteCommandError(code, `${message} (${candidate.source}: ${candidate.baseUrl})`, response.status === 404 ? 404 : 502);
+      }
+
+      return {
+        endpoint,
+        baseUrl: candidate.baseUrl,
+        source: candidate.source,
+        statusCode: response.status,
+        result: isRecord(payload) && 'data' in payload ? payload.data : payload,
+      };
+    } catch (error) {
+      lastError = error instanceof RemoteCommandError
+        ? error
+        : new RemoteCommandError(
+          'REMOTE_COMMAND_FAILED',
+          `${error instanceof Error ? error.message : String(error)} (${candidate.source}: ${candidate.baseUrl})`,
+          502,
+        );
+    }
   }
 
-  return {
-    endpoint,
-    statusCode: response.status,
-    result: isRecord(payload) && 'data' in payload ? payload.data : payload,
-  };
+  throw lastError ?? new RemoteCommandError('REMOTE_COMMAND_FAILED', `FreeKiosk command failed for ${device.id}.`);
 }
 
 async function getRemoteCapabilities(
@@ -1671,7 +1735,7 @@ function commandUsesFrameEvents(command: FrameCommand): boolean {
 function remoteFallbackAvailable(device: FrameDevice, command: FrameCommand): boolean {
   return commandUsesFrameEvents(command)
     && (device.remoteControlType ?? 'none') === 'freekiosk'
-    && Boolean(device.remoteApiUrl);
+    && remoteEndpointCandidates(device).length > 0;
 }
 
 function parseJsonOrText(value: string): unknown {
@@ -1869,14 +1933,120 @@ function toControllerProxyUrl(
 function publicDevice(device: FrameDevice): Omit<FrameDevice, 'remoteApiKey' | 'kioskPassword'> & {
   remoteApiKeyConfigured: boolean;
   kioskPasswordConfigured: boolean;
+  remoteApiAutoUrl?: string;
+  remoteApiEffectiveUrl?: string;
+  remoteApiEffectiveSource: 'manual' | 'auto' | 'none';
+  remoteApiConfigured: boolean;
 } {
   const { remoteApiKey: _remoteApiKey, kioskPassword: _kioskPassword, ...publicFields } = device;
+  const remote = remoteEndpointSummary(device);
   return {
     ...publicFields,
     remoteControlType: publicFields.remoteControlType ?? 'none',
     remoteApiKeyConfigured: Boolean(_remoteApiKey),
     kioskPasswordConfigured: Boolean(_kioskPassword),
+    remoteApiAutoPort: publicFields.remoteApiAutoPort ?? 8080,
+    remoteApiAutoUrl: remote.autoUrl,
+    remoteApiEffectiveUrl: remote.effectiveUrl,
+    remoteApiEffectiveSource: remote.effectiveSource,
+    remoteApiConfigured: remote.configured,
   };
+}
+
+function remoteEndpointSummary(device: FrameDevice): {
+  autoUrl?: string;
+  effectiveUrl?: string;
+  effectiveSource: 'manual' | 'auto' | 'none';
+  configured: boolean;
+} {
+  const candidates = remoteEndpointCandidates(device);
+  const effective = candidates[0];
+  return {
+    autoUrl: buildAutoRemoteApiUrl(device),
+    effectiveUrl: effective?.baseUrl,
+    effectiveSource: effective?.source ?? 'none',
+    configured: candidates.length > 0,
+  };
+}
+
+function remoteEndpointCandidates(device: FrameDevice): Array<{ baseUrl: string; source: 'manual' | 'auto' }> {
+  const candidates: Array<{ baseUrl: string; source: 'manual' | 'auto' }> = [];
+  if (device.remoteApiUrl) {
+    candidates.push({ baseUrl: trimTrailingSlash(device.remoteApiUrl), source: 'manual' });
+  }
+  const autoUrl = buildAutoRemoteApiUrl(device);
+  if (autoUrl && !candidates.some((candidate) => candidate.baseUrl === autoUrl)) {
+    candidates.push({ baseUrl: autoUrl, source: 'auto' });
+  }
+  return candidates;
+}
+
+function buildAutoRemoteApiUrl(device: FrameDevice): string | undefined {
+  if (!device.lastSeenIp || !isAutoRemoteCandidateIp(device.lastSeenIp)) return undefined;
+  const port = device.remoteApiAutoPort ?? 8080;
+  const host = device.lastSeenIp.includes(':') ? `[${device.lastSeenIp}]` : device.lastSeenIp;
+  return `http://${host}:${port}`;
+}
+
+function requestClientIp(request: FastifyRequest): string | undefined {
+  const forwardedFor = request.headers['x-forwarded-for'];
+  const firstForwardedFor = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+  const raw = firstForwardedFor?.split(',')[0]?.trim() || request.ip;
+  return normalizeIp(raw);
+}
+
+function normalizeIp(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  let candidate = value.trim();
+  if (candidate.startsWith('::ffff:')) candidate = candidate.slice('::ffff:'.length);
+  if (candidate.startsWith('[') && candidate.includes(']')) {
+    candidate = candidate.slice(1, candidate.indexOf(']'));
+  } else if (candidate.includes(':') && candidate.split(':').length === 2 && isIP(candidate) === 0) {
+    candidate = candidate.split(':')[0] ?? candidate;
+  }
+  return isIP(candidate) ? candidate : undefined;
+}
+
+function isAutoRemoteCandidateIp(ip: string): boolean {
+  const version = isIP(ip);
+  if (version === 4) {
+    const parts = ip.split('.').map((part) => Number(part));
+    const [a, b] = parts;
+    if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+    return a === 10
+      || (a === 172 && b >= 16 && b <= 31)
+      || (a === 192 && b === 168)
+      || (a === 169 && b === 254)
+      || (a === 100 && b >= 64 && b <= 127);
+  }
+  if (version === 6) {
+    const normalized = ip.toLowerCase();
+    return normalized === '::1'
+      || normalized.startsWith('fc')
+      || normalized.startsWith('fd')
+      || normalized.startsWith('fe80:');
+  }
+  return false;
+}
+
+function isLocalControllerRequest(device: FrameDevice, request: FastifyRequest): boolean {
+  const context = requestContext(request);
+  if (!context.host) return false;
+  try {
+    return normalizeHost(context.host) === normalizeHost(new URL(device.localControllerBaseUrl).host);
+  } catch {
+    return false;
+  }
+}
+
+function normalizeHost(host: string): string {
+  return host.trim().toLowerCase().replace(/\/+$/, '');
+}
+
+function isPreviewRequest(request: FastifyRequest): boolean {
+  const referer = Array.isArray(request.headers.referer) ? request.headers.referer[0] : request.headers.referer;
+  return request.url.includes('preview=1')
+    || Boolean(referer && (referer.includes('preview=1') || referer.includes('/setup')));
 }
 
 function publicFrameClaim(claim: FrameClaim): Omit<FrameClaim, 'codeHash'> & {
@@ -1951,6 +2121,7 @@ function createDeviceFromInput(
     pollIntervalSeconds: input.pollIntervalSeconds,
     remoteControlType: input.remoteControlType,
     remoteApiUrl: input.remoteApiUrl ? trimTrailingSlash(input.remoteApiUrl) : undefined,
+    remoteApiAutoPort: input.remoteApiAutoPort,
     remoteApiKey: input.remoteApiKey,
   };
 }
@@ -1990,6 +2161,7 @@ function normalizeDevicePatch(input: z.infer<typeof DevicePatchSchema>): Partial
   if (hasPatchKey(input, 'remoteApiUrl')) {
     patch.remoteApiUrl = input.remoteApiUrl ? trimTrailingSlash(input.remoteApiUrl) : input.remoteApiUrl;
   }
+  if (hasPatchKey(input, 'remoteApiAutoPort')) patch.remoteApiAutoPort = input.remoteApiAutoPort;
   if (hasPatchKey(input, 'remoteApiKey')) patch.remoteApiKey = input.remoteApiKey;
 
   return patch;
