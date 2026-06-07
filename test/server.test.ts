@@ -692,6 +692,18 @@ describe('controller API', () => {
     expect(updated.json().data.device.remoteApiUrl).toBe('http://10.0.0.50:8080');
     expect(updated.json().data.frameUrl).toBe('http://10.0.0.10:18082/frame/lenovo');
 
+    const cleared = await server.inject({
+      method: 'PATCH',
+      url: '/api/devices/lenovo',
+      headers: { host: '10.0.0.10:18082' },
+      payload: {
+        remoteApiUrl: null,
+      },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json().data.device.remoteApiUrl).toBeUndefined();
+    expect(cleared.json().data.device.remoteApiConfigured).toBe(false);
+
     const state = await server.inject({
       method: 'GET',
       url: '/api/frame/lenovo/state',

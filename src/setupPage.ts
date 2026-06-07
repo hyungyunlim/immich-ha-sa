@@ -1107,7 +1107,7 @@ export function renderSetupPage(params: SetupPageParams): string {
         localKioskBaseUrl: optionalValue(formData, 'localKioskBaseUrl'),
         externalKioskBaseUrl: optionalValue(formData, 'externalKioskBaseUrl') ?? null,
         remoteControlType: remoteApiUrl && selectedRemoteControlType === 'none' ? 'freekiosk' : selectedRemoteControlType,
-        remoteApiUrl,
+        remoteApiUrl: remoteApiUrl ?? (includeId ? undefined : null),
         remoteApiAutoPort: Number(formData.get('remoteApiAutoPort') || 8080),
       };
       const kioskPassword = optionalValue(formData, 'kioskPassword');
