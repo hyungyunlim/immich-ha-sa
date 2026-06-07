@@ -17,6 +17,9 @@ import { renderSetupBlockedPage, renderSetupPage } from './setupPage.js';
 import { JsonStore } from './store.js';
 import type { AlbumCache, FrameClaim, FrameCommand, FrameDevice, FrameState, PersonCache } from './types.js';
 
+const REMOTE_DISCOVERY_RETRY_MS = 30_000;
+const REMOTE_DISCOVERY_TIMEOUT_MS = 1_500;
+
 const FrameStatePatchSchema = z.object({
   activeAlbumIds: z.array(z.string().min(1)).optional(),
   activePersonIds: z.array(z.string().min(1)).optional(),
@@ -289,6 +292,8 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   });
   const events = deps.events ?? new FrameEventHub();
   const auth = deps.auth ?? new ControllerAuthManager(store, deps.config.controllerApiToken);
+  const remoteDiscoveryAttempts = new Map<string, number>();
+  const remoteDiscoveryInFlight = new Set<string>();
   let albumRefreshInFlight: Promise<AlbumCache> | undefined;
   let personRefreshInFlight: Promise<PersonCache> | undefined;
 
@@ -1279,10 +1284,55 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   }
 
   function rememberFrameClient(device: FrameDevice, request: FastifyRequest): void {
+    if ((device.remoteControlType ?? 'none') !== 'freekiosk') return;
     if (!isLocalControllerRequest(device, request) || isPreviewRequest(request)) return;
     const ip = requestClientIp(request);
     if (!ip || !isAutoRemoteCandidateIp(ip)) return;
+    const port = device.remoteApiAutoPort ?? 8080;
+    const key = `${device.id}|${ip}|${port}`;
+    const now = Date.now();
+    const lastAttemptAt = remoteDiscoveryAttempts.get(key) ?? 0;
+    if (remoteDiscoveryInFlight.has(key) || now - lastAttemptAt < REMOTE_DISCOVERY_RETRY_MS) return;
+
+    remoteDiscoveryAttempts.set(key, now);
+    remoteDiscoveryInFlight.add(key);
+    void verifyAndRememberFrameClient(device, ip, port)
+      .catch((error) => {
+        app.log.debug({
+          deviceId: device.id,
+          ip,
+          port,
+          error: error instanceof Error ? error.message : String(error),
+        }, 'FreeKiosk auto-discovery candidate rejected');
+      })
+      .finally(() => {
+        remoteDiscoveryInFlight.delete(key);
+      });
+  }
+
+  async function verifyAndRememberFrameClient(device: FrameDevice, ip: string, port: number): Promise<void> {
+    const baseUrl = buildAutoRemoteApiUrl({ ...device, lastSeenIp: ip, remoteApiAutoPort: port });
+    if (!baseUrl) return;
+
+    const headers: Record<string, string> = {};
+    if (device.remoteApiKey) headers['X-Api-Key'] = device.remoteApiKey;
+    const response = await fetch(`${baseUrl}/api/status`, {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(REMOTE_DISCOVERY_TIMEOUT_MS),
+    });
+    const payload = parseJsonOrText(await response.text());
+    if (!response.ok || !isFreeKioskStatusForDevice(payload, device, ip)) {
+      throw new Error(`candidate did not match ${device.id}`);
+    }
+
+    const latest = store.getDevice(device.id);
+    if (!latest || (latest.remoteApiAutoPort ?? 8080) !== port) return;
+    const previousIp = latest.lastSeenIp;
     store.markDeviceSeen(device.id, ip);
+    if (previousIp !== ip) {
+      app.log.info({ deviceId: device.id, ip, port }, 'FreeKiosk auto-discovery updated frame endpoint');
+    }
   }
 
   async function proxyKioskRequest(request: FastifyRequest, reply: FastifyReply) {
@@ -1591,7 +1641,7 @@ async function sendRemoteRequest(
   }
   const candidates = remoteEndpointCandidates(device);
   if (candidates.length === 0) {
-    throw new RemoteCommandError('REMOTE_NOT_CONFIGURED', `Frame ${device.id} is missing a manual remoteApiUrl and has no last-seen local IP for auto discovery.`, 400);
+    throw new RemoteCommandError('REMOTE_NOT_CONFIGURED', `Frame ${device.id} is missing a manual remoteApiUrl and has no verified FreeKiosk endpoint for auto discovery.`, 400);
   }
 
   const headers: Record<string, string> = {};
@@ -2027,6 +2077,44 @@ function isAutoRemoteCandidateIp(ip: string): boolean {
       || normalized.startsWith('fe80:');
   }
   return false;
+}
+
+function isFreeKioskStatusForDevice(payload: unknown, device: FrameDevice, ip: string): boolean {
+  const data = freeKioskStatusData(payload);
+  if (!data || !isRecord(data.device) || !isRecord(data.webview)) return false;
+
+  const statusIp = typeof data.device.ip === 'string' ? normalizeIp(data.device.ip) : undefined;
+  if (statusIp && statusIp !== ip) return false;
+
+  const currentUrl = data.webview.currentUrl;
+  return typeof currentUrl === 'string' && isFrameUrlForDevice(currentUrl, device);
+}
+
+function freeKioskStatusData(payload: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(payload)) return undefined;
+  if ('success' in payload && payload.success !== true) return undefined;
+  return isRecord(payload.data) ? payload.data : payload;
+}
+
+function isFrameUrlForDevice(value: string, device: FrameDevice): boolean {
+  let path: string;
+  try {
+    path = new URL(value, device.localControllerBaseUrl).pathname;
+  } catch {
+    return false;
+  }
+
+  const normalizedPath = trimTrailingSlash(path);
+  const id = encodeURIComponent(device.id);
+  const alias = encodeURIComponent(device.alias ?? device.id);
+  const candidates = [
+    `/frame/${id}`,
+    `/f/${alias}`,
+    `/kiosk-proxy/${id}`,
+  ];
+  return candidates.some((candidate) => (
+    normalizedPath === candidate || normalizedPath.startsWith(`${candidate}/`)
+  ));
 }
 
 function isLocalControllerRequest(device: FrameDevice, request: FastifyRequest): boolean {

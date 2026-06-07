@@ -49,6 +49,14 @@ function createTestServer(deps: Parameters<typeof createServer>[0]) {
   });
 }
 
+async function waitForDeviceIp(store: JsonStore, deviceId: string, ip: string): Promise<void> {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    if (store.getDevice(deviceId)?.lastSeenIp === ip) return;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  expect(store.getDevice(deviceId)?.lastSeenIp).toBe(ip);
+}
+
 describe('controller API', () => {
   it('returns resolved frame state', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
@@ -422,34 +430,79 @@ describe('controller API', () => {
     await server.close();
   });
 
-  it('records last-seen local frame IP from non-preview frame requests', async () => {
+  it('records verified FreeKiosk frame IP from non-preview frame requests', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
     const store = new JsonStore(config.storePath, config.defaultDevice);
+    store.updateDevice('lenovo', {
+      remoteControlType: 'freekiosk',
+      remoteApiAutoPort: 8080,
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === 'http://10.0.0.40:8080/api/status') {
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            device: { ip: '10.0.0.40' },
+            webview: { currentUrl: 'http://10.0.0.10:18082/f/other' },
+          },
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url === 'http://10.0.0.44:8080/api/status') {
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            device: { ip: '10.0.0.44' },
+            webview: { currentUrl: 'http://10.0.0.10:18082/f/lenovo' },
+          },
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    });
     const server = createTestServer({ config, store });
 
-    const preview = await server.inject({
-      method: 'GET',
-      url: '/frame/lenovo?preview=1',
-      headers: { host: '10.0.0.10:18082' },
-      remoteAddress: '10.0.0.40',
-    });
-    expect(preview.statusCode).toBe(200);
-    expect(store.getDevice('lenovo')?.lastSeenIp).toBeUndefined();
+    try {
+      const preview = await server.inject({
+        method: 'GET',
+        url: '/frame/lenovo?preview=1',
+        headers: { host: '10.0.0.10:18082' },
+        remoteAddress: '10.0.0.40',
+      });
+      expect(preview.statusCode).toBe(200);
+      expect(store.getDevice('lenovo')?.lastSeenIp).toBeUndefined();
 
-    const frame = await server.inject({
-      method: 'GET',
-      url: '/frame/lenovo',
-      headers: { host: '10.0.0.10:18082' },
-      remoteAddress: '10.0.0.44',
-    });
+      const wrongFrame = await server.inject({
+        method: 'GET',
+        url: '/frame/lenovo',
+        headers: { host: '10.0.0.10:18082' },
+        remoteAddress: '10.0.0.40',
+      });
+      expect(wrongFrame.statusCode).toBe(200);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(store.getDevice('lenovo')?.lastSeenIp).toBeUndefined();
 
-    expect(frame.statusCode).toBe(200);
-    const device = store.getDevice('lenovo');
-    expect(device?.lastSeenIp).toBe('10.0.0.44');
-    expect(device?.lastSeenAt).toBeTruthy();
-    await server.close();
+      const frame = await server.inject({
+        method: 'GET',
+        url: '/frame/lenovo',
+        headers: { host: '10.0.0.10:18082' },
+        remoteAddress: '10.0.0.44',
+      });
+
+      expect(frame.statusCode).toBe(200);
+      await waitForDeviceIp(store, 'lenovo', '10.0.0.44');
+      expect(store.getDevice('lenovo')?.lastSeenAt).toBeTruthy();
+    } finally {
+      fetchMock.mockRestore();
+      await server.close();
+    }
   });
 
   it('claims an external root pairing code into a stable alias frame path', async () => {
@@ -818,7 +871,7 @@ describe('controller API', () => {
     await new Promise<void>((resolve) => remote.close(() => resolve()));
   });
 
-  it('falls back to the last-seen auto FreeKiosk endpoint when the manual URL fails', async () => {
+  it('falls back to the verified auto FreeKiosk endpoint when the manual URL fails', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);

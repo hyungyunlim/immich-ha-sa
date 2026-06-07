@@ -871,12 +871,12 @@ export function renderSetupPage(params: SetupPageParams): string {
         <label class="field">
           <span class="label">Auto REST Port</span>
           <input name="remoteApiAutoPort" type="number" min="1" max="65535" step="1" value="8080">
-          <span class="help-text">Used with the frame's last-seen local IP when manual URL is blank or unreachable.</span>
+          <span class="help-text">Used with the frame's verified FreeKiosk IP when manual URL is blank or unreachable.</span>
         </label>
         <label class="field full">
           <span class="label">Manual Remote API URL</span>
           <input name="remoteApiUrl" type="url" placeholder="http://192.168.1.160:8080">
-          <span class="help-text">Optional FreeKiosk REST API address. Leave blank to use auto discovery from the frame's last-seen local IP and Auto REST Port.</span>
+          <span class="help-text">Optional FreeKiosk REST API address. Leave blank to use auto discovery from the frame's verified FreeKiosk IP and Auto REST Port.</span>
         </label>
         <details class="full">
           <summary>Advanced settings <span class="summary-hint">inherited URLs, external access, and password overrides</span></summary>
@@ -1466,7 +1466,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
           <label class="field full">
             <span class="label">Manual Remote API URL</span>
             <input name="remoteApiUrl" type="url" value="${escapeAttribute(device.remoteApiUrl ?? '')}" placeholder="http://192.168.1.160:8080">
-            <span class="help-text">Optional. Manual URL is tried first; if it is blank or unreachable, the controller tries the auto endpoint from last-seen local IP.</span>
+            <span class="help-text">Optional. Manual URL is tried first; if it is blank or unreachable, the controller tries the verified auto endpoint.</span>
             <span class="help-text">${escapeHtml(renderRemoteEndpointHelp(device))}</span>
           </label>
           <label class="field full">
@@ -1561,8 +1561,8 @@ function renderRemoteSummary(device: SetupPageDevice): string {
   if (type !== 'freekiosk') return type;
   const source = device.remoteApiEffectiveSource ?? 'none';
   if (source === 'manual') return 'freekiosk / manual';
-  if (source === 'auto') return 'freekiosk / auto';
-  return 'freekiosk / waiting for frame IP';
+  if (source === 'auto') return 'freekiosk / verified auto';
+  return 'freekiosk / waiting for verified IP';
 }
 
 function renderRemoteEndpointSummary(device: SetupPageDevice): string {
@@ -1571,9 +1571,9 @@ function renderRemoteEndpointSummary(device: SetupPageDevice): string {
     return `${device.remoteApiEffectiveUrl} (${device.remoteApiEffectiveSource ?? 'unknown'})`;
   }
   if (device.lastSeenIp) {
-    return `${device.lastSeenIp}:${device.remoteApiAutoPort ?? 8080} pending`;
+    return `${device.lastSeenIp}:${device.remoteApiAutoPort ?? 8080} verified`;
   }
-  return 'No last-seen local IP yet';
+  return 'No verified FreeKiosk IP yet';
 }
 
 function renderRemoteEndpointHelp(device: SetupPageDevice): string {
@@ -1581,15 +1581,15 @@ function renderRemoteEndpointHelp(device: SetupPageDevice): string {
   if (device.remoteApiEffectiveUrl) {
     parts.push(`Effective endpoint: ${device.remoteApiEffectiveUrl} (${device.remoteApiEffectiveSource ?? 'unknown'}).`);
   } else {
-    parts.push('Effective endpoint: unavailable until a manual URL is set or the frame opens its local frame URL.');
+    parts.push('Effective endpoint: unavailable until a manual URL is set or the frame opens its local frame URL and FreeKiosk status is verified.');
   }
   if (device.remoteApiAutoUrl) {
-    parts.push(`Auto endpoint: ${device.remoteApiAutoUrl}.`);
+    parts.push(`Verified auto endpoint: ${device.remoteApiAutoUrl}.`);
   }
   if (device.lastSeenIp && device.lastSeenAt) {
-    parts.push(`Last seen: ${device.lastSeenIp} at ${formatTimestamp(device.lastSeenAt)}.`);
+    parts.push(`Last verified: ${device.lastSeenIp} at ${formatTimestamp(device.lastSeenAt)}.`);
   } else {
-    parts.push('Last seen: not recorded yet.');
+    parts.push('Last verified: not recorded yet.');
   }
   return parts.join(' ');
 }
