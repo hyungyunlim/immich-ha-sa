@@ -1645,10 +1645,26 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     if (!control || typeof control.click !== 'function') return false;
     if (command === 'mute-on' || command === 'mute-off') {
       var shouldMute = command === 'mute-on';
-      if (control.classList && control.classList.contains('is-muted') === shouldMute) return true;
+      var currentMuted = readKioskMuteState(control);
+      if (currentMuted === shouldMute) return true;
     }
     control.click();
     return true;
+  }
+  function readKioskMuteState(control) {
+    if (!control) return null;
+    if (control.classList && control.classList.contains('is-muted')) return true;
+    if (typeof control.querySelector === 'function' && control.querySelector('.is-muted')) return true;
+    if (typeof control.closest === 'function' && control.closest('.is-muted')) return true;
+    var label = [
+      control.getAttribute && control.getAttribute('aria-label'),
+      control.getAttribute && control.getAttribute('title')
+    ].filter(Boolean).join(' ');
+    if (/unmute/i.test(label)) return true;
+    if (/\\bmute\\b/i.test(label)) return false;
+    if (control.matches && control.matches('.unmute')) return true;
+    if (control.matches && control.matches('.mute')) return false;
+    return null;
   }
   function dispatchKey() {
     var map = {

@@ -93,6 +93,9 @@ describe('Home Assistant integration files', () => {
 
     expect(serverSource).toContain('commandNeedsRemoteReconciliation(parsed.data.command)');
     expect(serverSource).toContain("command === 'mute-on' || command === 'mute-off'");
+    expect(serverSource).toContain('readKioskMuteState(control)');
+    expect(serverSource).toContain("control.querySelector('.is-muted')");
+    expect(serverSource).toContain("control.closest('.is-muted')");
     expect(serverSource).toContain("'REMOTE_EXPLICIT_MUTE_UNAVAILABLE'");
   });
 
