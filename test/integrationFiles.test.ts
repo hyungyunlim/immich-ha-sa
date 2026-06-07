@@ -75,6 +75,8 @@ describe('Home Assistant integration files', () => {
     expect(mediaPlayerSource).toContain('async_media_play_pause');
     expect(mediaPlayerSource).toContain('async_mute_volume');
     expect(mediaPlayerSource).toContain('async_set_volume_level');
+    expect(mediaPlayerSource).toContain('update_frame_state({"kioskVideoMuted": mute})');
+    expect(mediaPlayerSource).toContain('send_command("device-mute-toggle")');
     expect(switchSource).toContain('"remote_screen"');
     expect(switchSource).toContain('"screen-on"');
     expect(switchSource).toContain('"screen-off"');
