@@ -198,7 +198,7 @@ immich_frame.set_network_mode
 
 For frame display and audio hardware control, configure the FreeKiosk Remote API URL in the add-on device settings. The integration then exposes direct `Display Brightness` and `Media Volume` number entities, plus `Light Level` and `Auto Brightness Active` status entities. FreeKiosk 1.2.16 reports auto-brightness state but does not expose the documented REST toggle endpoints; setting display brightness through `/api/brightness` is the supported manual override path and FreeKiosk disables auto-brightness if needed.
 
-For frame audio buttons, use the `Device Mute Toggle`, `Volume Up`, and `Volume Down` entities when FreeKiosk Remote API is configured. The immich-kiosk video mute control is exposed only as a disabled-by-default diagnostic entity because WebView video unmute can be blocked without a real user gesture.
+For frame audio buttons, use the `Device Mute Toggle`, `Volume Up`, and `Volume Down` entities when FreeKiosk Remote API is configured. The immich-kiosk video mute control is exposed as a `Kiosk Video Mute` press button because immich-kiosk does not expose a reliable readable mute state to Home Assistant.
 
 For date-based photo selection, use `Date Filter Preset` for common ranges, or `Filter Start Date` / `Filter End Date` for a custom date picker range. The raw `Date Filter` text entity remains available for advanced immich-kiosk values such as `last-30-days` or `2021-01-01_to_today`. Use `Newest Filter` to limit the current album/source to the newest N assets; `0` disables it.
 

@@ -65,13 +65,13 @@ The Home Assistant device page exposes buttons for next, previous, play/pause, r
 
 FreeKiosk 1.2.16 reports auto-brightness state in `/api/status`, but it does not expose the documented `/api/autoBrightness/enable` and `/api/autoBrightness/disable` REST endpoints. Use `Display Brightness` for manual control; FreeKiosk's `/api/brightness` endpoint disables auto-brightness when needed.
 
-Kiosk Video Mute Diagnostic is intentionally disabled by default and categorized as a diagnostic Home Assistant entity. Existing legacy Kiosk Mute Toggle entities are disabled once during integration setup after upgrading to `0.1.20` or newer. It clicks immich-kiosk's real `.navigation--mute` control first, then falls back to directly updating the current video element's muted state. Keep it for troubleshooting browser/video behavior, not for normal automations.
+Kiosk Video Mute is exposed as a Home Assistant press button. It clicks immich-kiosk's real `.navigation--mute` control first, then falls back to directly toggling the current video element's muted state or sending the ArrowUp key event.
 
 Keep the frame's `disableNavigation` setting off when using next/previous buttons. immich-kiosk's `disable_navigation` option blocks touch/click, keyboard, and menu navigation, so bridged commands and physical key events will be ignored by immich-kiosk if this is enabled.
 
 ## Kiosk Audio
 
-The Home Assistant Kiosk Video Mute Diagnostic button controls immich-kiosk mute state, not Android device volume. Browser video unmute can still be blocked when there has not been a real user gesture in the WebView. For reliable frame-wide audio control, use Device Mute Toggle instead; it sends Android `KEYCODE_VOLUME_MUTE` through FreeKiosk.
+The Home Assistant Kiosk Video Mute button controls immich-kiosk video mute, not Android device volume. It is intentionally a press button because immich-kiosk does not expose a reliable readable mute state to Home Assistant. For reliable frame-wide audio state, use Device Mute Toggle instead; it sends Android `KEYCODE_VOLUME_MUTE` through FreeKiosk.
 
 The Volume Up, Volume Down, and Device Mute Toggle buttons are FreeKiosk/Android device audio controls.
 

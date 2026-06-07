@@ -24,6 +24,7 @@ async def async_setup_entry(
             ImmichFrameCommandButton(coordinator, "next", "Next", "next"),
             ImmichFrameCommandButton(coordinator, "play_pause", "Play/Pause", "play-pause"),
             ImmichFrameCommandButton(coordinator, "reload", "Reload", "reload"),
+            ImmichFrameCommandButton(coordinator, "kiosk_video_mute", "Kiosk Video Mute", "mute-toggle"),
             ImmichFrameCommandButton(coordinator, "screen_on", "Screen On", "screen-on"),
             ImmichFrameCommandButton(coordinator, "screen_off", "Screen Off", "screen-off"),
             ImmichFrameCommandButton(coordinator, "volume_up", "Volume Up", "volume-up"),

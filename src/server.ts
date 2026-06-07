@@ -242,7 +242,7 @@ const DevicePatchSchema = z.object({
 });
 
 const FrameCommandSchema = z.object({
-  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'mute-toggle', 'mute-on', 'mute-off', 'screen-on', 'screen-off', 'volume-up', 'volume-down', 'device-mute-toggle', 'dpad-up']),
+  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'mute-toggle', 'screen-on', 'screen-off', 'volume-up', 'volume-down', 'device-mute-toggle', 'dpad-up']),
 });
 
 const RemoteLevelSchema = z.object({
@@ -832,6 +832,25 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
       return;
     }
+    if (commandPrefersRemotePress(parsed.data.command) && remoteFallbackAvailable(device, parsed.data.command)) {
+      try {
+        const remoteFallback = await sendRemoteCommand(device, parsed.data.command);
+        return ok({
+          command: parsed.data.command,
+          frameEvent: null,
+          remoteFallback,
+        });
+      } catch (error) {
+        if (events.connectedClientCount(deviceId) === 0) {
+          const remoteError = error instanceof RemoteCommandError
+            ? error
+            : new RemoteCommandError('REMOTE_COMMAND_FAILED', error instanceof Error ? error.message : String(error));
+          reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
+          return;
+        }
+      }
+    }
+
     if (commandUsesFrameEvents(parsed.data.command)) {
       const delivered = events.emitCommand(deviceId, {
         command: parsed.data.command,
@@ -841,7 +860,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         connectedClients: events.connectedClientCount(deviceId),
         delivered,
       };
-      if ((delivered === 0 || commandNeedsRemoteReconciliation(parsed.data.command)) && remoteFallbackAvailable(device, parsed.data.command)) {
+      if (delivered === 0 && remoteFallbackAvailable(device, parsed.data.command)) {
         try {
           const remoteFallback = await sendRemoteCommand(device, parsed.data.command);
           return ok({
@@ -1450,12 +1469,6 @@ async function sendRemoteCommand(
         },
       };
     } catch {
-      if (command === 'mute-on' || command === 'mute-off') {
-        throw new RemoteCommandError(
-          'REMOTE_EXPLICIT_MUTE_UNAVAILABLE',
-          'Explicit kiosk mute requires the frame controller page or FreeKiosk JavaScript execution.',
-        );
-      }
       // Older FreeKiosk builds or non-controller pages can still be driven by the native key endpoints.
     }
   }
@@ -1589,8 +1602,6 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     && command !== 'previous'
     && command !== 'play-pause'
     && command !== 'mute-toggle'
-    && command !== 'mute-on'
-    && command !== 'mute-off'
   ) {
     return null;
   }
@@ -1639,41 +1650,19 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     var selector = null;
     if (command === 'next') selector = '.navigation--next-asset, [aria-label="Next"], [title="Next"]';
     if (command === 'previous') selector = '.navigation--prev-asset, [aria-label="Previous"], [title="Previous"]';
-    if (command === 'mute-toggle' || command === 'mute-on' || command === 'mute-off') selector = '.navigation--mute, [aria-label="Mute"], [aria-label="Unmute"], [title="Mute"], [title="Unmute"], .mute, .unmute';
+    if (command === 'mute-toggle') selector = '.navigation--mute, [aria-label="Mute"], [aria-label="Unmute"], [title="Mute"], [title="Unmute"], .mute, .unmute';
     if (!selector) return false;
     var control = doc.querySelector(selector);
     if (!control || typeof control.click !== 'function') return false;
-    if (command === 'mute-on' || command === 'mute-off') {
-      var shouldMute = command === 'mute-on';
-      var currentMuted = readKioskMuteState(control);
-      if (currentMuted === shouldMute) return true;
-    }
     control.click();
     return true;
-  }
-  function readKioskMuteState(control) {
-    if (!control) return null;
-    if (control.classList && control.classList.contains('is-muted')) return true;
-    if (typeof control.querySelector === 'function' && control.querySelector('.is-muted')) return true;
-    if (typeof control.closest === 'function' && control.closest('.is-muted')) return true;
-    var label = [
-      control.getAttribute && control.getAttribute('aria-label'),
-      control.getAttribute && control.getAttribute('title')
-    ].filter(Boolean).join(' ');
-    if (/unmute/i.test(label)) return true;
-    if (/\\bmute\\b/i.test(label)) return false;
-    if (control.matches && control.matches('.unmute')) return true;
-    if (control.matches && control.matches('.mute')) return false;
-    return null;
   }
   function dispatchKey() {
     var map = {
       next: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
       previous: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
       'play-pause': { key: ' ', code: 'Space', keyCode: 32 },
-      'mute-toggle': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 },
-      'mute-on': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 },
-      'mute-off': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 }
+      'mute-toggle': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 }
     };
     var target = map[command];
     if (!target) return false;
@@ -1912,8 +1901,6 @@ function freeKioskEndpoint(command: FrameCommand): string {
     case 'reload':
       return '/api/reload';
     case 'mute-toggle':
-    case 'mute-on':
-    case 'mute-off':
       return '/api/remote/up';
     case 'screen-on':
       return '/api/screen/on';
@@ -1935,13 +1922,11 @@ function commandUsesFrameEvents(command: FrameCommand): boolean {
     || command === 'previous'
     || command === 'play-pause'
     || command === 'reload'
-    || command === 'mute-toggle'
-    || command === 'mute-on'
-    || command === 'mute-off';
+    || command === 'mute-toggle';
 }
 
-function commandNeedsRemoteReconciliation(command: FrameCommand): boolean {
-  return command === 'mute-on' || command === 'mute-off';
+function commandPrefersRemotePress(command: FrameCommand): boolean {
+  return command === 'mute-toggle';
 }
 
 function remoteFallbackAvailable(device: FrameDevice, command: FrameCommand): boolean {

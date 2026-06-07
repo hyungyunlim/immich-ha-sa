@@ -866,7 +866,7 @@ describe('controller API', () => {
     });
 
     expect(mute.statusCode).toBe(200);
-    expect(mute.json().data.frameEvent).toMatchObject({ connectedClients: 0, delivered: 0 });
+    expect(mute.json().data.frameEvent).toBeNull();
     expect(mute.json().data.remoteFallback.endpoint).toBe('/api/js');
     expect(mute.json().data.remoteFallback.result.strategy).toBe('webview-js');
     expect(requests).toHaveLength(5);

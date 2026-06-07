@@ -17,12 +17,11 @@ describe('frame page', () => {
 
     expect(html).toContain('.navigation--mute');
     expect(html).toContain('toggleVideoMutedDirectly');
-    expect(html).toContain('kioskVideoMuted');
-    expect(html).toContain('applyVideoMutedState(desiredVideoMuted)');
     expect(html).toContain("if (command === 'mute-toggle')");
-    expect(html).toContain("if (command === 'mute-on')");
-    expect(html).toContain("if (command === 'mute-off')");
-    expect(html).toContain('setVideoMutedDirectly(true)');
-    expect(html).toContain('setVideoMutedDirectly(false)');
+    expect(html).not.toContain('kioskVideoMuted');
+    expect(html).not.toContain('desiredVideoMuted');
+    expect(html).not.toContain("if (command === 'mute-on')");
+    expect(html).not.toContain("if (command === 'mute-off')");
+    expect(html).not.toContain('setVideoMutedDirectly');
   });
 });

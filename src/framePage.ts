@@ -59,7 +59,6 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       var previewMode = ${JSON.stringify(previewMode)};
       var lastVersion = 0;
       var lastRendererUrl = '';
-      var desiredVideoMuted = null;
       var pollTimer = null;
       var pollIntervalMs = ${Math.max(previewMode ? 60 : 5, device.pollIntervalSeconds) * 1000};
       var frameVideoMuted = true;
@@ -67,19 +66,15 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         next: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
         previous: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
         'play-pause': { key: ' ', code: 'Space', keyCode: 32 },
-        'mute-toggle': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 },
-        'mute-on': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 },
-        'mute-off': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 }
+        'mute-toggle': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 }
       };
 
       function applyState(state) {
         if (!state || !state.rendererUrl) return;
         if (state.version && state.version < lastVersion) return;
         if (state.version) lastVersion = state.version;
-        desiredVideoMuted = state.kioskVideoMuted !== false;
         if (state.rendererUrl === lastRendererUrl) {
           document.body.className = '';
-          scheduleVideoMutedSync();
           return;
         }
         lastRendererUrl = state.rendererUrl;
@@ -121,16 +116,12 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         var selector = null;
         if (command === 'next') selector = '.navigation--next-asset, [aria-label="Next"], [title="Next"]';
         if (command === 'previous') selector = '.navigation--prev-asset, [aria-label="Previous"], [title="Previous"]';
-        if (command === 'mute-toggle' || command === 'mute-on' || command === 'mute-off') selector = '.navigation--mute, [aria-label="Mute"], [aria-label="Unmute"], [title="Mute"], [title="Unmute"], .mute, .unmute';
+        if (command === 'mute-toggle') selector = '.navigation--mute, [aria-label="Mute"], [aria-label="Unmute"], [title="Mute"], [title="Unmute"], .mute, .unmute';
         if (!selector) return false;
         var control = doc.querySelector(selector);
         if (!control || typeof control.click !== 'function') return false;
-        if (command === 'mute-on' || command === 'mute-off') {
-          var shouldMute = command === 'mute-on';
-          if (control.classList && control.classList.contains('is-muted') === shouldMute) return true;
-        }
         control.click();
-        if (command === 'mute-toggle' || command === 'mute-on' || command === 'mute-off') {
+        if (command === 'mute-toggle') {
           setTimeout(syncVideoMutedFromKiosk, 0);
         }
         return true;
@@ -175,17 +166,6 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         return applyVideoMutedState(readKioskMutedState());
       }
 
-      function scheduleVideoMutedSync() {
-        if (desiredVideoMuted === null) return;
-        var attempts = 0;
-        function attempt() {
-          attempts += 1;
-          if (applyVideoMutedState(desiredVideoMuted) || attempts >= 12) return;
-          setTimeout(attempt, 250);
-        }
-        setTimeout(attempt, 0);
-      }
-
       function toggleVideoMutedDirectly() {
         var muted = !readKioskMutedState();
         var win = iframeWindow();
@@ -195,13 +175,6 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
           }
         } catch (error) {}
         return applyVideoMutedState(muted);
-      }
-
-      function setVideoMutedDirectly(muted) {
-        if (readKioskMutedState() === muted) {
-          return applyVideoMutedState(muted);
-        }
-        return clickKioskControl(muted ? 'mute-on' : 'mute-off') || toggleVideoMutedDirectly() || dispatchKioskKey(muted ? 'mute-on' : 'mute-off');
       }
 
       function dispatchKioskKey(command) {
@@ -237,12 +210,6 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         if (command === 'mute-toggle') {
           return clickKioskControl(command) || toggleVideoMutedDirectly() || dispatchKioskKey(command);
         }
-        if (command === 'mute-on') {
-          return setVideoMutedDirectly(true);
-        }
-        if (command === 'mute-off') {
-          return setVideoMutedDirectly(false);
-        }
         return triggerKioskApi(command) || clickKioskControl(command) || dispatchKioskKey(command);
       }
 
@@ -251,7 +218,6 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       iframe.addEventListener('load', function () {
         if (previewMode) return;
         try { iframe.contentWindow && iframe.contentWindow.focus(); } catch (error) {}
-        scheduleVideoMutedSync();
       });
 
       document.addEventListener('keyup', function (event) {
