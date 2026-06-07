@@ -44,6 +44,7 @@ describe('Home Assistant integration files', () => {
     expect(switchSource).toContain('"kiosk_video_mute"');
     expect(switchSource).toContain('"Kiosk Video Mute"');
     expect(switchSource).toContain('"kioskVideoMuted"');
+    expect(switchSource).toContain('send_command("mute-toggle")');
     expect(switchSource).not.toContain('EntityCategory.DIAGNOSTIC');
     expect(initSource).toContain('"kioskVideoMuted"');
   });

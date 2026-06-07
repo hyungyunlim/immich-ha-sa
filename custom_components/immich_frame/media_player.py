@@ -85,7 +85,10 @@ class ImmichFrameSlideshowMediaPlayer(
         await self.coordinator.async_request_refresh()
 
     async def async_mute_volume(self, mute: bool) -> None:
+        kiosk_muted = self.coordinator.data.get("state", {}).get("kioskVideoMuted", True)
         device_muted = remote_effective_muted(self.coordinator.data)
+        if bool(kiosk_muted) is not mute:
+            await self.coordinator.client.send_command("mute-toggle")
         await self.coordinator.client.update_frame_state({"kioskVideoMuted": mute})
         if device_muted is not None and device_muted is not mute:
             await self.coordinator.client.send_command("device-mute-toggle")

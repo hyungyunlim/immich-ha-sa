@@ -112,14 +112,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 "showVideos",
                 False,
             ),
-            ImmichFrameSleepSwitch(
-                coordinator,
-                "kiosk_video_mute",
-                "Kiosk Video Mute",
-                "kioskVideoMuted",
-                True,
-                "mdi:volume-off",
-            ),
+            ImmichFrameKioskVideoMuteSwitch(coordinator),
             ImmichFrameSleepSwitch(
                 coordinator,
                 "show_archived",
@@ -295,6 +288,24 @@ class ImmichFrameSleepSwitch(CoordinatorEntity[ImmichFrameCoordinator], SwitchEn
 
     async def _set_enabled(self, enabled: bool) -> None:
         await self.coordinator.client.update_frame_state({self._patch_key: enabled})
+        await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameKioskVideoMuteSwitch(ImmichFrameSleepSwitch):
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            "kiosk_video_mute",
+            "Kiosk Video Mute",
+            "kioskVideoMuted",
+            True,
+            "mdi:volume-off",
+        )
+
+    async def _set_enabled(self, enabled: bool) -> None:
+        if self.is_on is not enabled:
+            await self.coordinator.client.send_command("mute-toggle")
+        await self.coordinator.client.update_frame_state({"kioskVideoMuted": enabled})
         await self.coordinator.async_request_refresh()
 
 
