@@ -1055,12 +1055,18 @@ describe('controller API', () => {
             success: true,
             data: {
               screen: { on: true, brightness: 37 },
+              audio: { volume: 33 },
             },
           }));
           return;
         }
 
-        if (request.url === '/api/screen/off' || request.url === '/api/screen/on' || request.url === '/api/brightness') {
+        if (
+          request.url === '/api/screen/off'
+          || request.url === '/api/screen/on'
+          || request.url === '/api/brightness'
+          || request.url === '/api/remote/keyboard/mute'
+        ) {
           response.end(JSON.stringify({ success: true, data: { executed: true } }));
           return;
         }
@@ -1094,6 +1100,12 @@ describe('controller API', () => {
       captured: true,
       value: 37,
     });
+    expect(off.json().data.deviceMute).toMatchObject({
+      action: 'mute',
+      muted: true,
+      changed: true,
+      endpoint: '/api/remote/keyboard/mute',
+    });
     expect(store.getDevice('lenovo')?.remoteBrightnessRestoreValue).toBe(37);
 
     const on = await server.inject({
@@ -1113,9 +1125,79 @@ describe('controller API', () => {
 
     expect(requests).toEqual([
       { method: 'GET', url: '/api/status', body: undefined, apiKey: 'test-key' },
+      { method: 'POST', url: '/api/remote/keyboard/mute', body: undefined, apiKey: 'test-key' },
       { method: 'POST', url: '/api/screen/off', body: undefined, apiKey: 'test-key' },
       { method: 'POST', url: '/api/screen/on', body: undefined, apiKey: 'test-key' },
       { method: 'POST', url: '/api/brightness', body: { value: 37 }, apiKey: 'test-key' },
+    ]);
+
+    await server.close();
+    await new Promise<void>((resolve) => remote.close(() => resolve()));
+  });
+
+  it('does not toggle device mute during screen off when FreeKiosk is already muted', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const requests: Array<{ method?: string; url?: string; body?: unknown; apiKey?: string | string[] }> = [];
+    const remote = createHttpServer((request, response) => {
+      request.on('data', () => {});
+      request.on('end', () => {
+        requests.push({
+          method: request.method,
+          url: request.url,
+          body: undefined,
+          apiKey: request.headers['x-api-key'],
+        });
+        response.setHeader('content-type', 'application/json');
+
+        if (request.url === '/api/status') {
+          response.end(JSON.stringify({
+            success: true,
+            data: {
+              screen: { on: true, brightness: 42 },
+              audio: { muted: true, volume: 44 },
+            },
+          }));
+          return;
+        }
+
+        if (request.url === '/api/screen/off') {
+          response.end(JSON.stringify({ success: true, data: { executed: true } }));
+          return;
+        }
+
+        response.statusCode = 404;
+        response.end(JSON.stringify({ success: false, error: 'Endpoint not found' }));
+      });
+    });
+    await new Promise<void>((resolve) => remote.listen(0, '127.0.0.1', resolve));
+
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    const remotePort = (remote.address() as AddressInfo).port;
+    store.updateDevice('lenovo', {
+      remoteControlType: 'freekiosk',
+      remoteApiUrl: `http://127.0.0.1:${remotePort}`,
+      remoteApiKey: 'test-key',
+    });
+    const server = createTestServer({ config, store });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'screen-off' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data.deviceMute).toMatchObject({
+      action: 'mute',
+      muted: true,
+      changed: false,
+      endpoint: '/api/status',
+    });
+    expect(requests).toEqual([
+      { method: 'GET', url: '/api/status', body: undefined, apiKey: 'test-key' },
+      { method: 'POST', url: '/api/screen/off', body: undefined, apiKey: 'test-key' },
     ]);
 
     await server.close();

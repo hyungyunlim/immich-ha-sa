@@ -883,8 +883,8 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       });
     }
     try {
-      const brightnessRestore = parsed.data.command === 'screen-off'
-        ? await captureRemoteBrightnessForRestore(store, device)
+      const screenOffPreparation = parsed.data.command === 'screen-off'
+        ? await prepareRemoteScreenOff(store, device)
         : undefined;
       const result = await sendRemoteCommand(device, parsed.data.command);
       if (parsed.data.command === 'screen-on') {
@@ -893,7 +893,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           brightnessRestore: await restoreRemoteBrightnessAfterScreenOn(store, deviceId),
         });
       }
-      return ok(brightnessRestore ? { ...result, brightnessRestore } : result);
+      return ok(screenOffPreparation ? { ...result, ...screenOffPreparation } : result);
     } catch (error) {
       const remoteError = error instanceof RemoteCommandError
         ? error
@@ -1508,39 +1508,46 @@ interface RemoteBrightnessRestoreResult {
   reason?: string;
 }
 
-async function captureRemoteBrightnessForRestore(
+interface RemoteDeviceMuteResult {
+  action: 'mute';
+  muted: boolean;
+  changed: boolean;
+  endpoint?: string;
+  baseUrl?: string;
+  source?: 'manual' | 'auto';
+  statusCode?: number;
+  reason?: string;
+}
+
+interface RemoteScreenOffPreparationResult {
+  brightnessRestore: RemoteBrightnessCaptureResult;
+  deviceMute: RemoteDeviceMuteResult;
+}
+
+async function prepareRemoteScreenOff(
   store: JsonStore,
   device: FrameDevice,
-): Promise<RemoteBrightnessCaptureResult> {
+): Promise<RemoteScreenOffPreparationResult> {
   try {
     const remote = await sendRemoteRequest(device, '/api/status', { method: 'GET' });
-    const value = remoteBrightnessValue(remote.result);
-    if (value === undefined) {
-      return {
-        action: 'capture',
-        captured: false,
-        endpoint: remote.endpoint,
-        baseUrl: remote.baseUrl,
-        source: remote.source,
-        statusCode: remote.statusCode,
-        reason: 'brightness-unavailable',
-      };
-    }
-    store.updateDevice(device.id, { remoteBrightnessRestoreValue: value });
     return {
-      action: 'capture',
-      captured: true,
-      value,
-      endpoint: remote.endpoint,
-      baseUrl: remote.baseUrl,
-      source: remote.source,
-      statusCode: remote.statusCode,
+      brightnessRestore: captureRemoteBrightnessFromStatus(store, device, remote),
+      deviceMute: await ensureRemoteDeviceMutedFromStatus(device, remote),
     };
   } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
     return {
-      action: 'capture',
-      captured: false,
-      reason: error instanceof Error ? error.message : String(error),
+      brightnessRestore: {
+        action: 'capture',
+        captured: false,
+        reason,
+      },
+      deviceMute: {
+        action: 'mute',
+        muted: false,
+        changed: false,
+        reason,
+      },
     };
   }
 }
@@ -1581,6 +1588,85 @@ async function restoreRemoteBrightnessAfterScreenOn(
   }
 }
 
+function captureRemoteBrightnessFromStatus(
+  store: JsonStore,
+  device: FrameDevice,
+  remote: RemoteRequestResult,
+): RemoteBrightnessCaptureResult {
+  const value = remoteBrightnessValue(remote.result);
+  if (value === undefined) {
+    return {
+      action: 'capture',
+      captured: false,
+      endpoint: remote.endpoint,
+      baseUrl: remote.baseUrl,
+      source: remote.source,
+      statusCode: remote.statusCode,
+      reason: 'brightness-unavailable',
+    };
+  }
+  store.updateDevice(device.id, { remoteBrightnessRestoreValue: value });
+  return {
+    action: 'capture',
+    captured: true,
+    value,
+    endpoint: remote.endpoint,
+    baseUrl: remote.baseUrl,
+    source: remote.source,
+    statusCode: remote.statusCode,
+  };
+}
+
+async function ensureRemoteDeviceMutedFromStatus(
+  device: FrameDevice,
+  remote: RemoteRequestResult,
+): Promise<RemoteDeviceMuteResult> {
+  const muted = remoteDeviceMutedValue(remote.result);
+  if (muted === true) {
+    return {
+      action: 'mute',
+      muted: true,
+      changed: false,
+      endpoint: remote.endpoint,
+      baseUrl: remote.baseUrl,
+      source: remote.source,
+      statusCode: remote.statusCode,
+    };
+  }
+  if (muted === undefined) {
+    return {
+      action: 'mute',
+      muted: false,
+      changed: false,
+      endpoint: remote.endpoint,
+      baseUrl: remote.baseUrl,
+      source: remote.source,
+      statusCode: remote.statusCode,
+      reason: 'mute-state-unavailable',
+    };
+  }
+
+  try {
+    const result = await sendRemoteCommand(device, 'device-mute-toggle');
+    return {
+      action: 'mute',
+      muted: true,
+      changed: true,
+      endpoint: result.endpoint,
+      baseUrl: result.baseUrl,
+      source: result.source,
+      statusCode: result.statusCode,
+    };
+  } catch (error) {
+    return {
+      action: 'mute',
+      muted: false,
+      changed: false,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 function remoteBrightnessValue(status: unknown): number | undefined {
   if (!isRecord(status) || !isRecord(status.screen)) return undefined;
   const value = status.screen.brightness;
@@ -1588,6 +1674,15 @@ function remoteBrightnessValue(status: unknown): number | undefined {
   const rounded = Math.round(value);
   if (rounded < 0 || rounded > 100) return undefined;
   return rounded;
+}
+
+function remoteDeviceMutedValue(status: unknown): boolean | undefined {
+  if (!isRecord(status) || !isRecord(status.audio)) return undefined;
+  const muted = status.audio.muted;
+  if (typeof muted === 'boolean') return muted;
+  const volume = status.audio.volume;
+  if (typeof volume !== 'number' || !Number.isFinite(volume)) return undefined;
+  return volume <= 0;
 }
 
 async function delay(ms: number): Promise<void> {
