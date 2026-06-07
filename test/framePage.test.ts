@@ -20,5 +20,9 @@ describe('frame page', () => {
     expect(html).toContain('kioskVideoMuted');
     expect(html).toContain('applyVideoMutedState(desiredVideoMuted)');
     expect(html).toContain("if (command === 'mute-toggle')");
+    expect(html).toContain("if (command === 'mute-on')");
+    expect(html).toContain("if (command === 'mute-off')");
+    expect(html).toContain('setVideoMutedDirectly(true)');
+    expect(html).toContain('setVideoMutedDirectly(false)');
   });
 });

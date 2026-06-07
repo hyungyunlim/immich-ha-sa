@@ -303,8 +303,7 @@ class ImmichFrameKioskVideoMuteSwitch(ImmichFrameSleepSwitch):
         )
 
     async def _set_enabled(self, enabled: bool) -> None:
-        if self.is_on is not enabled:
-            await self.coordinator.client.send_command("mute-toggle")
+        await self.coordinator.client.send_command("mute-on" if enabled else "mute-off")
         await self.coordinator.client.update_frame_state({"kioskVideoMuted": enabled})
         await self.coordinator.async_request_refresh()
 

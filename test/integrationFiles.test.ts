@@ -44,7 +44,7 @@ describe('Home Assistant integration files', () => {
     expect(switchSource).toContain('"kiosk_video_mute"');
     expect(switchSource).toContain('"Kiosk Video Mute"');
     expect(switchSource).toContain('"kioskVideoMuted"');
-    expect(switchSource).toContain('send_command("mute-toggle")');
+    expect(switchSource).toContain('"mute-on" if enabled else "mute-off"');
     expect(switchSource).not.toContain('EntityCategory.DIAGNOSTIC');
     expect(initSource).toContain('"kioskVideoMuted"');
   });
@@ -76,6 +76,7 @@ describe('Home Assistant integration files', () => {
     expect(mediaPlayerSource).toContain('async_media_play_pause');
     expect(mediaPlayerSource).toContain('async_mute_volume');
     expect(mediaPlayerSource).toContain('async_set_volume_level');
+    expect(mediaPlayerSource).toContain('"mute-on" if mute else "mute-off"');
     expect(mediaPlayerSource).toContain('update_frame_state({"kioskVideoMuted": mute})');
     expect(mediaPlayerSource).toContain('send_command("device-mute-toggle")');
     expect(switchSource).toContain('"remote_screen"');
