@@ -36,6 +36,7 @@ export interface FrameDevice {
   lastSeenIp?: string;
   lastSeenAt?: string;
   remoteApiKey?: string;
+  remoteBrightnessRestoreValue?: number;
 }
 
 export interface FrameState {

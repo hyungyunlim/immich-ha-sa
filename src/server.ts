@@ -19,6 +19,7 @@ import type { AlbumCache, FrameClaim, FrameCommand, FrameDevice, FrameState, Per
 
 const REMOTE_DISCOVERY_RETRY_MS = 30_000;
 const REMOTE_DISCOVERY_TIMEOUT_MS = 1_500;
+const REMOTE_BRIGHTNESS_RESTORE_DELAY_MS = 500;
 
 const FrameStatePatchSchema = z.object({
   activeAlbumIds: z.array(z.string().min(1)).optional(),
@@ -861,8 +862,17 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       });
     }
     try {
+      const brightnessRestore = parsed.data.command === 'screen-off'
+        ? await captureRemoteBrightnessForRestore(store, device)
+        : undefined;
       const result = await sendRemoteCommand(device, parsed.data.command);
-      return ok(result);
+      if (parsed.data.command === 'screen-on') {
+        return ok({
+          ...result,
+          brightnessRestore: await restoreRemoteBrightnessAfterScreenOn(store, deviceId),
+        });
+      }
+      return ok(brightnessRestore ? { ...result, brightnessRestore } : result);
     } catch (error) {
       const remoteError = error instanceof RemoteCommandError
         ? error
@@ -903,7 +913,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       return;
     }
     try {
-      return ok(await setRemoteLevel(device, 'brightness', parsed.data.value));
+      const result = await setRemoteLevel(device, 'brightness', parsed.data.value);
+      store.updateDevice(deviceId, { remoteBrightnessRestoreValue: parsed.data.value });
+      return ok({ ...result, brightnessRestoreValue: parsed.data.value });
     } catch (error) {
       const remoteError = error instanceof RemoteCommandError
         ? error
@@ -1451,6 +1463,116 @@ async function sendRemoteCommand(
     statusCode: remote.statusCode,
     result: remote.result,
   };
+}
+
+interface RemoteBrightnessCaptureResult {
+  action: 'capture';
+  captured: boolean;
+  value?: number;
+  endpoint?: string;
+  baseUrl?: string;
+  source?: 'manual' | 'auto';
+  statusCode?: number;
+  reason?: string;
+}
+
+interface RemoteBrightnessRestoreResult {
+  action: 'restore';
+  restored: boolean;
+  value?: number;
+  endpoint?: string;
+  baseUrl?: string;
+  source?: 'manual' | 'auto';
+  statusCode?: number;
+  reason?: string;
+}
+
+async function captureRemoteBrightnessForRestore(
+  store: JsonStore,
+  device: FrameDevice,
+): Promise<RemoteBrightnessCaptureResult> {
+  try {
+    const remote = await sendRemoteRequest(device, '/api/status', { method: 'GET' });
+    const value = remoteBrightnessValue(remote.result);
+    if (value === undefined) {
+      return {
+        action: 'capture',
+        captured: false,
+        endpoint: remote.endpoint,
+        baseUrl: remote.baseUrl,
+        source: remote.source,
+        statusCode: remote.statusCode,
+        reason: 'brightness-unavailable',
+      };
+    }
+    store.updateDevice(device.id, { remoteBrightnessRestoreValue: value });
+    return {
+      action: 'capture',
+      captured: true,
+      value,
+      endpoint: remote.endpoint,
+      baseUrl: remote.baseUrl,
+      source: remote.source,
+      statusCode: remote.statusCode,
+    };
+  } catch (error) {
+    return {
+      action: 'capture',
+      captured: false,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function restoreRemoteBrightnessAfterScreenOn(
+  store: JsonStore,
+  deviceId: string,
+): Promise<RemoteBrightnessRestoreResult> {
+  const device = store.getDevice(deviceId);
+  const value = device?.remoteBrightnessRestoreValue;
+  if (!device || typeof value !== 'number' || !Number.isInteger(value)) {
+    return {
+      action: 'restore',
+      restored: false,
+      reason: 'brightness-unavailable',
+    };
+  }
+
+  await delay(REMOTE_BRIGHTNESS_RESTORE_DELAY_MS);
+  try {
+    const remote = await setRemoteLevel(device, 'brightness', value);
+    return {
+      action: 'restore',
+      restored: true,
+      value,
+      endpoint: remote.endpoint,
+      baseUrl: remote.baseUrl,
+      source: remote.source,
+      statusCode: remote.statusCode,
+    };
+  } catch (error) {
+    return {
+      action: 'restore',
+      restored: false,
+      value,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function remoteBrightnessValue(status: unknown): number | undefined {
+  if (!isRecord(status) || !isRecord(status.screen)) return undefined;
+  const value = status.screen.brightness;
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const rounded = Math.round(value);
+  if (rounded < 0 || rounded > 100) return undefined;
+  return rounded;
+}
+
+async function delay(ms: number): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function freeKioskJavaScriptCommand(command: FrameCommand): string | null {

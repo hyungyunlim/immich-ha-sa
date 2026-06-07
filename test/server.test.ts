@@ -1010,6 +1010,8 @@ describe('controller API', () => {
     });
     expect(brightness.statusCode).toBe(200);
     expect(brightness.json().data.endpoint).toBe('/api/brightness');
+    expect(brightness.json().data.brightnessRestoreValue).toBe(61);
+    expect(store.getDevice('lenovo')?.remoteBrightnessRestoreValue).toBe(61);
 
     const volume = await server.inject({
       method: 'PUT',
@@ -1024,6 +1026,96 @@ describe('controller API', () => {
       { method: 'GET', url: '/', body: undefined, apiKey: 'test-key' },
       { method: 'POST', url: '/api/brightness', body: { value: 61 }, apiKey: 'test-key' },
       { method: 'POST', url: '/api/volume', body: { value: 33 }, apiKey: 'test-key' },
+    ]);
+
+    await server.close();
+    await new Promise<void>((resolve) => remote.close(() => resolve()));
+  });
+
+  it('captures and restores FreeKiosk brightness across screen power cycles', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const requests: Array<{ method?: string; url?: string; body?: unknown; apiKey?: string | string[] }> = [];
+    const remote = createHttpServer((request, response) => {
+      let raw = '';
+      request.on('data', (chunk) => {
+        raw += String(chunk);
+      });
+      request.on('end', () => {
+        requests.push({
+          method: request.method,
+          url: request.url,
+          body: raw ? JSON.parse(raw) as unknown : undefined,
+          apiKey: request.headers['x-api-key'],
+        });
+        response.setHeader('content-type', 'application/json');
+
+        if (request.url === '/api/status') {
+          response.end(JSON.stringify({
+            success: true,
+            data: {
+              screen: { on: true, brightness: 37 },
+            },
+          }));
+          return;
+        }
+
+        if (request.url === '/api/screen/off' || request.url === '/api/screen/on' || request.url === '/api/brightness') {
+          response.end(JSON.stringify({ success: true, data: { executed: true } }));
+          return;
+        }
+
+        response.statusCode = 404;
+        response.end(JSON.stringify({ success: false, error: 'Endpoint not found' }));
+      });
+    });
+    await new Promise<void>((resolve) => remote.listen(0, '127.0.0.1', resolve));
+
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    const remotePort = (remote.address() as AddressInfo).port;
+    store.updateDevice('lenovo', {
+      remoteControlType: 'freekiosk',
+      remoteApiUrl: `http://127.0.0.1:${remotePort}`,
+      remoteApiKey: 'test-key',
+    });
+    const server = createTestServer({ config, store });
+
+    const off = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'screen-off' },
+    });
+
+    expect(off.statusCode).toBe(200);
+    expect(off.json().data.endpoint).toBe('/api/screen/off');
+    expect(off.json().data.brightnessRestore).toMatchObject({
+      action: 'capture',
+      captured: true,
+      value: 37,
+    });
+    expect(store.getDevice('lenovo')?.remoteBrightnessRestoreValue).toBe(37);
+
+    const on = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'screen-on' },
+    });
+
+    expect(on.statusCode).toBe(200);
+    expect(on.json().data.endpoint).toBe('/api/screen/on');
+    expect(on.json().data.brightnessRestore).toMatchObject({
+      action: 'restore',
+      restored: true,
+      value: 37,
+      endpoint: '/api/brightness',
+    });
+
+    expect(requests).toEqual([
+      { method: 'GET', url: '/api/status', body: undefined, apiKey: 'test-key' },
+      { method: 'POST', url: '/api/screen/off', body: undefined, apiKey: 'test-key' },
+      { method: 'POST', url: '/api/screen/on', body: undefined, apiKey: 'test-key' },
+      { method: 'POST', url: '/api/brightness', body: { value: 37 }, apiKey: 'test-key' },
     ]);
 
     await server.close();
