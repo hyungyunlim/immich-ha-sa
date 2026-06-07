@@ -1580,6 +1580,7 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     command !== 'next'
     && command !== 'previous'
     && command !== 'play-pause'
+    && command !== 'mute-toggle'
   ) {
     return null;
   }
@@ -1628,6 +1629,7 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     var selector = null;
     if (command === 'next') selector = '.navigation--next-asset, [aria-label="Next"], [title="Next"]';
     if (command === 'previous') selector = '.navigation--prev-asset, [aria-label="Previous"], [title="Previous"]';
+    if (command === 'mute-toggle') selector = '.navigation--mute, [aria-label="Mute"], [aria-label="Unmute"], [title="Mute"], [title="Unmute"], .mute, .unmute';
     if (!selector) return false;
     var control = doc.querySelector(selector);
     if (!control || typeof control.click !== 'function') return false;
@@ -1638,7 +1640,8 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     var map = {
       next: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
       previous: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
-      'play-pause': { key: ' ', code: 'Space', keyCode: 32 }
+      'play-pause': { key: ' ', code: 'Space', keyCode: 32 },
+      'mute-toggle': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 }
     };
     var target = map[command];
     if (!target) return false;
@@ -1877,7 +1880,7 @@ function freeKioskEndpoint(command: FrameCommand): string {
     case 'reload':
       return '/api/reload';
     case 'mute-toggle':
-      return '/api/remote/keyboard/up';
+      return '/api/remote/up';
     case 'screen-on':
       return '/api/screen/on';
     case 'screen-off':
@@ -1889,7 +1892,7 @@ function freeKioskEndpoint(command: FrameCommand): string {
     case 'device-mute-toggle':
       return '/api/remote/keyboard/mute';
     case 'dpad-up':
-      return '/api/remote/keyboard/up';
+      return '/api/remote/up';
   }
 }
 
@@ -1897,7 +1900,8 @@ function commandUsesFrameEvents(command: FrameCommand): boolean {
   return command === 'next'
     || command === 'previous'
     || command === 'play-pause'
-    || command === 'reload';
+    || command === 'reload'
+    || command === 'mute-toggle';
 }
 
 function remoteFallbackAvailable(device: FrameDevice, command: FrameCommand): boolean {
