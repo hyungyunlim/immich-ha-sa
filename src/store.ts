@@ -225,6 +225,28 @@ export class JsonStore {
     return structuredClone(profile);
   }
 
+  deleteProfile(profileId: string): { deleted: boolean; clearedDeviceIds: string[] } {
+    if (!this.data.profiles[profileId]) return { deleted: false, clearedDeviceIds: [] };
+
+    delete this.data.profiles[profileId];
+
+    const now = new Date().toISOString();
+    const clearedDeviceIds: string[] = [];
+    for (const [deviceId, state] of Object.entries(this.data.frames)) {
+      if (state.activeProfileId !== profileId) continue;
+      this.data.frames[deviceId] = {
+        ...state,
+        activeProfileId: undefined,
+        version: state.version + 1,
+        updatedAt: now,
+      };
+      clearedDeviceIds.push(deviceId);
+    }
+
+    this.save();
+    return { deleted: true, clearedDeviceIds };
+  }
+
   private ensureDevice(deviceId: string): FrameDevice {
     if (!this.data.devices[deviceId]) {
       this.data.devices[deviceId] = {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from aiohttp import ClientSession
 
@@ -69,6 +70,21 @@ class ImmichFrameClient:
             "POST",
             f"/api/frames/{self.device_id}/apply-profile",
             json={"profileId": profile_id},
+            auth=True,
+        )
+
+    async def upsert_profile(self, profile_id: str, profile: dict[str, Any]) -> dict[str, Any]:
+        return await self._request(
+            "PUT",
+            f"/api/profiles/{quote(profile_id, safe='')}",
+            json=profile,
+            auth=True,
+        )
+
+    async def delete_profile(self, profile_id: str) -> dict[str, Any]:
+        return await self._request(
+            "DELETE",
+            f"/api/profiles/{quote(profile_id, safe='')}",
             auth=True,
         )
 

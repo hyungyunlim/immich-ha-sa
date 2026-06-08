@@ -21,6 +21,8 @@ from .const import (
     DOMAIN,
     SERVICE_REFRESH_ALBUMS,
     SERVICE_REFRESH_PEOPLE,
+    SERVICE_DELETE_PROFILE,
+    SERVICE_SAVE_PROFILE,
     SERVICE_SET_ALBUM,
     SERVICE_SET_PEOPLE,
     SERVICE_SET_NETWORK_MODE,
@@ -28,6 +30,13 @@ from .const import (
     SERVICE_SET_RENDERER_OPTIONS,
 )
 from .coordinator import ImmichFrameCoordinator
+from .profile_helpers import (
+    existing_profile_for_id,
+    profile_from_frame_state,
+    profile_id_for_delete,
+    profile_id_for_save,
+    profile_name_for_save,
+)
 
 PLATFORMS = [
     Platform.BINARY_SENSOR,
@@ -157,6 +166,34 @@ def _register_services(hass: HomeAssistant) -> None:
         await client.apply_profile(call.data["profile_id"])
         await coordinator.async_request_refresh()
 
+    async def save_profile(call: ServiceCall) -> None:
+        client, coordinator = _runtime_for_call(hass, call)
+        state = await client.frame_state()
+        profiles = await client.profiles()
+        requested_name = call.data.get("name")
+        requested_profile_id = call.data.get("profile_id")
+        name = profile_name_for_save(profiles, state, requested_name, requested_profile_id)
+        profile_id = profile_id_for_save(name, requested_profile_id, state, requested_name)
+        if not call.data.get("overwrite", True) and existing_profile_for_id(profiles, profile_id):
+            raise HomeAssistantError(f"Profile already exists: {profile_id}")
+        profile = profile_from_frame_state(state, profile_id, name)
+        await client.upsert_profile(profile_id, profile)
+        await client.update_frame_state({"activeProfileId": profile_id})
+        coordinator.profile_name_draft = name
+        coordinator.profile_id_draft = profile_id
+        await coordinator.async_request_refresh()
+
+    async def delete_profile(call: ServiceCall) -> None:
+        client, coordinator = _runtime_for_call(hass, call)
+        state = await client.frame_state()
+        profile_id = profile_id_for_delete(call.data.get("profile_id"), state)
+        if profile_id == "default":
+            raise HomeAssistantError("The default profile cannot be deleted")
+        await client.delete_profile(profile_id)
+        if coordinator.profile_id_draft == profile_id:
+            coordinator.profile_id_draft = ""
+        await coordinator.async_request_refresh()
+
     async def refresh_albums(call: ServiceCall) -> None:
         client, coordinator = _runtime_for_call(hass, call)
         await client.refresh_albums()
@@ -201,6 +238,30 @@ def _register_services(hass: HomeAssistant) -> None:
         SERVICE_SET_PROFILE,
         set_profile,
         schema=vol.Schema({vol.Optional(CONF_DEVICE_ID): cv.string, "profile_id": cv.string}),
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SAVE_PROFILE,
+        save_profile,
+        schema=vol.Schema(
+            {
+                vol.Optional(CONF_DEVICE_ID): cv.string,
+                vol.Optional("profile_id"): cv.string,
+                vol.Optional("name"): cv.string,
+                vol.Optional("overwrite", default=True): cv.boolean,
+            }
+        ),
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_DELETE_PROFILE,
+        delete_profile,
+        schema=vol.Schema(
+            {
+                vol.Optional(CONF_DEVICE_ID): cv.string,
+                vol.Optional("profile_id"): cv.string,
+            }
+        ),
     )
     hass.services.async_register(
         DOMAIN,

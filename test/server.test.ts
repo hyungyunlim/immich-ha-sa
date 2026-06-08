@@ -78,6 +78,82 @@ describe('controller API', () => {
     await server.close();
   });
 
+  it('deletes profiles and clears active frame references', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createTestServer({ config });
+    const profile = {
+      name: 'Evening',
+      albumIds: [],
+      durationSeconds: 45,
+      imageFit: 'cover',
+      showTime: true,
+      showWeather: false,
+      albumOrder: 'random',
+      preferredNetworkMode: 'auto',
+    };
+
+    const saved = await server.inject({
+      method: 'PUT',
+      url: '/api/profiles/evening',
+      payload: profile,
+    });
+    expect(saved.statusCode).toBe(200);
+
+    const applied = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/apply-profile',
+      payload: { profileId: 'evening' },
+    });
+    expect(applied.statusCode).toBe(200);
+    expect(applied.json().data.activeProfileId).toBe('evening');
+
+    const deleted = await server.inject({
+      method: 'DELETE',
+      url: '/api/profiles/evening',
+    });
+    expect(deleted.statusCode).toBe(200);
+    expect(deleted.json().data).toMatchObject({
+      deleted: true,
+      profileId: 'evening',
+      clearedDeviceIds: ['lenovo'],
+    });
+
+    const profiles = await server.inject({
+      method: 'GET',
+      url: '/api/profiles',
+    });
+    expect(profiles.statusCode).toBe(200);
+    expect(profiles.json().data.items).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'evening' }),
+    ]));
+
+    const state = await server.inject({
+      method: 'GET',
+      url: '/api/frame/lenovo/state',
+    });
+    expect(state.statusCode).toBe(200);
+    expect(state.json().data.activeProfileId).toBeUndefined();
+    await server.close();
+  });
+
+  it('rejects deleting the default profile', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createTestServer({ config });
+
+    const response = await server.inject({
+      method: 'DELETE',
+      url: '/api/profiles/default',
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('DEFAULT_PROFILE');
+    await server.close();
+  });
+
   it('rejects unknown album ids when cache is populated', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);

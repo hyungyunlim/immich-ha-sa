@@ -1095,6 +1095,31 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return ok(store.upsertProfile(parsed.data));
   });
 
+  app.delete('/api/profiles/:profileId', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const { profileId } = request.params as { profileId: string };
+    if (profileId === 'default') {
+      reply.status(400).send(fail('DEFAULT_PROFILE', 'The default profile cannot be deleted.'));
+      return;
+    }
+    if (!store.getProfile(profileId)) {
+      reply.status(404).send(fail('PROFILE_NOT_FOUND', `Profile not found: ${profileId}`));
+      return;
+    }
+
+    const result = store.deleteProfile(profileId);
+    for (const deviceId of result.clearedDeviceIds) {
+      const state = store.getFrameState(deviceId);
+      if (state) events.emitState(deviceId, state);
+    }
+
+    return ok({
+      deleted: result.deleted,
+      profileId,
+      clearedDeviceIds: result.clearedDeviceIds,
+    });
+  });
+
   app.post('/api/frames/:deviceId/apply-profile', async (request, reply) => {
     if (!auth.requireMutationAuth(request, reply)) return;
     const { deviceId } = request.params as { deviceId: string };

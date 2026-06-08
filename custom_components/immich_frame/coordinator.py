@@ -22,6 +22,8 @@ class ImmichFrameCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             update_interval=timedelta(seconds=30),
         )
         self.client = client
+        self.profile_name_draft = ""
+        self.profile_id_draft = ""
 
     async def _async_update_data(self) -> dict[str, Any]:
         state = await self.client.frame_state()

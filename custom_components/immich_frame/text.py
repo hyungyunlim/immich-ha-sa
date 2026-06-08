@@ -24,6 +24,8 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ImmichFrameStateText(coordinator, "image_date_format", "Image Date Format", "imageDateFormat", 64),
             ImmichFrameStateText(coordinator, "sleep_start", "Sleep Start", "sleepStart", 4),
             ImmichFrameStateText(coordinator, "sleep_end", "Sleep End", "sleepEnd", 4),
+            ImmichFrameProfileDraftText(coordinator, "profile_name", "Profile Name", "profile_name_draft", 80),
+            ImmichFrameProfileDraftText(coordinator, "profile_id", "Profile ID", "profile_id_draft", 128),
         ]
     )
 
@@ -210,3 +212,29 @@ class ImmichFrameStateText(CoordinatorEntity[ImmichFrameCoordinator], TextEntity
     async def async_set_value(self, value: str) -> None:
         await self.coordinator.client.update_frame_state({self._patch_key: value.strip()})
         await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameProfileDraftText(CoordinatorEntity[ImmichFrameCoordinator], TextEntity):
+    def __init__(
+        self,
+        coordinator: ImmichFrameCoordinator,
+        key: str,
+        label: str,
+        draft_attr: str,
+        native_max: int,
+    ) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._draft_attr = draft_attr
+        self._attr_name = f"{frame_label(device_id)} Frame {label}"
+        self._attr_unique_id = frame_unique_id(device_id, key)
+        self._attr_device_info = frame_device_info(device_id)
+        self._attr_native_max = native_max
+
+    @property
+    def native_value(self) -> str | None:
+        return str(getattr(self.coordinator, self._draft_attr, ""))
+
+    async def async_set_value(self, value: str) -> None:
+        setattr(self.coordinator, self._draft_attr, value.strip())
+        self.async_write_ha_state()

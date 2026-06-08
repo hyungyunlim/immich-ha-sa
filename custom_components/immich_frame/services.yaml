@@ -32,6 +32,37 @@ set_profile:
       selector:
         text:
 
+save_profile:
+  fields:
+    device_id:
+      required: false
+      selector:
+        text:
+    name:
+      required: false
+      selector:
+        text:
+    profile_id:
+      required: false
+      selector:
+        text:
+    overwrite:
+      required: false
+      default: true
+      selector:
+        boolean:
+
+delete_profile:
+  fields:
+    device_id:
+      required: false
+      selector:
+        text:
+    profile_id:
+      required: false
+      selector:
+        text:
+
 set_people:
   fields:
     device_id:

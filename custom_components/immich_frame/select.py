@@ -72,6 +72,13 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ),
             ImmichFrameStateSelect(
                 coordinator,
+                "album_order",
+                "Album Order",
+                "albumOrder",
+                ["random", "newest", "oldest"],
+            ),
+            ImmichFrameStateSelect(
+                coordinator,
                 "image_effect",
                 "Image Effect",
                 "imageEffect",

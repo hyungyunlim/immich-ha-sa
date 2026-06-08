@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.74
+
+- Add a Home Assistant Album Order select for immich-kiosk `album_order` values.
+- Add Home Assistant profile save and delete controls and services.
+
 ## 0.1.73
 
 - Hide the immich-kiosk text metadata icon for image descriptions while preserving date and location metadata icons.

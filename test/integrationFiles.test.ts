@@ -27,6 +27,15 @@ describe('Home Assistant integration files', () => {
     expect(source).toContain('["contain", "cover", "none"]');
   });
 
+  it('exposes album order as a Home Assistant select entity', () => {
+    const source = readFileSync(join(root, 'custom_components/immich_frame/select.py'), 'utf8');
+
+    expect(source).toContain('"album_order"');
+    expect(source).toContain('"Album Order"');
+    expect(source).toContain('"albumOrder"');
+    expect(source).toContain('["random", "newest", "oldest"]');
+  });
+
   it('does not expose the unreliable FreeKiosk D-pad up command button', () => {
     const source = readFileSync(join(root, 'custom_components/immich_frame/button.py'), 'utf8');
 
@@ -163,5 +172,31 @@ describe('Home Assistant integration files', () => {
     expect(buttonSource).toContain('"refresh_people"');
     expect(servicesSource).toContain('set_people:');
     expect(servicesSource).toContain('refresh_people:');
+  });
+
+  it('exposes profile save and delete controls', () => {
+    const apiSource = readFileSync(join(root, 'custom_components/immich_frame/api.py'), 'utf8');
+    const buttonSource = readFileSync(join(root, 'custom_components/immich_frame/button.py'), 'utf8');
+    const constSource = readFileSync(join(root, 'custom_components/immich_frame/const.py'), 'utf8');
+    const initSource = readFileSync(join(root, 'custom_components/immich_frame/__init__.py'), 'utf8');
+    const servicesSource = readFileSync(join(root, 'custom_components/immich_frame/services.yaml'), 'utf8');
+    const textSource = readFileSync(join(root, 'custom_components/immich_frame/text.py'), 'utf8');
+
+    expect(apiSource).toContain('upsert_profile');
+    expect(apiSource).toContain('delete_profile');
+    expect(apiSource).toContain("quote(profile_id, safe='')");
+    expect(buttonSource).toContain('Frame Save Profile');
+    expect(buttonSource).toContain('Frame Delete Profile');
+    expect(buttonSource).toContain('"save_profile"');
+    expect(buttonSource).toContain('"delete_profile"');
+    expect(constSource).toContain('SERVICE_SAVE_PROFILE = "save_profile"');
+    expect(constSource).toContain('SERVICE_DELETE_PROFILE = "delete_profile"');
+    expect(initSource).toContain('SERVICE_SAVE_PROFILE');
+    expect(initSource).toContain('SERVICE_DELETE_PROFILE');
+    expect(initSource).toContain('profile_from_frame_state');
+    expect(servicesSource).toContain('save_profile:');
+    expect(servicesSource).toContain('delete_profile:');
+    expect(textSource).toContain('"Profile Name"');
+    expect(textSource).toContain('"Profile ID"');
   });
 });
