@@ -38,6 +38,8 @@ The controller owns desired state and generates the browser-facing `immich-kiosk
 
 If your existing `immich-kiosk` instance uses `KIOSK_PASSWORD`, set the same value as `KIOSK_PASSWORD` for the controller. The controller appends the required `password` query parameter when it generates the iframe URL.
 
+For code-change, validation, and production rollout workflow, see [Development and Production Deployment Guide](docs/development-guide.md).
+
 ## Controller Setup
 
 1. Copy the env template:
