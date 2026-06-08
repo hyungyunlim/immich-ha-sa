@@ -2150,7 +2150,7 @@ function rewriteProxyText(value: string, proxyPrefix: string, contentType: strin
   }
   if (normalizedContentType.startsWith('text/css')) {
     const rewritten = value.replace(/url\((["']?)\/(?!\/|kiosk-proxy\/)/g, `url($1${normalizedPrefix}/`);
-    return rewritten.includes('.frame--background') ? `${rewritten}\n${KIOSK_WEBVIEW_COMPAT_CSS}` : rewritten;
+    return rewritten.includes('.frame--background') ? `${rewritten}\n${KIOSK_PROXY_COMPAT_CSS}` : rewritten;
   }
   const rewritten = value
     .replace(/\b(href|src|action|poster|manifest|hx-get|hx-post|hx-put|hx-patch|hx-delete)=("|')\/(?!\/|kiosk-proxy\/)/g, `$1=$2${normalizedPrefix}/`)
@@ -2177,7 +2177,7 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-const KIOSK_WEBVIEW_COMPAT_CSS = `
+const KIOSK_PROXY_COMPAT_CSS = `
 /* Immich Frame Controller: legacy Android WebView background-fill fix. */
 .frame {
   top: 0 !important;
@@ -2214,6 +2214,99 @@ const KIOSK_WEBVIEW_COMPAT_CSS = `
   object-fit: cover !important;
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
+}
+
+/* Immich Frame Controller: bottom slide-up image description treatment. */
+.asset-metadata-container {
+  box-sizing: border-box !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+}
+.asset--metadata {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+.asset--metadata--description {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 72rem !important;
+  max-height: 9rem !important;
+  align-items: flex-start !important;
+  gap: 0.75rem !important;
+  overflow: hidden !important;
+  padding: 0.85rem 1rem !important;
+  border-radius: 0.375rem !important;
+  background: rgba(0, 0, 0, 0.42) !important;
+}
+.asset--metadata--description .asset--metadata--icon {
+  flex: 0 0 0.9rem !important;
+  margin-top: 0.2rem !important;
+  opacity: 0.72 !important;
+}
+.asset--metadata--description > div:last-child {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  height: 7rem !important;
+  overflow: hidden !important;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 84%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 84%, transparent 100%);
+}
+.asset--metadata--description small {
+  display: block !important;
+  font-size: 1.25rem !important;
+  line-height: 1.45 !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+  animation: immich-frame-description-slide-up 34s linear infinite;
+  will-change: transform;
+}
+@keyframes immich-frame-description-slide-up {
+  0% {
+    transform: translateY(7rem);
+  }
+  12% {
+    transform: translateY(0);
+  }
+  72% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(-100%);
+  }
+}
+@media screen and (max-width: 31.25rem) {
+  .asset--metadata--description {
+    max-height: 7rem !important;
+    padding: 0.65rem 0.75rem !important;
+  }
+  .asset--metadata--description > div:last-child {
+    height: 5.5rem !important;
+  }
+  .asset--metadata--description small {
+    font-size: 1rem !important;
+  }
+  @keyframes immich-frame-description-slide-up {
+    0% {
+      transform: translateY(5.5rem);
+    }
+    12% {
+      transform: translateY(0);
+    }
+    72% {
+      transform: translateY(-100%);
+    }
+    100% {
+      transform: translateY(-100%);
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .asset--metadata--description small {
+    animation: none !important;
+    transform: none !important;
+  }
 }
 `;
 

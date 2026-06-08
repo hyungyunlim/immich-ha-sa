@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.68
+
+- Add a controller-side immich-kiosk description overlay treatment that widens image descriptions and scrolls long text upward inside the lower overlay.
+
 ## 0.1.51
 
 - Add mute and volume support to the Home Assistant Slideshow media player entity.

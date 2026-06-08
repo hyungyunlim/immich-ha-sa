@@ -1314,6 +1314,9 @@ describe('controller API', () => {
     expect(css.body).toContain('legacy Android WebView background-fill fix');
     expect(css.body).toContain('.frame--background img');
     expect(css.body).toContain('-webkit-transform: translateZ(0)');
+    expect(css.body).toContain('bottom slide-up image description treatment');
+    expect(css.body).toContain('.asset--metadata--description');
+    expect(css.body).toContain('immich-frame-description-slide-up');
 
     const javascript = await server.inject({
       method: 'GET',
