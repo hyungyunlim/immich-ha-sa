@@ -66,6 +66,7 @@ const state: FrameState = {
   imageDateFormat: 'YYYY-MM-DD',
   showImageDescription: false,
   imageDescriptionScrollDuration: 52,
+  imageDescriptionScrollSpeed: 2.5,
   imageDescriptionStartDelay: 3,
   imageDescriptionAreaHeight: 5.75,
   imageDescriptionOverlayOpacity: 10,
@@ -183,6 +184,7 @@ describe('renderer URL generation', () => {
       imageDateFormat: 'YYYY/MM/DD',
       showImageDescription: true,
       imageDescriptionScrollDuration: 64,
+      imageDescriptionScrollSpeed: 3.75,
       imageDescriptionStartDelay: 4.5,
       imageDescriptionAreaHeight: 6.5,
       imageDescriptionOverlayOpacity: 8,
@@ -235,6 +237,7 @@ describe('renderer URL generation', () => {
     expect(resolved.rendererUrl).toContain('image_date_format=YYYY%2FMM%2FDD');
     expect(resolved.rendererUrl).toContain('show_image_description=true');
     expect(resolved.rendererUrl).toContain('ifc_description_scroll_duration=64');
+    expect(resolved.rendererUrl).toContain('ifc_description_scroll_speed=3.75');
     expect(resolved.rendererUrl).toContain('ifc_description_start_delay=4.5');
     expect(resolved.rendererUrl).toContain('ifc_description_area_height=6.5');
     expect(resolved.rendererUrl).toContain('ifc_description_overlay_opacity=8');

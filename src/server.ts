@@ -73,6 +73,7 @@ const FrameStatePatchSchema = z.object({
   imageDateFormat: z.string().min(1).max(64).optional(),
   showImageDescription: z.boolean().optional(),
   imageDescriptionScrollDuration: z.number().min(10).max(240).optional(),
+  imageDescriptionScrollSpeed: z.number().min(0.5).max(20).optional(),
   imageDescriptionStartDelay: z.number().min(0).max(60).optional(),
   imageDescriptionAreaHeight: z.number().min(3).max(12).optional(),
   imageDescriptionOverlayOpacity: z.number().min(0).max(60).optional(),
@@ -144,6 +145,7 @@ const ProfileSchema = z.object({
   imageDateFormat: z.string().min(1).max(64).default('YYYY-MM-DD'),
   showImageDescription: z.boolean().default(false),
   imageDescriptionScrollDuration: z.number().min(10).max(240).default(52),
+  imageDescriptionScrollSpeed: z.number().min(0.5).max(20).default(2.5),
   imageDescriptionStartDelay: z.number().min(0).max(60).default(3),
   imageDescriptionAreaHeight: z.number().min(3).max(12).default(5.75),
   imageDescriptionOverlayOpacity: z.number().min(0).max(60).default(10),
@@ -479,6 +481,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           imageDateFormat: frameState?.imageDateFormat,
           showImageDescription: frameState?.showImageDescription,
           imageDescriptionScrollDuration: frameState?.imageDescriptionScrollDuration,
+          imageDescriptionScrollSpeed: frameState?.imageDescriptionScrollSpeed,
           imageDescriptionStartDelay: frameState?.imageDescriptionStartDelay,
           imageDescriptionAreaHeight: frameState?.imageDescriptionAreaHeight,
           imageDescriptionOverlayOpacity: frameState?.imageDescriptionOverlayOpacity,
@@ -1160,6 +1163,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       imageDateFormat: profile.imageDateFormat,
       showImageDescription: profile.showImageDescription,
       imageDescriptionScrollDuration: profile.imageDescriptionScrollDuration,
+      imageDescriptionScrollSpeed: profile.imageDescriptionScrollSpeed,
       imageDescriptionStartDelay: profile.imageDescriptionStartDelay,
       imageDescriptionAreaHeight: profile.imageDescriptionAreaHeight,
       imageDescriptionOverlayOpacity: profile.imageDescriptionOverlayOpacity,
@@ -2240,6 +2244,7 @@ const KIOSK_PROXY_COMPAT_CSS = `
 /* Immich Frame Controller: bottom slide-up image description treatment. */
 :root {
   --ifc-description-scroll-duration: 52s;
+  --ifc-description-scroll-speed: 2.5;
   --ifc-description-start-delay: 3s;
   --ifc-description-area-height: 5.75rem;
   --ifc-description-mobile-area-height: 5.25rem;
@@ -2301,7 +2306,10 @@ const KIOSK_PROXY_COMPAT_CSS = `
   transform: none !important;
 }
 .asset--metadata--description.immich-frame-description-is-long small {
-  animation: immich-frame-description-slide-up var(--ifc-description-scroll-duration, 52s) linear infinite;
+  animation-name: immich-frame-description-slide-up;
+  animation-duration: var(--ifc-description-scroll-duration, 52s);
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
   will-change: transform;
 }
 @keyframes immich-frame-description-slide-up {
@@ -2377,18 +2385,25 @@ const KIOSK_PROXY_COMPAT_JS = `
   var ANIMATION_STYLE_ID = 'immich-frame-description-animation-style';
   var DEFAULTS = {
     scrollDuration: 52,
+    scrollSpeed: 2.5,
     startDelay: 3,
     areaHeight: 5.75,
     overlayOpacity: 10,
     longThresholdLines: 3.25,
   };
   var settings = {
+    maxScrollDuration: DEFAULTS.scrollDuration,
+    scrollSpeed: DEFAULTS.scrollSpeed,
+    startDelay: DEFAULTS.startDelay,
+    bottomHoldDuration: 5,
+    resetDuration: 0.3,
     areaHeight: DEFAULTS.areaHeight,
     mobileAreaHeight: 5.25,
     topPadding: 0.38,
     mobileTopPadding: 0.32,
     longThresholdLines: DEFAULTS.longThresholdLines,
   };
+  var animationRules = {};
   var scheduled = false;
 
   function isFiniteNumber(value) {
@@ -2444,7 +2459,8 @@ const KIOSK_PROXY_COMPAT_JS = `
   }
 
   function applySettings() {
-    var duration = readNumber('ifc_description_scroll_duration', DEFAULTS.scrollDuration, 10, 240);
+    var maxDuration = readNumber('ifc_description_scroll_duration', DEFAULTS.scrollDuration, 10, 240);
+    var scrollSpeed = readNumber('ifc_description_scroll_speed', DEFAULTS.scrollSpeed, 0.5, 20);
     var startDelay = readNumber('ifc_description_start_delay', DEFAULTS.startDelay, 0, 60);
     var areaHeight = readNumber('ifc_description_area_height', DEFAULTS.areaHeight, 3, 12);
     var overlayOpacity = readNumber('ifc_description_overlay_opacity', DEFAULTS.overlayOpacity, 0, 60);
@@ -2457,31 +2473,68 @@ const KIOSK_PROXY_COMPAT_JS = `
     var mobileAreaHeight = Math.max(3, areaHeight - 0.5);
     var root = document.documentElement;
 
+    settings.maxScrollDuration = maxDuration;
+    settings.scrollSpeed = scrollSpeed;
+    settings.startDelay = startDelay;
     settings.areaHeight = areaHeight;
     settings.mobileAreaHeight = mobileAreaHeight;
     settings.topPadding = 0.38;
     settings.mobileTopPadding = 0.32;
     settings.longThresholdLines = longThresholdLines;
-    root.style.setProperty('--ifc-description-scroll-duration', rounded(duration) + 's');
+    root.style.setProperty('--ifc-description-scroll-duration', rounded(maxDuration) + 's');
+    root.style.setProperty('--ifc-description-scroll-speed', rounded(scrollSpeed));
     root.style.setProperty('--ifc-description-start-delay', rounded(startDelay) + 's');
     root.style.setProperty('--ifc-description-area-height', rounded(areaHeight) + 'rem');
     root.style.setProperty('--ifc-description-mobile-area-height', rounded(mobileAreaHeight) + 'rem');
     root.style.setProperty('--ifc-description-overlay-opacity', rounded(overlayOpacity / 100));
     root.style.setProperty('--ifc-description-top-padding', rounded(settings.topPadding) + 'rem');
     root.style.setProperty('--ifc-description-mobile-top-padding', rounded(settings.mobileTopPadding) + 'rem');
-    updateAnimationKeyframes(duration, startDelay);
   }
 
-  function updateAnimationKeyframes(duration, startDelay) {
-    var moveEndPercent = 84;
-    var bottomHoldEndPercent = 94;
-    var holdPercent = Math.min(moveEndPercent - 10, Math.max(0, (startDelay / duration) * 100));
-    var css = [
-      '@keyframes immich-frame-description-slide-up {',
+  function timingPercent(seconds, duration) {
+    return clamp((seconds / duration) * 100, 0, 100);
+  }
+
+  function animationTimingForDistance(scrollDistance) {
+    var travelDistance = Math.abs(scrollDistance);
+    var moveDuration = Math.max(1, travelDistance / settings.scrollSpeed);
+    var minimumDuration = settings.startDelay
+      + 1
+      + settings.bottomHoldDuration
+      + settings.resetDuration;
+    var desiredDuration = settings.startDelay
+      + moveDuration
+      + settings.bottomHoldDuration
+      + settings.resetDuration;
+    var duration = Math.max(minimumDuration, Math.min(settings.maxScrollDuration, desiredDuration));
+    var effectiveMoveDuration = Math.max(
+      1,
+      duration - settings.startDelay - settings.bottomHoldDuration - settings.resetDuration
+    );
+    return {
+      duration: duration,
+      holdPercent: timingPercent(settings.startDelay, duration),
+      moveEndPercent: timingPercent(settings.startDelay + effectiveMoveDuration, duration),
+      bottomHoldEndPercent: timingPercent(duration - settings.resetDuration, duration),
+    };
+  }
+
+  function keyframeNameForTiming(timing) {
+    return ('immich-frame-description-slide-up-' + [
+      rounded(timing.holdPercent),
+      rounded(timing.moveEndPercent),
+      rounded(timing.bottomHoldEndPercent),
+    ].join('-')).replace(/[^a-zA-Z0-9_-]/g, '_');
+  }
+
+  function ensureAnimationKeyframes(name, timing) {
+    if (animationRules[name]) return;
+    animationRules[name] = [
+      '@keyframes ' + name + ' {',
       '0% { transform: translateY(0); }',
-      rounded(holdPercent) + '% { transform: translateY(0); }',
-      moveEndPercent + '% { transform: translateY(var(--ifc-description-scroll-distance, 0px)); }',
-      bottomHoldEndPercent + '% { transform: translateY(var(--ifc-description-scroll-distance, 0px)); }',
+      rounded(timing.holdPercent) + '% { transform: translateY(0); }',
+      rounded(timing.moveEndPercent) + '% { transform: translateY(var(--ifc-description-scroll-distance, 0px)); }',
+      rounded(timing.bottomHoldEndPercent) + '% { transform: translateY(var(--ifc-description-scroll-distance, 0px)); }',
       '100% { transform: translateY(0); }',
       '}',
     ].join('\\n');
@@ -2491,8 +2544,15 @@ const KIOSK_PROXY_COMPAT_JS = `
       style.id = ANIMATION_STYLE_ID;
       document.head.appendChild(style);
     }
-    if (style.textContent !== css) {
-      style.textContent = css;
+    var css = [];
+    for (var key in animationRules) {
+      if (Object.prototype.hasOwnProperty.call(animationRules, key)) {
+        css.push(animationRules[key]);
+      }
+    }
+    var nextText = css.join('\\n');
+    if (style.textContent !== nextText) {
+      style.textContent = nextText;
     }
   }
 
@@ -2517,10 +2577,25 @@ const KIOSK_PROXY_COMPAT_JS = `
 
     if (isLong) {
       var scrollDistance = Math.min(0, visibleAreaHeight - naturalHeight - Math.max(4, lineHeight * 0.35));
+      var timing = animationTimingForDistance(scrollDistance);
+      var animationName = keyframeNameForTiming(timing);
+      ensureAnimationKeyframes(animationName, timing);
       description.style.setProperty('--ifc-description-scroll-distance', rounded(scrollDistance) + 'px');
+      description.style.setProperty('--ifc-description-scroll-duration', rounded(timing.duration) + 's');
+      description.style.setProperty('--ifc-description-scroll-speed', rounded(settings.scrollSpeed));
+      text.style.animationName = animationName;
+      text.style.webkitAnimationName = animationName;
+      text.style.animationDuration = rounded(timing.duration) + 's';
+      text.style.webkitAnimationDuration = rounded(timing.duration) + 's';
       description.classList.add(LONG_CLASS);
     } else {
       description.style.removeProperty('--ifc-description-scroll-distance');
+      description.style.removeProperty('--ifc-description-scroll-duration');
+      description.style.removeProperty('--ifc-description-scroll-speed');
+      text.style.removeProperty('animation-name');
+      text.style.removeProperty('-webkit-animation-name');
+      text.style.removeProperty('animation-duration');
+      text.style.removeProperty('-webkit-animation-duration');
       description.classList.remove(LONG_CLASS);
     }
   }

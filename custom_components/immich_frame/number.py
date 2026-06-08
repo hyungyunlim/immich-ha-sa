@@ -78,12 +78,22 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ImmichFrameNumber(
                 coordinator,
                 "image_description_scroll_duration",
-                "Image Description Scroll Duration",
+                "Image Description Max Scroll Duration",
                 "imageDescriptionScrollDuration",
                 10,
                 240,
                 1,
                 "s",
+            ),
+            ImmichFrameNumber(
+                coordinator,
+                "image_description_scroll_speed",
+                "Image Description Scroll Speed",
+                "imageDescriptionScrollSpeed",
+                0.5,
+                20,
+                0.25,
+                "px/s",
             ),
             ImmichFrameNumber(
                 coordinator,

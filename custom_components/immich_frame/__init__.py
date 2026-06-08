@@ -283,6 +283,7 @@ def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional("imageDateFormat"): cv.string,
                 vol.Optional("showImageDescription"): cv.boolean,
                 vol.Optional("imageDescriptionScrollDuration"): vol.All(vol.Coerce(float), vol.Range(min=10, max=240)),
+                vol.Optional("imageDescriptionScrollSpeed"): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=20)),
                 vol.Optional("imageDescriptionStartDelay"): vol.All(vol.Coerce(float), vol.Range(min=0, max=60)),
                 vol.Optional("imageDescriptionAreaHeight"): vol.All(vol.Coerce(float), vol.Range(min=3, max=12)),
                 vol.Optional("imageDescriptionOverlayOpacity"): vol.All(vol.Coerce(float), vol.Range(min=0, max=60)),

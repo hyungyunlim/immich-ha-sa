@@ -1332,6 +1332,7 @@ describe('controller API', () => {
     expect(javascript.body).toContain('startsWith("/kiosk-proxy/lenovo/asset/")');
     expect(javascript.body).toContain('image description overflow helper');
     expect(javascript.body).toContain('ifc_description_scroll_duration');
+    expect(javascript.body).toContain('ifc_description_scroll_speed');
     expect(javascript.body).toContain('ifc_description_start_delay');
     expect(javascript.body).toContain('immich-frame-description-animation-style');
     expect(javascript.body).toContain('immich-frame-description-is-long');

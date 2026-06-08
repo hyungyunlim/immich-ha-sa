@@ -92,6 +92,7 @@ export interface FrameState {
   imageDateFormat: string;
   showImageDescription: boolean;
   imageDescriptionScrollDuration: number;
+  imageDescriptionScrollSpeed: number;
   imageDescriptionStartDelay: number;
   imageDescriptionAreaHeight: number;
   imageDescriptionOverlayOpacity: number;
@@ -171,6 +172,7 @@ export interface FrameProfile {
   imageDateFormat: string;
   showImageDescription: boolean;
   imageDescriptionScrollDuration: number;
+  imageDescriptionScrollSpeed: number;
   imageDescriptionStartDelay: number;
   imageDescriptionAreaHeight: number;
   imageDescriptionOverlayOpacity: number;

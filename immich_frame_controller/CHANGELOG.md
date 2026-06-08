@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.72
+
+- Add a configurable image description scroll speed and calculate long-description animation duration from measured overflow distance.
+- Treat image description scroll duration as the maximum cycle duration for very long descriptions.
+
 ## 0.1.71
 
 - Add a configurable image description start delay and extra top padding for the slide-up description area.
