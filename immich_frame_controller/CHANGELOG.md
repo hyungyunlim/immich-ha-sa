@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.71
+
+- Add a configurable image description start delay and extra top padding for the slide-up description area.
+
 ## 0.1.70
 
 - Stabilize image description slide-up rendering by avoiding visible re-measure toggles, clipping long text before the helper runs, and scrolling only the overflow distance instead of moving the whole caption off-screen.

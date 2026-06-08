@@ -73,6 +73,7 @@ const FrameStatePatchSchema = z.object({
   imageDateFormat: z.string().min(1).max(64).optional(),
   showImageDescription: z.boolean().optional(),
   imageDescriptionScrollDuration: z.number().min(10).max(240).optional(),
+  imageDescriptionStartDelay: z.number().min(0).max(60).optional(),
   imageDescriptionAreaHeight: z.number().min(3).max(12).optional(),
   imageDescriptionOverlayOpacity: z.number().min(0).max(60).optional(),
   imageDescriptionLongThresholdLines: z.number().min(2).max(10).optional(),
@@ -143,6 +144,7 @@ const ProfileSchema = z.object({
   imageDateFormat: z.string().min(1).max(64).default('YYYY-MM-DD'),
   showImageDescription: z.boolean().default(false),
   imageDescriptionScrollDuration: z.number().min(10).max(240).default(52),
+  imageDescriptionStartDelay: z.number().min(0).max(60).default(3),
   imageDescriptionAreaHeight: z.number().min(3).max(12).default(5.75),
   imageDescriptionOverlayOpacity: z.number().min(0).max(60).default(10),
   imageDescriptionLongThresholdLines: z.number().min(2).max(10).default(3.25),
@@ -477,6 +479,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           imageDateFormat: frameState?.imageDateFormat,
           showImageDescription: frameState?.showImageDescription,
           imageDescriptionScrollDuration: frameState?.imageDescriptionScrollDuration,
+          imageDescriptionStartDelay: frameState?.imageDescriptionStartDelay,
           imageDescriptionAreaHeight: frameState?.imageDescriptionAreaHeight,
           imageDescriptionOverlayOpacity: frameState?.imageDescriptionOverlayOpacity,
           imageDescriptionLongThresholdLines: frameState?.imageDescriptionLongThresholdLines,
@@ -1157,6 +1160,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       imageDateFormat: profile.imageDateFormat,
       showImageDescription: profile.showImageDescription,
       imageDescriptionScrollDuration: profile.imageDescriptionScrollDuration,
+      imageDescriptionStartDelay: profile.imageDescriptionStartDelay,
       imageDescriptionAreaHeight: profile.imageDescriptionAreaHeight,
       imageDescriptionOverlayOpacity: profile.imageDescriptionOverlayOpacity,
       imageDescriptionLongThresholdLines: profile.imageDescriptionLongThresholdLines,
@@ -2236,9 +2240,12 @@ const KIOSK_PROXY_COMPAT_CSS = `
 /* Immich Frame Controller: bottom slide-up image description treatment. */
 :root {
   --ifc-description-scroll-duration: 52s;
+  --ifc-description-start-delay: 3s;
   --ifc-description-area-height: 5.75rem;
   --ifc-description-mobile-area-height: 5.25rem;
   --ifc-description-overlay-opacity: 0.1;
+  --ifc-description-top-padding: 0.38rem;
+  --ifc-description-mobile-top-padding: 0.32rem;
 }
 .asset-metadata-container {
   box-sizing: border-box !important;
@@ -2269,10 +2276,12 @@ const KIOSK_PROXY_COMPAT_CSS = `
   opacity: 0.68 !important;
 }
 .asset--metadata--description > div:last-child {
+  box-sizing: border-box !important;
   flex: 1 1 auto !important;
   min-width: 0 !important;
   max-height: var(--ifc-description-area-height, 5.75rem) !important;
   overflow: hidden !important;
+  padding-top: var(--ifc-description-top-padding, 0.38rem) !important;
 }
 .asset--metadata--description.immich-frame-description-is-long {
   max-height: calc(var(--ifc-description-area-height, 5.75rem) + 1.45rem) !important;
@@ -2299,13 +2308,13 @@ const KIOSK_PROXY_COMPAT_CSS = `
   0% {
     transform: translateY(0);
   }
-  16% {
+  6% {
     transform: translateY(0);
   }
-  82% {
+  84% {
     transform: translateY(var(--ifc-description-scroll-distance, 0px));
   }
-  92% {
+  94% {
     transform: translateY(var(--ifc-description-scroll-distance, 0px));
   }
   100% {
@@ -2327,6 +2336,7 @@ const KIOSK_PROXY_COMPAT_CSS = `
   }
   .asset--metadata--description > div:last-child {
     max-height: var(--ifc-description-mobile-area-height, 5.25rem) !important;
+    padding-top: var(--ifc-description-mobile-top-padding, 0.32rem) !important;
   }
   .asset--metadata--description small {
     font-size: 0.95rem !important;
@@ -2335,13 +2345,13 @@ const KIOSK_PROXY_COMPAT_CSS = `
     0% {
       transform: translateY(0);
     }
-    16% {
+    6% {
       transform: translateY(0);
     }
-    82% {
+    84% {
       transform: translateY(var(--ifc-description-scroll-distance, 0px));
     }
-    92% {
+    94% {
       transform: translateY(var(--ifc-description-scroll-distance, 0px));
     }
     100% {
@@ -2364,8 +2374,10 @@ const KIOSK_PROXY_COMPAT_JS = `
   window.__immichFrameDescriptionHelper = true;
 
   var LONG_CLASS = 'immich-frame-description-is-long';
+  var ANIMATION_STYLE_ID = 'immich-frame-description-animation-style';
   var DEFAULTS = {
     scrollDuration: 52,
+    startDelay: 3,
     areaHeight: 5.75,
     overlayOpacity: 10,
     longThresholdLines: 3.25,
@@ -2373,6 +2385,8 @@ const KIOSK_PROXY_COMPAT_JS = `
   var settings = {
     areaHeight: DEFAULTS.areaHeight,
     mobileAreaHeight: 5.25,
+    topPadding: 0.38,
+    mobileTopPadding: 0.32,
     longThresholdLines: DEFAULTS.longThresholdLines,
   };
   var scheduled = false;
@@ -2431,6 +2445,7 @@ const KIOSK_PROXY_COMPAT_JS = `
 
   function applySettings() {
     var duration = readNumber('ifc_description_scroll_duration', DEFAULTS.scrollDuration, 10, 240);
+    var startDelay = readNumber('ifc_description_start_delay', DEFAULTS.startDelay, 0, 60);
     var areaHeight = readNumber('ifc_description_area_height', DEFAULTS.areaHeight, 3, 12);
     var overlayOpacity = readNumber('ifc_description_overlay_opacity', DEFAULTS.overlayOpacity, 0, 60);
     var longThresholdLines = readNumber(
@@ -2444,11 +2459,41 @@ const KIOSK_PROXY_COMPAT_JS = `
 
     settings.areaHeight = areaHeight;
     settings.mobileAreaHeight = mobileAreaHeight;
+    settings.topPadding = 0.38;
+    settings.mobileTopPadding = 0.32;
     settings.longThresholdLines = longThresholdLines;
     root.style.setProperty('--ifc-description-scroll-duration', rounded(duration) + 's');
+    root.style.setProperty('--ifc-description-start-delay', rounded(startDelay) + 's');
     root.style.setProperty('--ifc-description-area-height', rounded(areaHeight) + 'rem');
     root.style.setProperty('--ifc-description-mobile-area-height', rounded(mobileAreaHeight) + 'rem');
     root.style.setProperty('--ifc-description-overlay-opacity', rounded(overlayOpacity / 100));
+    root.style.setProperty('--ifc-description-top-padding', rounded(settings.topPadding) + 'rem');
+    root.style.setProperty('--ifc-description-mobile-top-padding', rounded(settings.mobileTopPadding) + 'rem');
+    updateAnimationKeyframes(duration, startDelay);
+  }
+
+  function updateAnimationKeyframes(duration, startDelay) {
+    var moveEndPercent = 84;
+    var bottomHoldEndPercent = 94;
+    var holdPercent = Math.min(moveEndPercent - 10, Math.max(0, (startDelay / duration) * 100));
+    var css = [
+      '@keyframes immich-frame-description-slide-up {',
+      '0% { transform: translateY(0); }',
+      rounded(holdPercent) + '% { transform: translateY(0); }',
+      moveEndPercent + '% { transform: translateY(var(--ifc-description-scroll-distance, 0px)); }',
+      bottomHoldEndPercent + '% { transform: translateY(var(--ifc-description-scroll-distance, 0px)); }',
+      '100% { transform: translateY(0); }',
+      '}',
+    ].join('\\n');
+    var style = document.getElementById(ANIMATION_STYLE_ID);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = ANIMATION_STYLE_ID;
+      document.head.appendChild(style);
+    }
+    if (style.textContent !== css) {
+      style.textContent = css;
+    }
   }
 
   function updateDescription(description) {
@@ -2460,7 +2505,11 @@ const KIOSK_PROXY_COMPAT_JS = `
     var lineHeight = numericPx(style.lineHeight, fontSize * 1.45);
     var rootStyle = window.getComputedStyle(document.documentElement);
     var rootFontSize = numericPx(rootStyle.fontSize, 16);
-    var visibleAreaHeight = (viewportUsesMobileArea() ? settings.mobileAreaHeight : settings.areaHeight) * rootFontSize;
+    var usesMobileArea = viewportUsesMobileArea();
+    var visibleAreaHeight = (
+      (usesMobileArea ? settings.mobileAreaHeight : settings.areaHeight)
+      - (usesMobileArea ? settings.mobileTopPadding : settings.topPadding)
+    ) * rootFontSize;
     var naturalHeight = elementHeight(text);
     var exceedsLineThreshold = naturalHeight > lineHeight * settings.longThresholdLines;
     var exceedsAreaHeight = naturalHeight > visibleAreaHeight + 1;

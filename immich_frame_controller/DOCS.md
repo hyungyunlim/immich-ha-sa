@@ -121,7 +121,7 @@ The controller also exposes common immich-kiosk URL override settings for frame-
 - Motion: `transition`, `fadeTransitionDuration`, `crossFadeTransitionDuration`, `imageEffect`, `imageEffectAmount`.
 - Layout and display: `layout`, `imageFit`, `backgroundBlur`, `backgroundBlurAmount`, `fontSize`, `frameless`, `showArchived`.
 - Clock and weather: `showTime`, `timeFormat`, `showAmPm`, `showSeconds`, `showDate`, `dateFormat`, `clockSource`, `showWeather`, `weatherLocation`, `weatherRotationInterval`.
-- Image metadata: `showImageDate`, `showImageTime`, `showAlbumName`, `showPersonName`, `showPersonAge`, `showImageLocation`, `showImageCamera`, `showImageExif`, `showImageDescription`, `imageDescriptionScrollDuration`, `imageDescriptionAreaHeight`, `imageDescriptionOverlayOpacity`, `imageDescriptionLongThresholdLines`, `showImageRating`, `showOwner`, `showUser`, `showImageQr`, `showImageId`, `showMoreInfo`.
+- Image metadata: `showImageDate`, `showImageTime`, `showAlbumName`, `showPersonName`, `showPersonAge`, `showImageLocation`, `showImageCamera`, `showImageExif`, `showImageDescription`, `imageDescriptionScrollDuration`, `imageDescriptionStartDelay`, `imageDescriptionAreaHeight`, `imageDescriptionOverlayOpacity`, `imageDescriptionLongThresholdLines`, `showImageRating`, `showOwner`, `showUser`, `showImageQr`, `showImageId`, `showMoreInfo`.
 - Kiosk UI: `disableNavigation`, `hideCursor`, `showProgressBar`, `progressBarPosition`.
 - Display care: `burnInInterval`, `burnInDuration`, `burnInOpacity`.
 

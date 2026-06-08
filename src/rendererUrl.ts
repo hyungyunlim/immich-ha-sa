@@ -135,6 +135,7 @@ export function buildRendererUrl(
   url.searchParams.set('image_date_format', state.imageDateFormat);
   url.searchParams.set('show_image_description', String(state.showImageDescription));
   url.searchParams.set('ifc_description_scroll_duration', String(state.imageDescriptionScrollDuration));
+  url.searchParams.set('ifc_description_start_delay', String(state.imageDescriptionStartDelay));
   url.searchParams.set('ifc_description_area_height', String(state.imageDescriptionAreaHeight));
   url.searchParams.set('ifc_description_overlay_opacity', String(state.imageDescriptionOverlayOpacity));
   url.searchParams.set('ifc_description_long_threshold_lines', String(state.imageDescriptionLongThresholdLines));

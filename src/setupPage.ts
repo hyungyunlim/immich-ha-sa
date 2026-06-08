@@ -99,6 +99,7 @@ interface SetupPageDevice {
   imageDateFormat?: string;
   showImageDescription?: boolean;
   imageDescriptionScrollDuration?: number;
+  imageDescriptionStartDelay?: number;
   imageDescriptionAreaHeight?: number;
   imageDescriptionOverlayOpacity?: number;
   imageDescriptionLongThresholdLines?: number;
@@ -1562,7 +1563,7 @@ function renderMetadataSummary(device: SetupPageDevice): string {
 }
 
 function renderDescriptionScrollSummary(device: SetupPageDevice): string {
-  return `${device.imageDescriptionScrollDuration ?? 52}s / ${device.imageDescriptionAreaHeight ?? 5.75}rem / ${device.imageDescriptionOverlayOpacity ?? 10}% / ${device.imageDescriptionLongThresholdLines ?? 3.25} lines`;
+  return `${device.imageDescriptionScrollDuration ?? 52}s / wait ${device.imageDescriptionStartDelay ?? 3}s / ${device.imageDescriptionAreaHeight ?? 5.75}rem / ${device.imageDescriptionOverlayOpacity ?? 10}% / ${device.imageDescriptionLongThresholdLines ?? 3.25} lines`;
 }
 
 function renderRemoteSummary(device: SetupPageDevice): string {

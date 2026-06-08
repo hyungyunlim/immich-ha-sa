@@ -97,6 +97,16 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ),
             ImmichFrameNumber(
                 coordinator,
+                "image_description_start_delay",
+                "Image Description Start Delay",
+                "imageDescriptionStartDelay",
+                0,
+                60,
+                0.5,
+                "s",
+            ),
+            ImmichFrameNumber(
+                coordinator,
                 "image_description_overlay_opacity",
                 "Image Description Overlay Opacity",
                 "imageDescriptionOverlayOpacity",

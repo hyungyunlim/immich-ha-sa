@@ -117,6 +117,8 @@ describe('Home Assistant integration files', () => {
 
     expect(numberSource).toContain('"image_description_scroll_duration"');
     expect(numberSource).toContain('"imageDescriptionScrollDuration"');
+    expect(numberSource).toContain('"image_description_start_delay"');
+    expect(numberSource).toContain('"imageDescriptionStartDelay"');
     expect(numberSource).toContain('"image_description_area_height"');
     expect(numberSource).toContain('"imageDescriptionAreaHeight"');
     expect(numberSource).toContain('"image_description_overlay_opacity"');
@@ -124,10 +126,12 @@ describe('Home Assistant integration files', () => {
     expect(numberSource).toContain('"image_description_long_threshold_lines"');
     expect(numberSource).toContain('"imageDescriptionLongThresholdLines"');
     expect(initSource).toContain('vol.Optional("imageDescriptionScrollDuration")');
+    expect(initSource).toContain('vol.Optional("imageDescriptionStartDelay")');
     expect(initSource).toContain('vol.Optional("imageDescriptionAreaHeight")');
     expect(initSource).toContain('vol.Optional("imageDescriptionOverlayOpacity")');
     expect(initSource).toContain('vol.Optional("imageDescriptionLongThresholdLines")');
     expect(servicesSource).toContain('imageDescriptionScrollDuration:');
+    expect(servicesSource).toContain('imageDescriptionStartDelay:');
     expect(servicesSource).toContain('imageDescriptionAreaHeight:');
     expect(servicesSource).toContain('imageDescriptionOverlayOpacity:');
     expect(servicesSource).toContain('imageDescriptionLongThresholdLines:');
