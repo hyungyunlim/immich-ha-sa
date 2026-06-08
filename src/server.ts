@@ -2271,7 +2271,8 @@ const KIOSK_PROXY_COMPAT_CSS = `
 .asset--metadata--description > div:last-child {
   flex: 1 1 auto !important;
   min-width: 0 !important;
-  overflow: visible !important;
+  max-height: var(--ifc-description-area-height, 5.75rem) !important;
+  overflow: hidden !important;
 }
 .asset--metadata--description.immich-frame-description-is-long {
   max-height: calc(var(--ifc-description-area-height, 5.75rem) + 1.45rem) !important;
@@ -2296,16 +2297,19 @@ const KIOSK_PROXY_COMPAT_CSS = `
 }
 @keyframes immich-frame-description-slide-up {
   0% {
-    transform: translateY(var(--ifc-description-area-height, 5.75rem));
-  }
-  12% {
     transform: translateY(0);
   }
-  72% {
-    transform: translateY(-100%);
+  16% {
+    transform: translateY(0);
+  }
+  82% {
+    transform: translateY(var(--ifc-description-scroll-distance, 0px));
+  }
+  92% {
+    transform: translateY(var(--ifc-description-scroll-distance, 0px));
   }
   100% {
-    transform: translateY(-100%);
+    transform: translateY(0);
   }
 }
 @media screen and (max-width: 31.25rem) {
@@ -2321,21 +2325,27 @@ const KIOSK_PROXY_COMPAT_CSS = `
   .asset--metadata--description.immich-frame-description-is-long > div:last-child {
     height: var(--ifc-description-mobile-area-height, 5.25rem) !important;
   }
+  .asset--metadata--description > div:last-child {
+    max-height: var(--ifc-description-mobile-area-height, 5.25rem) !important;
+  }
   .asset--metadata--description small {
     font-size: 0.95rem !important;
   }
   @keyframes immich-frame-description-slide-up {
     0% {
-      transform: translateY(var(--ifc-description-mobile-area-height, 5.25rem));
-    }
-    12% {
       transform: translateY(0);
     }
-    72% {
-      transform: translateY(-100%);
+    16% {
+      transform: translateY(0);
+    }
+    82% {
+      transform: translateY(var(--ifc-description-scroll-distance, 0px));
+    }
+    92% {
+      transform: translateY(var(--ifc-description-scroll-distance, 0px));
     }
     100% {
-      transform: translateY(-100%);
+      transform: translateY(0);
     }
   }
 }
@@ -2414,6 +2424,11 @@ const KIOSK_PROXY_COMPAT_JS = `
     return Boolean(window.matchMedia && window.matchMedia('screen and (max-width: 31.25rem)').matches);
   }
 
+  function elementHeight(element) {
+    var rect = element.getBoundingClientRect();
+    return Math.max(element.scrollHeight || 0, element.offsetHeight || 0, rect.height || 0);
+  }
+
   function applySettings() {
     var duration = readNumber('ifc_description_scroll_duration', DEFAULTS.scrollDuration, 10, 240);
     var areaHeight = readNumber('ifc_description_area_height', DEFAULTS.areaHeight, 3, 12);
@@ -2440,21 +2455,24 @@ const KIOSK_PROXY_COMPAT_JS = `
     var text = description.querySelector('small');
     if (!text) return;
 
-    description.classList.remove(LONG_CLASS);
-
     var style = window.getComputedStyle(text);
     var fontSize = numericPx(style.fontSize, 16);
     var lineHeight = numericPx(style.lineHeight, fontSize * 1.45);
     var rootStyle = window.getComputedStyle(document.documentElement);
     var rootFontSize = numericPx(rootStyle.fontSize, 16);
     var visibleAreaHeight = (viewportUsesMobileArea() ? settings.mobileAreaHeight : settings.areaHeight) * rootFontSize;
-    var naturalHeight = text.getBoundingClientRect().height;
+    var naturalHeight = elementHeight(text);
     var exceedsLineThreshold = naturalHeight > lineHeight * settings.longThresholdLines;
     var exceedsAreaHeight = naturalHeight > visibleAreaHeight + 1;
     var isLong = exceedsLineThreshold && exceedsAreaHeight;
 
     if (isLong) {
+      var scrollDistance = Math.min(0, visibleAreaHeight - naturalHeight - Math.max(4, lineHeight * 0.35));
+      description.style.setProperty('--ifc-description-scroll-distance', rounded(scrollDistance) + 'px');
       description.classList.add(LONG_CLASS);
+    } else {
+      description.style.removeProperty('--ifc-description-scroll-distance');
+      description.classList.remove(LONG_CLASS);
     }
   }
 
@@ -2470,7 +2488,9 @@ const KIOSK_PROXY_COMPAT_JS = `
   function scheduleScan() {
     if (scheduled) return;
     scheduled = true;
-    window.setTimeout(scanDescriptions, 80);
+    window.requestAnimationFrame
+      ? window.requestAnimationFrame(scanDescriptions)
+      : window.setTimeout(scanDescriptions, 16);
   }
 
   document.addEventListener('DOMContentLoaded', scheduleScan);

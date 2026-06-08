@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.70
+
+- Stabilize image description slide-up rendering by avoiding visible re-measure toggles, clipping long text before the helper runs, and scrolling only the overflow distance instead of moving the whole caption off-screen.
+
 ## 0.1.69
 
 - Scroll image descriptions only when the text exceeds the configured visible area and long-text threshold.
