@@ -65,6 +65,10 @@ const state: FrameState = {
   showImageDate: false,
   imageDateFormat: 'YYYY-MM-DD',
   showImageDescription: false,
+  imageDescriptionScrollDuration: 52,
+  imageDescriptionAreaHeight: 5.75,
+  imageDescriptionOverlayOpacity: 10,
+  imageDescriptionLongThresholdLines: 3.25,
   showImageCamera: false,
   showImageExif: false,
   showImageLocation: false,
@@ -177,6 +181,10 @@ describe('renderer URL generation', () => {
       showImageDate: true,
       imageDateFormat: 'YYYY/MM/DD',
       showImageDescription: true,
+      imageDescriptionScrollDuration: 64,
+      imageDescriptionAreaHeight: 6.5,
+      imageDescriptionOverlayOpacity: 8,
+      imageDescriptionLongThresholdLines: 4,
       showImageCamera: true,
       showImageExif: true,
       showImageLocation: true,
@@ -224,6 +232,10 @@ describe('renderer URL generation', () => {
     expect(resolved.rendererUrl).toContain('show_image_date=true');
     expect(resolved.rendererUrl).toContain('image_date_format=YYYY%2FMM%2FDD');
     expect(resolved.rendererUrl).toContain('show_image_description=true');
+    expect(resolved.rendererUrl).toContain('ifc_description_scroll_duration=64');
+    expect(resolved.rendererUrl).toContain('ifc_description_area_height=6.5');
+    expect(resolved.rendererUrl).toContain('ifc_description_overlay_opacity=8');
+    expect(resolved.rendererUrl).toContain('ifc_description_long_threshold_lines=4');
     expect(resolved.rendererUrl).toContain('show_image_camera=true');
     expect(resolved.rendererUrl).toContain('show_image_exif=true');
     expect(resolved.rendererUrl).toContain('show_image_location=true');

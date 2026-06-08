@@ -72,6 +72,10 @@ const FrameStatePatchSchema = z.object({
   showImageDate: z.boolean().optional(),
   imageDateFormat: z.string().min(1).max(64).optional(),
   showImageDescription: z.boolean().optional(),
+  imageDescriptionScrollDuration: z.number().min(10).max(240).optional(),
+  imageDescriptionAreaHeight: z.number().min(3).max(12).optional(),
+  imageDescriptionOverlayOpacity: z.number().min(0).max(60).optional(),
+  imageDescriptionLongThresholdLines: z.number().min(2).max(10).optional(),
   showImageCamera: z.boolean().optional(),
   showImageExif: z.boolean().optional(),
   showImageLocation: z.boolean().optional(),
@@ -138,6 +142,10 @@ const ProfileSchema = z.object({
   showImageDate: z.boolean().default(false),
   imageDateFormat: z.string().min(1).max(64).default('YYYY-MM-DD'),
   showImageDescription: z.boolean().default(false),
+  imageDescriptionScrollDuration: z.number().min(10).max(240).default(52),
+  imageDescriptionAreaHeight: z.number().min(3).max(12).default(5.75),
+  imageDescriptionOverlayOpacity: z.number().min(0).max(60).default(10),
+  imageDescriptionLongThresholdLines: z.number().min(2).max(10).default(3.25),
   showImageCamera: z.boolean().default(false),
   showImageExif: z.boolean().default(false),
   showImageLocation: z.boolean().default(false),
@@ -468,6 +476,10 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           showImageDate: frameState?.showImageDate,
           imageDateFormat: frameState?.imageDateFormat,
           showImageDescription: frameState?.showImageDescription,
+          imageDescriptionScrollDuration: frameState?.imageDescriptionScrollDuration,
+          imageDescriptionAreaHeight: frameState?.imageDescriptionAreaHeight,
+          imageDescriptionOverlayOpacity: frameState?.imageDescriptionOverlayOpacity,
+          imageDescriptionLongThresholdLines: frameState?.imageDescriptionLongThresholdLines,
           showImageCamera: frameState?.showImageCamera,
           showImageExif: frameState?.showImageExif,
           showImageLocation: frameState?.showImageLocation,
@@ -1144,6 +1156,10 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       showImageDate: profile.showImageDate,
       imageDateFormat: profile.imageDateFormat,
       showImageDescription: profile.showImageDescription,
+      imageDescriptionScrollDuration: profile.imageDescriptionScrollDuration,
+      imageDescriptionAreaHeight: profile.imageDescriptionAreaHeight,
+      imageDescriptionOverlayOpacity: profile.imageDescriptionOverlayOpacity,
+      imageDescriptionLongThresholdLines: profile.imageDescriptionLongThresholdLines,
       showImageCamera: profile.showImageCamera,
       showImageExif: profile.showImageExif,
       showImageLocation: profile.showImageLocation,
@@ -2146,7 +2162,8 @@ function rewriteProxyText(value: string, proxyPrefix: string, contentType: strin
   const normalizedPrefix = proxyPrefix.replace(/\/+$/, '');
   const normalizedContentType = contentType.toLowerCase();
   if (normalizedContentType.includes('javascript')) {
-    return value.replace(/(["'`])\/(assets|asset)(?=[/"'`?])/g, `$1${normalizedPrefix}/$2`);
+    const rewritten = value.replace(/(["'`])\/(assets|asset)(?=[/"'`?])/g, `$1${normalizedPrefix}/$2`);
+    return `${rewritten}\n${KIOSK_PROXY_COMPAT_JS}`;
   }
   if (normalizedContentType.startsWith('text/css')) {
     const rewritten = value.replace(/url\((["']?)\/(?!\/|kiosk-proxy\/)/g, `url($1${normalizedPrefix}/`);
@@ -2217,6 +2234,12 @@ const KIOSK_PROXY_COMPAT_CSS = `
 }
 
 /* Immich Frame Controller: bottom slide-up image description treatment. */
+:root {
+  --ifc-description-scroll-duration: 52s;
+  --ifc-description-area-height: 5.75rem;
+  --ifc-description-mobile-area-height: 5.25rem;
+  --ifc-description-overlay-opacity: 0.1;
+}
 .asset-metadata-container {
   box-sizing: border-box !important;
   left: 0 !important;
@@ -2225,6 +2248,7 @@ const KIOSK_PROXY_COMPAT_CSS = `
 }
 .asset--metadata {
   flex: 1 1 auto !important;
+  width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
 }
@@ -2232,39 +2256,47 @@ const KIOSK_PROXY_COMPAT_CSS = `
   box-sizing: border-box !important;
   width: 100% !important;
   max-width: 72rem !important;
-  max-height: 9rem !important;
   align-items: flex-start !important;
-  gap: 0.75rem !important;
+  gap: 0.6rem !important;
   overflow: hidden !important;
-  padding: 0.85rem 1rem !important;
+  padding: 0.45rem 0.65rem !important;
   border-radius: 0.375rem !important;
-  background: rgba(0, 0, 0, 0.42) !important;
+  background: rgba(0, 0, 0, var(--ifc-description-overlay-opacity, 0.1)) !important;
 }
 .asset--metadata--description .asset--metadata--icon {
   flex: 0 0 0.9rem !important;
-  margin-top: 0.2rem !important;
-  opacity: 0.72 !important;
+  margin-top: 0.18rem !important;
+  opacity: 0.68 !important;
 }
 .asset--metadata--description > div:last-child {
   flex: 1 1 auto !important;
   min-width: 0 !important;
-  height: 7rem !important;
+  overflow: visible !important;
+}
+.asset--metadata--description.immich-frame-description-is-long {
+  max-height: calc(var(--ifc-description-area-height, 5.75rem) + 1.45rem) !important;
+}
+.asset--metadata--description.immich-frame-description-is-long > div:last-child {
+  height: var(--ifc-description-area-height, 5.75rem) !important;
   overflow: hidden !important;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 84%, transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 84%, transparent 100%);
 }
 .asset--metadata--description small {
   display: block !important;
-  font-size: 1.25rem !important;
+  font-size: 1.16rem !important;
   line-height: 1.45 !important;
   overflow-wrap: anywhere !important;
   white-space: normal !important;
-  animation: immich-frame-description-slide-up 34s linear infinite;
+  transform: none !important;
+}
+.asset--metadata--description.immich-frame-description-is-long small {
+  animation: immich-frame-description-slide-up var(--ifc-description-scroll-duration, 52s) linear infinite;
   will-change: transform;
 }
 @keyframes immich-frame-description-slide-up {
   0% {
-    transform: translateY(7rem);
+    transform: translateY(var(--ifc-description-area-height, 5.75rem));
   }
   12% {
     transform: translateY(0);
@@ -2277,19 +2309,24 @@ const KIOSK_PROXY_COMPAT_CSS = `
   }
 }
 @media screen and (max-width: 31.25rem) {
-  .asset--metadata--description {
-    max-height: 7rem !important;
-    padding: 0.65rem 0.75rem !important;
+  .asset--metadata {
+    max-width: 100% !important;
   }
-  .asset--metadata--description > div:last-child {
-    height: 5.5rem !important;
+  .asset--metadata--description {
+    padding: 0.4rem 0.55rem !important;
+  }
+  .asset--metadata--description.immich-frame-description-is-long {
+    max-height: calc(var(--ifc-description-mobile-area-height, 5.25rem) + 1.35rem) !important;
+  }
+  .asset--metadata--description.immich-frame-description-is-long > div:last-child {
+    height: var(--ifc-description-mobile-area-height, 5.25rem) !important;
   }
   .asset--metadata--description small {
-    font-size: 1rem !important;
+    font-size: 0.95rem !important;
   }
   @keyframes immich-frame-description-slide-up {
     0% {
-      transform: translateY(5.5rem);
+      transform: translateY(var(--ifc-description-mobile-area-height, 5.25rem));
     }
     12% {
       transform: translateY(0);
@@ -2303,11 +2340,155 @@ const KIOSK_PROXY_COMPAT_CSS = `
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .asset--metadata--description small {
+  .asset--metadata--description.immich-frame-description-is-long small {
     animation: none !important;
     transform: none !important;
   }
 }
+`;
+
+const KIOSK_PROXY_COMPAT_JS = `
+/* Immich Frame Controller: image description overflow helper. */
+;(function () {
+  if (typeof window === 'undefined' || !window.document || window.__immichFrameDescriptionHelper) return;
+  window.__immichFrameDescriptionHelper = true;
+
+  var LONG_CLASS = 'immich-frame-description-is-long';
+  var DEFAULTS = {
+    scrollDuration: 52,
+    areaHeight: 5.75,
+    overlayOpacity: 10,
+    longThresholdLines: 3.25,
+  };
+  var settings = {
+    areaHeight: DEFAULTS.areaHeight,
+    mobileAreaHeight: 5.25,
+    longThresholdLines: DEFAULTS.longThresholdLines,
+  };
+  var scheduled = false;
+
+  function isFiniteNumber(value) {
+    return typeof value === 'number' && isFinite(value);
+  }
+
+  function numericPx(value, fallback) {
+    var parsed = parseFloat(value);
+    return isFiniteNumber(parsed) ? parsed : fallback;
+  }
+
+  function rounded(value) {
+    return String(Math.round(value * 1000) / 1000);
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function decodeQueryValue(value) {
+    try {
+      return decodeURIComponent(value.replace(/\\+/g, ' '));
+    } catch (_error) {
+      return value;
+    }
+  }
+
+  function queryParam(name) {
+    var query = window.location.search ? window.location.search.substring(1).split('&') : [];
+    for (var index = 0; index < query.length; index += 1) {
+      var pair = query[index].split('=');
+      if (decodeQueryValue(pair[0] || '') === name) {
+        return decodeQueryValue(pair.slice(1).join('='));
+      }
+    }
+    return '';
+  }
+
+  function readNumber(name, fallback, min, max) {
+    var raw = queryParam(name);
+    var parsed = parseFloat(raw);
+    if (!isFiniteNumber(parsed)) return fallback;
+    return clamp(parsed, min, max);
+  }
+
+  function viewportUsesMobileArea() {
+    return Boolean(window.matchMedia && window.matchMedia('screen and (max-width: 31.25rem)').matches);
+  }
+
+  function applySettings() {
+    var duration = readNumber('ifc_description_scroll_duration', DEFAULTS.scrollDuration, 10, 240);
+    var areaHeight = readNumber('ifc_description_area_height', DEFAULTS.areaHeight, 3, 12);
+    var overlayOpacity = readNumber('ifc_description_overlay_opacity', DEFAULTS.overlayOpacity, 0, 60);
+    var longThresholdLines = readNumber(
+      'ifc_description_long_threshold_lines',
+      DEFAULTS.longThresholdLines,
+      2,
+      10
+    );
+    var mobileAreaHeight = Math.max(3, areaHeight - 0.5);
+    var root = document.documentElement;
+
+    settings.areaHeight = areaHeight;
+    settings.mobileAreaHeight = mobileAreaHeight;
+    settings.longThresholdLines = longThresholdLines;
+    root.style.setProperty('--ifc-description-scroll-duration', rounded(duration) + 's');
+    root.style.setProperty('--ifc-description-area-height', rounded(areaHeight) + 'rem');
+    root.style.setProperty('--ifc-description-mobile-area-height', rounded(mobileAreaHeight) + 'rem');
+    root.style.setProperty('--ifc-description-overlay-opacity', rounded(overlayOpacity / 100));
+  }
+
+  function updateDescription(description) {
+    var text = description.querySelector('small');
+    if (!text) return;
+
+    description.classList.remove(LONG_CLASS);
+
+    var style = window.getComputedStyle(text);
+    var fontSize = numericPx(style.fontSize, 16);
+    var lineHeight = numericPx(style.lineHeight, fontSize * 1.45);
+    var rootStyle = window.getComputedStyle(document.documentElement);
+    var rootFontSize = numericPx(rootStyle.fontSize, 16);
+    var visibleAreaHeight = (viewportUsesMobileArea() ? settings.mobileAreaHeight : settings.areaHeight) * rootFontSize;
+    var naturalHeight = text.getBoundingClientRect().height;
+    var exceedsLineThreshold = naturalHeight > lineHeight * settings.longThresholdLines;
+    var exceedsAreaHeight = naturalHeight > visibleAreaHeight + 1;
+    var isLong = exceedsLineThreshold && exceedsAreaHeight;
+
+    if (isLong) {
+      description.classList.add(LONG_CLASS);
+    }
+  }
+
+  function scanDescriptions() {
+    scheduled = false;
+    applySettings();
+    var descriptions = document.querySelectorAll('.asset--metadata--description');
+    for (var index = 0; index < descriptions.length; index += 1) {
+      updateDescription(descriptions[index]);
+    }
+  }
+
+  function scheduleScan() {
+    if (scheduled) return;
+    scheduled = true;
+    window.setTimeout(scanDescriptions, 80);
+  }
+
+  document.addEventListener('DOMContentLoaded', scheduleScan);
+  window.addEventListener('load', scheduleScan);
+  window.addEventListener('resize', scheduleScan);
+
+  if (window.MutationObserver) {
+    new MutationObserver(scheduleScan).observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  } else {
+    window.setInterval(scheduleScan, 1500);
+  }
+
+  scheduleScan();
+})();
 `;
 
 function toControllerProxyUrl(

@@ -91,6 +91,10 @@ export interface FrameState {
   showImageDate: boolean;
   imageDateFormat: string;
   showImageDescription: boolean;
+  imageDescriptionScrollDuration: number;
+  imageDescriptionAreaHeight: number;
+  imageDescriptionOverlayOpacity: number;
+  imageDescriptionLongThresholdLines: number;
   showImageCamera: boolean;
   showImageExif: boolean;
   showImageLocation: boolean;
@@ -165,6 +169,10 @@ export interface FrameProfile {
   showImageDate: boolean;
   imageDateFormat: string;
   showImageDescription: boolean;
+  imageDescriptionScrollDuration: number;
+  imageDescriptionAreaHeight: number;
+  imageDescriptionOverlayOpacity: number;
+  imageDescriptionLongThresholdLines: number;
   showImageCamera: boolean;
   showImageExif: boolean;
   showImageLocation: boolean;

@@ -134,6 +134,10 @@ export function buildRendererUrl(
   url.searchParams.set('show_image_date', String(state.showImageDate));
   url.searchParams.set('image_date_format', state.imageDateFormat);
   url.searchParams.set('show_image_description', String(state.showImageDescription));
+  url.searchParams.set('ifc_description_scroll_duration', String(state.imageDescriptionScrollDuration));
+  url.searchParams.set('ifc_description_area_height', String(state.imageDescriptionAreaHeight));
+  url.searchParams.set('ifc_description_overlay_opacity', String(state.imageDescriptionOverlayOpacity));
+  url.searchParams.set('ifc_description_long_threshold_lines', String(state.imageDescriptionLongThresholdLines));
   url.searchParams.set('show_image_camera', String(state.showImageCamera));
   url.searchParams.set('show_image_exif', String(state.showImageExif));
   url.searchParams.set('show_image_location', String(state.showImageLocation));

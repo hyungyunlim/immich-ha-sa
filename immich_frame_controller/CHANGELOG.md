@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.69
+
+- Scroll image descriptions only when the text exceeds the configured visible area and long-text threshold.
+- Make the image description scroll duration, visible area height, overlay opacity, and long-text threshold configurable from the Home Assistant integration and `set_renderer_options`.
+- Reduce the default description overlay opacity and keep long descriptions clipped inside their own metadata row so date and location metadata remain separate.
+
 ## 0.1.68
 
 - Add a controller-side immich-kiosk description overlay treatment that widens image descriptions and scrolls long text upward inside the lower overlay.

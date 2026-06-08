@@ -1316,6 +1316,8 @@ describe('controller API', () => {
     expect(css.body).toContain('-webkit-transform: translateZ(0)');
     expect(css.body).toContain('bottom slide-up image description treatment');
     expect(css.body).toContain('.asset--metadata--description');
+    expect(css.body).toContain('--ifc-description-scroll-duration');
+    expect(css.body).toContain('immich-frame-description-is-long');
     expect(css.body).toContain('immich-frame-description-slide-up');
 
     const javascript = await server.inject({
@@ -1328,6 +1330,9 @@ describe('controller API', () => {
     expect(javascript.body).toContain('const dataAttr = /^data-[\\w]+$/;');
     expect(javascript.body).toContain('register("/kiosk-proxy/lenovo/assets/js/sw.js")');
     expect(javascript.body).toContain('startsWith("/kiosk-proxy/lenovo/asset/")');
+    expect(javascript.body).toContain('image description overflow helper');
+    expect(javascript.body).toContain('ifc_description_scroll_duration');
+    expect(javascript.body).toContain('immich-frame-description-is-long');
     expect(javascript.body).not.toContain('/kiosk-proxy/lenovo/^data');
 
     const video = await server.inject({

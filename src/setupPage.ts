@@ -98,6 +98,10 @@ interface SetupPageDevice {
   showImageDate?: boolean;
   imageDateFormat?: string;
   showImageDescription?: boolean;
+  imageDescriptionScrollDuration?: number;
+  imageDescriptionAreaHeight?: number;
+  imageDescriptionOverlayOpacity?: number;
+  imageDescriptionLongThresholdLines?: number;
   showImageCamera?: boolean;
   showImageExif?: boolean;
   showImageLocation?: boolean;
@@ -1392,6 +1396,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Media', renderMediaSummary(device))}
         ${renderKeyValue('Archived Assets', boolLabel(device.showArchived))}
         ${renderKeyValue('Metadata', renderMetadataSummary(device))}
+        ${renderKeyValue('Description Scroll', renderDescriptionScrollSummary(device))}
         ${renderKeyValue('Asset Filters', renderAssetFilters(device))}
         ${renderKeyValue('Arrow Actions', `${device.upArrowAction ?? 'none'} / ${device.downArrowAction ?? 'none'}`)}
         ${renderKeyValue('Burn-in', `${device.burnInInterval ?? 0}m / ${device.burnInDuration ?? 30}s / ${device.burnInOpacity ?? 30}%`)}
@@ -1554,6 +1559,10 @@ function renderMetadataSummary(device: SetupPageDevice): string {
     device.showUser ? 'user' : '',
   ].filter(Boolean);
   return fields.length > 0 ? fields.join(', ') : 'Off';
+}
+
+function renderDescriptionScrollSummary(device: SetupPageDevice): string {
+  return `${device.imageDescriptionScrollDuration ?? 52}s / ${device.imageDescriptionAreaHeight ?? 5.75}rem / ${device.imageDescriptionOverlayOpacity ?? 10}% / ${device.imageDescriptionLongThresholdLines ?? 3.25} lines`;
 }
 
 function renderRemoteSummary(device: SetupPageDevice): string {

@@ -110,6 +110,29 @@ describe('Home Assistant integration files', () => {
     expect(numberSource).toContain('"excludeVideosOver"');
   });
 
+  it('exposes image description scroll controls and services', () => {
+    const initSource = readFileSync(join(root, 'custom_components/immich_frame/__init__.py'), 'utf8');
+    const numberSource = readFileSync(join(root, 'custom_components/immich_frame/number.py'), 'utf8');
+    const servicesSource = readFileSync(join(root, 'custom_components/immich_frame/services.yaml'), 'utf8');
+
+    expect(numberSource).toContain('"image_description_scroll_duration"');
+    expect(numberSource).toContain('"imageDescriptionScrollDuration"');
+    expect(numberSource).toContain('"image_description_area_height"');
+    expect(numberSource).toContain('"imageDescriptionAreaHeight"');
+    expect(numberSource).toContain('"image_description_overlay_opacity"');
+    expect(numberSource).toContain('"imageDescriptionOverlayOpacity"');
+    expect(numberSource).toContain('"image_description_long_threshold_lines"');
+    expect(numberSource).toContain('"imageDescriptionLongThresholdLines"');
+    expect(initSource).toContain('vol.Optional("imageDescriptionScrollDuration")');
+    expect(initSource).toContain('vol.Optional("imageDescriptionAreaHeight")');
+    expect(initSource).toContain('vol.Optional("imageDescriptionOverlayOpacity")');
+    expect(initSource).toContain('vol.Optional("imageDescriptionLongThresholdLines")');
+    expect(servicesSource).toContain('imageDescriptionScrollDuration:');
+    expect(servicesSource).toContain('imageDescriptionAreaHeight:');
+    expect(servicesSource).toContain('imageDescriptionOverlayOpacity:');
+    expect(servicesSource).toContain('imageDescriptionLongThresholdLines:');
+  });
+
   it('exposes person filter controls and services', () => {
     const selectSource = readFileSync(join(root, 'custom_components/immich_frame/select.py'), 'utf8');
     const sensorSource = readFileSync(join(root, 'custom_components/immich_frame/sensor.py'), 'utf8');
