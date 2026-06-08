@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.73
+
+- Hide the immich-kiosk text metadata icon for image descriptions while preserving date and location metadata icons.
+
 ## 0.1.72
 
 - Add a configurable image description scroll speed and calculate long-description animation duration from measured overflow distance.

@@ -2269,16 +2269,14 @@ const KIOSK_PROXY_COMPAT_CSS = `
   width: 100% !important;
   max-width: 72rem !important;
   align-items: flex-start !important;
-  gap: 0.6rem !important;
+  gap: 0 !important;
   overflow: hidden !important;
   padding: 0.45rem 0.65rem !important;
   border-radius: 0.375rem !important;
   background: rgba(0, 0, 0, var(--ifc-description-overlay-opacity, 0.1)) !important;
 }
 .asset--metadata--description .asset--metadata--icon {
-  flex: 0 0 0.9rem !important;
-  margin-top: 0.18rem !important;
-  opacity: 0.68 !important;
+  display: none !important;
 }
 .asset--metadata--description > div:last-child {
   box-sizing: border-box !important;
