@@ -75,6 +75,13 @@ interface SetupPageDevice {
   showWeather?: boolean;
   weatherLocation?: string;
   weatherRotationInterval?: number;
+  weatherShowForecast?: string;
+  weatherShowHumidity?: string;
+  weatherShowWind?: string;
+  weatherShowWindDirection?: string;
+  weatherShowVisibility?: string;
+  weatherShowTemperatureRange?: string;
+  weatherRoundTemperature?: string;
   transition?: string;
   layout?: string;
   imageEffect?: string;
@@ -1543,7 +1550,21 @@ function renderWeatherSummary(device: SetupPageDevice): string {
   if (device.showWeather === false) return 'Off';
   const location = device.weatherLocation?.trim() || 'default';
   const rotation = location === 'rotate' ? ` / ${device.weatherRotationInterval ?? 60}s` : '';
-  return `${location}${rotation}`;
+  const details = [
+    renderWeatherOverride('forecast', device.weatherShowForecast),
+    renderWeatherOverride('humidity', device.weatherShowHumidity),
+    renderWeatherOverride('wind', device.weatherShowWind),
+    renderWeatherOverride('wind dir', device.weatherShowWindDirection),
+    renderWeatherOverride('visibility', device.weatherShowVisibility),
+    renderWeatherOverride('range', device.weatherShowTemperatureRange),
+    renderWeatherOverride('round', device.weatherRoundTemperature),
+  ].filter(Boolean);
+  return details.length > 0 ? `${location}${rotation} / ${details.join(', ')}` : `${location}${rotation}`;
+}
+
+function renderWeatherOverride(label: string, value?: string): string {
+  if (!value || value === 'inherit') return '';
+  return `${label} ${value}`;
 }
 
 function renderMetadataSummary(device: SetupPageDevice): string {

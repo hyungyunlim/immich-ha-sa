@@ -171,6 +171,62 @@ set_renderer_options:
           max: 3600
           step: 1
           unit_of_measurement: s
+    weatherShowForecast:
+      required: false
+      selector:
+        select:
+          options:
+            - inherit
+            - "true"
+            - "false"
+    weatherShowHumidity:
+      required: false
+      selector:
+        select:
+          options:
+            - inherit
+            - "true"
+            - "false"
+    weatherShowWind:
+      required: false
+      selector:
+        select:
+          options:
+            - inherit
+            - "true"
+            - "false"
+    weatherShowWindDirection:
+      required: false
+      selector:
+        select:
+          options:
+            - inherit
+            - "true"
+            - "false"
+    weatherShowVisibility:
+      required: false
+      selector:
+        select:
+          options:
+            - inherit
+            - "true"
+            - "false"
+    weatherShowTemperatureRange:
+      required: false
+      selector:
+        select:
+          options:
+            - inherit
+            - "true"
+            - "false"
+    weatherRoundTemperature:
+      required: false
+      selector:
+        select:
+          options:
+            - inherit
+            - "true"
+            - "false"
     activePersonIds:
       required: false
       selector:

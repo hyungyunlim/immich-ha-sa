@@ -31,6 +31,13 @@ const state: FrameState = {
   showWeather: true,
   weatherLocation: '',
   weatherRotationInterval: 60,
+  weatherShowForecast: 'inherit',
+  weatherShowHumidity: 'inherit',
+  weatherShowWind: 'inherit',
+  weatherShowWindDirection: 'inherit',
+  weatherShowVisibility: 'inherit',
+  weatherShowTemperatureRange: 'inherit',
+  weatherRoundTemperature: 'inherit',
   showVideos: false,
   kioskVideoMuted: true,
   excludeVideosOver: 0,
@@ -158,6 +165,13 @@ describe('renderer URL generation', () => {
       showWeather: true,
       weatherLocation: 'rotate',
       weatherRotationInterval: 120,
+      weatherShowForecast: 'true',
+      weatherShowHumidity: 'false',
+      weatherShowWind: 'true',
+      weatherShowWindDirection: 'false',
+      weatherShowVisibility: 'true',
+      weatherShowTemperatureRange: 'false',
+      weatherRoundTemperature: 'true',
       transition: 'fade',
       excludeVideosOver: 45,
       showArchived: true,
@@ -215,6 +229,13 @@ describe('renderer URL generation', () => {
     expect(resolved.rendererUrl).toContain('show_weather=true');
     expect(resolved.rendererUrl).toContain('weather=rotate');
     expect(resolved.rendererUrl).toContain('rotation_interval=120');
+    expect(resolved.rendererUrl).toContain('weather_show_forecast=true');
+    expect(resolved.rendererUrl).toContain('weather_show_humidity=false');
+    expect(resolved.rendererUrl).toContain('weather_show_wind=true');
+    expect(resolved.rendererUrl).toContain('weather_show_wind_direction=false');
+    expect(resolved.rendererUrl).toContain('weather_show_visibility=true');
+    expect(resolved.rendererUrl).toContain('weather_show_temperature_range=false');
+    expect(resolved.rendererUrl).toContain('weather_round_temperature=true');
     expect(resolved.rendererUrl).toContain('show_videos=true');
     expect(resolved.rendererUrl).toContain('exclude_videos_over=45');
     expect(resolved.rendererUrl).toContain('show_archived=true');
@@ -293,5 +314,17 @@ describe('renderer URL generation', () => {
     });
     expect(resolved.rendererUrl).toContain('show_weather=false');
     expect(resolved.rendererUrl).toContain('weather=none');
+  });
+
+  it('omits inherited weather detail URL overrides', () => {
+    const resolved = buildRendererUrl(device, state);
+
+    expect(resolved.rendererUrl).not.toContain('weather_show_forecast=');
+    expect(resolved.rendererUrl).not.toContain('weather_show_humidity=');
+    expect(resolved.rendererUrl).not.toContain('weather_show_wind=');
+    expect(resolved.rendererUrl).not.toContain('weather_show_wind_direction=');
+    expect(resolved.rendererUrl).not.toContain('weather_show_visibility=');
+    expect(resolved.rendererUrl).not.toContain('weather_show_temperature_range=');
+    expect(resolved.rendererUrl).not.toContain('weather_round_temperature=');
   });
 });

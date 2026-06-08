@@ -36,6 +36,31 @@ describe('Home Assistant integration files', () => {
     expect(source).toContain('["random", "newest", "oldest"]');
   });
 
+  it('exposes weather detail overrides as Home Assistant select entities and services', () => {
+    const selectSource = readFileSync(join(root, 'custom_components/immich_frame/select.py'), 'utf8');
+    const initSource = readFileSync(join(root, 'custom_components/immich_frame/__init__.py'), 'utf8');
+    const servicesSource = readFileSync(join(root, 'custom_components/immich_frame/services.yaml'), 'utf8');
+    const profileSource = readFileSync(join(root, 'custom_components/immich_frame/profile_helpers.py'), 'utf8');
+
+    expect(selectSource).toContain('WEATHER_OVERRIDE_OPTIONS');
+    expect(selectSource).toContain('"Weather Forecast"');
+    expect(selectSource).toContain('"weatherShowForecast"');
+    expect(selectSource).toContain('"Weather Humidity"');
+    expect(selectSource).toContain('"weatherShowHumidity"');
+    expect(selectSource).toContain('"Weather Wind Direction"');
+    expect(selectSource).toContain('"weatherShowWindDirection"');
+    expect(selectSource).toContain('"Weather Temperature Range"');
+    expect(selectSource).toContain('"weatherShowTemperatureRange"');
+    expect(selectSource).toContain('"Weather Round Temperature"');
+    expect(selectSource).toContain('"weatherRoundTemperature"');
+    expect(initSource).toContain('vol.Optional("weatherShowForecast")');
+    expect(initSource).toContain('vol.Optional("weatherRoundTemperature")');
+    expect(servicesSource).toContain('weatherShowForecast:');
+    expect(servicesSource).toContain('weatherRoundTemperature:');
+    expect(profileSource).toContain('"weatherShowForecast"');
+    expect(profileSource).toContain('"weatherRoundTemperature"');
+  });
+
   it('does not expose the unreliable FreeKiosk D-pad up command button', () => {
     const source = readFileSync(join(root, 'custom_components/immich_frame/button.py'), 'utf8');
 

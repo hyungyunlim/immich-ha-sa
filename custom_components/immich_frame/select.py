@@ -22,6 +22,11 @@ ALBUM_OPTION_MULTIPLE_ALBUMS = "Multiple Albums"
 PERSON_OPTION_NO_FILTER = "No Person Filter"
 PERSON_OPTION_ALL_NAMED_PEOPLE = "All Named People"
 PERSON_OPTION_MULTIPLE_PEOPLE = "Multiple People"
+WEATHER_OVERRIDE_OPTIONS = {
+    "Use Kiosk Config": "inherit",
+    "Show": "true",
+    "Hide": "false",
+}
 
 
 async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
@@ -48,6 +53,48 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 "Clock Source",
                 "clockSource",
                 ["client", "server"],
+            ),
+            ImmichFrameWeatherOverrideSelect(
+                coordinator,
+                "weather_show_forecast",
+                "Weather Forecast",
+                "weatherShowForecast",
+            ),
+            ImmichFrameWeatherOverrideSelect(
+                coordinator,
+                "weather_show_humidity",
+                "Weather Humidity",
+                "weatherShowHumidity",
+            ),
+            ImmichFrameWeatherOverrideSelect(
+                coordinator,
+                "weather_show_wind",
+                "Weather Wind",
+                "weatherShowWind",
+            ),
+            ImmichFrameWeatherOverrideSelect(
+                coordinator,
+                "weather_show_wind_direction",
+                "Weather Wind Direction",
+                "weatherShowWindDirection",
+            ),
+            ImmichFrameWeatherOverrideSelect(
+                coordinator,
+                "weather_show_visibility",
+                "Weather Visibility",
+                "weatherShowVisibility",
+            ),
+            ImmichFrameWeatherOverrideSelect(
+                coordinator,
+                "weather_show_temperature_range",
+                "Weather Temperature Range",
+                "weatherShowTemperatureRange",
+            ),
+            ImmichFrameWeatherOverrideSelect(
+                coordinator,
+                "weather_round_temperature",
+                "Weather Round Temperature",
+                "weatherRoundTemperature",
             ),
             ImmichFrameStateSelect(
                 coordinator,
@@ -391,6 +438,36 @@ class ImmichFrameStateSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEn
 
     async def async_select_option(self, option: str) -> None:
         await self.coordinator.client.update_frame_state({self._patch_key: option})
+        await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameWeatherOverrideSelect(CoordinatorEntity[ImmichFrameCoordinator], SelectEntity):
+    _attr_options = list(WEATHER_OVERRIDE_OPTIONS.keys())
+
+    def __init__(
+        self,
+        coordinator: ImmichFrameCoordinator,
+        key: str,
+        label: str,
+        patch_key: str,
+    ) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._patch_key = patch_key
+        self._attr_name = f"{frame_label(device_id)} Frame {label}"
+        self._attr_unique_id = frame_unique_id(device_id, key)
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def current_option(self) -> str | None:
+        value = self.coordinator.data.get("state", {}).get(self._patch_key, "inherit")
+        for label, patch_value in WEATHER_OVERRIDE_OPTIONS.items():
+            if value == patch_value:
+                return label
+        return "Use Kiosk Config"
+
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.client.update_frame_state({self._patch_key: WEATHER_OVERRIDE_OPTIONS[option]})
         await self.coordinator.async_request_refresh()
 
 

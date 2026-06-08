@@ -1,6 +1,7 @@
 import type {
   FrameDevice,
   FrameState,
+  KioskBooleanOverride,
   ResolvedFrameState,
   ResolvedNetworkMode,
 } from './types.js';
@@ -90,6 +91,13 @@ export function buildRendererUrl(
     url.searchParams.set('weather', state.weatherLocation.trim());
   }
   url.searchParams.set('rotation_interval', String(state.weatherRotationInterval));
+  setBooleanOverride(url, 'weather_show_forecast', state.weatherShowForecast);
+  setBooleanOverride(url, 'weather_show_humidity', state.weatherShowHumidity);
+  setBooleanOverride(url, 'weather_show_wind', state.weatherShowWind);
+  setBooleanOverride(url, 'weather_show_wind_direction', state.weatherShowWindDirection);
+  setBooleanOverride(url, 'weather_show_visibility', state.weatherShowVisibility);
+  setBooleanOverride(url, 'weather_show_temperature_range', state.weatherShowTemperatureRange);
+  setBooleanOverride(url, 'weather_round_temperature', state.weatherRoundTemperature);
   url.searchParams.set('show_videos', String(state.showVideos));
   url.searchParams.delete('exclude_videos_over');
   if (state.excludeVideosOver > 0) {
@@ -166,6 +174,13 @@ export function buildRendererUrl(
     rendererUrl: url.toString(),
     lastKnownGoodRendererUrl: url.toString(),
   };
+}
+
+function setBooleanOverride(url: URL, param: string, value: KioskBooleanOverride): void {
+  url.searchParams.delete(param);
+  if (value !== 'inherit') {
+    url.searchParams.set(param, value);
+  }
 }
 
 export function buildProxiedRendererUrl(

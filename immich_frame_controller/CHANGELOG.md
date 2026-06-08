@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.75
+
+- Add Home Assistant weather detail override selects for immich-kiosk weather forecast, humidity, wind, wind direction, visibility, temperature range, and rounded temperature URL queries.
+- Preserve existing immich-kiosk `config.yaml` weather location behavior with an explicit `Use Kiosk Config` inherit state for each weather detail override.
+
 ## 0.1.74
 
 - Add a Home Assistant Album Order select for immich-kiosk `album_order` values.
