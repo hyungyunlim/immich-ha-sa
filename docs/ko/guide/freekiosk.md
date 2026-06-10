@@ -14,6 +14,10 @@
 - **Remote API URL**: FreeKiosk REST 기본 URL, 예: `http://192.168.1.160:8080`
 - **Remote API Key**: 선택, FreeKiosk에서 활성화한 경우에만
 
+::: warning 원격 액자는 같은 네트워크가 필요합니다
+컨트롤러가 Remote API URL에 직접 도달할 수 있어야 합니다. LAN 밖의 액자는 Cloudflare Tunnel이 이 트래픽을 처리하지 않으므로 — WireGuard나 Tailscale로 컨트롤러 호스트와 액자를 연결하고, 액자의 VPN 주소를 Remote API URL로 사용하세요. [원격 프레임](./remote-frames#remote-hardware-control)을 참고하세요.
+:::
+
 ## Home Assistant에 생기는 것
 
 Number 엔티티:

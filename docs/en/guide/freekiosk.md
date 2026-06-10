@@ -14,6 +14,10 @@ Open the device settings in the [controller console](./controller-setup) and set
 - **Remote API URL**: the FreeKiosk REST base URL, for example `http://192.168.1.160:8080`
 - **Remote API Key**: optional, only if enabled in FreeKiosk
 
+::: warning Remote frames need a shared network
+The controller must be able to reach the Remote API URL directly. For a frame outside the LAN, the Cloudflare Tunnel does not carry this traffic — connect the controller host and the frame with WireGuard or Tailscale and use the frame's VPN address as the Remote API URL. See [Remote Frames](./remote-frames#remote-hardware-control).
+:::
+
 ## What you get in Home Assistant
 
 Number entities:
