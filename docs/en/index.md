@@ -27,22 +27,44 @@ title: Immich Frame Controller
     </div>
     <div class="diagram-frames">
       <div class="diagram-frame">
-        <div class="frame-screen frame-screen-a">
-          <img src="/frames/living.webp" alt="" loading="lazy" width="640" height="640" />
+        <div class="frame-mat">
+          <svg viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="62" cy="36" r="11" />
+              <path d="M16 102 L42 66 L58 88 L70 74 L84 102" />
+              <path d="M14 102 H86" />
+            </g>
+          </svg>
         </div>
         <div class="frame-name">Living room</div>
         <code class="frame-url">/f/living-room</code>
       </div>
       <div class="diagram-frame">
-        <div class="frame-screen frame-screen-b">
-          <img src="/frames/kitchen.webp" alt="" loading="lazy" width="640" height="640" />
+        <div class="frame-mat">
+          <svg viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M40 102 Q34 84 44 74 L56 74 Q66 84 60 102 Z" />
+              <path d="M50 74 C50 58 42 54 36 44" />
+              <path d="M50 74 C50 56 58 50 66 38" />
+              <circle cx="34" cy="40" r="2.5" />
+              <circle cx="68" cy="34" r="2.5" />
+              <path d="M26 102 H74" />
+            </g>
+          </svg>
         </div>
         <div class="frame-name">Kitchen</div>
         <code class="frame-url">/f/kitchen</code>
       </div>
       <div class="diagram-frame">
-        <div class="frame-screen frame-screen-c">
-          <img src="/frames/parents.webp" alt="" loading="lazy" width="640" height="640" />
+        <div class="frame-mat">
+          <svg viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="40" cy="58" r="10" />
+              <path d="M24 104 Q24 74 40 74 Q56 74 56 104" />
+              <circle cx="66" cy="64" r="8" />
+              <path d="M52 104 Q52 80 66 80 Q80 80 80 104" />
+            </g>
+          </svg>
         </div>
         <div class="frame-name">Parents' home</div>
         <code class="frame-url">/f/parents</code>
