@@ -1,6 +1,7 @@
 interface SetupPageParams {
   controllerUrl: string;
   deviceId: string;
+  ingressPath?: string;
   pairingCode: string;
   expiresAt: string;
   albumCount: number;
@@ -1165,8 +1166,15 @@ export function renderSetupPage(params: SetupPageParams): string {
       return payload;
     }
 
+    var ingressBasePath = ${JSON.stringify(params.ingressPath ?? '')};
     function controllerPath(path) {
       const cleanPath = String(path).replace(/^\\/+/, '');
+      // Under Home Assistant ingress the page URL (panel route) is not a reliable
+      // base for relative API calls, so anchor to the ingress prefix the server
+      // reported. Direct LAN access has no prefix and resolves relative as before.
+      if (ingressBasePath) {
+        return window.location.origin + ingressBasePath + '/' + cleanPath;
+      }
       return new URL(cleanPath, new URL('.', window.location.href)).toString();
     }
 

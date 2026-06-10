@@ -780,6 +780,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     reply.header('cache-control', 'no-store, max-age=0').type('text/html; charset=utf-8').send(renderSetupPage({
       controllerUrl: device.localControllerBaseUrl,
       deviceId: device.id,
+      ingressPath: ingressPathFromRequest(request),
       pairingCode: pairing.code,
       expiresAt: pairing.expiresAt,
       albumCount: data.albumCache.items.length,
@@ -1694,6 +1695,17 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       if (!store.getDevice(candidate)) return candidate;
     }
     return `${base}_${Date.now().toString(36)}`;
+  }
+
+  // Home Assistant ingress serves the console under a prefixed path and advertises
+  // it via X-Ingress-Path. The client needs it to build API URLs that route back to
+  // the add-on; without it, relative fetches resolve against the panel URL and never
+  // reach the controller. Absent (direct LAN access) → client uses relative paths.
+  function ingressPathFromRequest(request: FastifyRequest): string | undefined {
+    const raw = request.headers['x-ingress-path'];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (typeof value !== 'string' || !value.startsWith('/')) return undefined;
+    return value.replace(/\/+$/, '');
   }
 
   function requireLocalConsoleAccess(request: FastifyRequest, reply: FastifyReply): boolean {

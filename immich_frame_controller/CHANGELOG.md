@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.78
+
+- Fix device management (add/edit/delete, MQTT bind/unbind) failing from the Home Assistant ingress panel: the console now builds API request URLs from the `X-Ingress-Path` header the Supervisor provides, so they route back to the add-on instead of resolving against the panel URL and never arriving. Direct LAN access is unchanged.
+
 ## 0.1.77
 
 - Prefer the FreeKiosk REST API for hardware commands (screen, brightness, volume) whenever the controller can reach the device; MQTT now carries commands only for broker-only remote frames or as a safe retry. REST confirms real execution and keeps local frames working even when a FreeKiosk release regresses an MQTT command (e.g. screen power). Telemetry, presence, and motion still come over MQTT.

@@ -448,6 +448,27 @@ describe('controller API', () => {
     expect(response.body).toContain("'Request failed' + status");
     expect(response.body).not.toContain('fetch(path,');
     expect(response.headers['cache-control']).toBe('no-store, max-age=0');
+    // Direct LAN access: no ingress prefix, client resolves relative paths.
+    expect(response.body).toContain('var ingressBasePath = "";');
+    await server.close();
+  });
+
+  it('injects the Home Assistant ingress path so console API calls route back to the add-on', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createTestServer({ config });
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/setup',
+      headers: { host: '10.0.0.10:18082', 'x-ingress-path': '/api/hassio_ingress/abc123/' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    // Trailing slash stripped; client builds origin + prefix + '/api/...'.
+    expect(response.body).toContain('var ingressBasePath = "/api/hassio_ingress/abc123";');
+    expect(response.body).toContain("window.location.origin + ingressBasePath + '/' + cleanPath");
     await server.close();
   });
 
