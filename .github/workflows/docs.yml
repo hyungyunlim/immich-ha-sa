@@ -37,7 +37,7 @@ jobs:
         working-directory: docs
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: b2a65131115f38b75bcc1f722e08db55
