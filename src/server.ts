@@ -358,13 +358,81 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       logger: app.log,
     })
     : undefined);
+  // Open SSE streams that push normalized telemetry to the Home Assistant
+  // integration the instant MQTT reports a change (motion, screen, availability),
+  // instead of waiting for its periodic poll.
+  const telemetryClients = new Map<string, Set<FastifyReply>>();
   mqtt?.onDeviceUpdate((snapshot, kind) => {
     if (kind === 'state') rememberMqttDeviceIp(snapshot);
+    const device = deviceForMqttTopicId(snapshot.topicId);
+    if (device) emitTelemetry(device.id);
   });
   mqtt?.connect();
   app.addHook('onClose', async () => {
+    for (const clients of telemetryClients.values()) {
+      for (const reply of clients) {
+        try {
+          reply.raw.end();
+        } catch {
+          // already closed
+        }
+      }
+    }
+    telemetryClients.clear();
     await mqtt?.close();
   });
+
+  function telemetryPayloadForDevice(device: FrameDevice): Record<string, unknown> | undefined {
+    const snapshot = mqttSnapshotForDevice(device);
+    if (!snapshot) return undefined;
+    if (snapshot.availability === 'online' && snapshot.state) {
+      return {
+        provider: 'freekiosk',
+        source: 'mqtt',
+        availability: 'online' satisfies RemoteAvailability,
+        status: snapshot.state,
+        statusReceivedAt: snapshot.stateReceivedAt,
+        capabilities: inferFreeKioskCapabilities(snapshot.state),
+      };
+    }
+    return {
+      provider: 'freekiosk',
+      source: 'mqtt',
+      availability: (snapshot.availability ?? 'unknown') satisfies RemoteAvailability,
+      status: undefined,
+      lastStateAt: snapshot.stateReceivedAt,
+    };
+  }
+
+  function writeTelemetryEvent(reply: FastifyReply, event: string, data: unknown): boolean {
+    try {
+      reply.raw.write(`event: ${event}\n`);
+      reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function emitTelemetry(deviceId: string): void {
+    const clients = telemetryClients.get(deviceId);
+    if (!clients || clients.size === 0) return;
+    const device = store.getDevice(deviceId);
+    if (!device) return;
+    const payload = telemetryPayloadForDevice(device);
+    if (!payload) return;
+    for (const reply of clients) {
+      if (!writeTelemetryEvent(reply, 'telemetry', payload)) clients.delete(reply);
+    }
+  }
+
+  function telemetryHeartbeat(): void {
+    for (const clients of telemetryClients.values()) {
+      for (const reply of clients) {
+        if (!writeTelemetryEvent(reply, 'heartbeat', { at: new Date().toISOString() })) clients.delete(reply);
+      }
+    }
+  }
 
   // Keeps the REST auto-discovery endpoint aligned with the IP the device reports
   // over MQTT, so REST fallback keeps working after DHCP changes.
@@ -690,7 +758,10 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     done(null, body);
   });
 
-  setInterval(() => events.heartbeat(), 25000).unref();
+  setInterval(() => {
+    events.heartbeat();
+    telemetryHeartbeat();
+  }, 25000).unref();
   const albumRefreshIntervalSeconds = deps.config.albumRefreshIntervalSeconds ?? 0;
   const runAutomaticMediaRefresh = () => {
     void refreshAlbumCache('automatic').catch((error) => {
@@ -1427,6 +1498,43 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   app.get('/api/mqtt/status', async (request, reply) => {
     if (!requireLocalConsoleAccess(request, reply)) return;
     return ok(buildMqttStatusPayload());
+  });
+
+  app.get('/api/frames/:deviceId/telemetry/events', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const { deviceId } = request.params as { deviceId: string };
+    const device = store.getDevice(deviceId);
+    if (!device) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
+
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    reply.raw.write('\n');
+
+    const clients = telemetryClients.get(deviceId) ?? new Set<FastifyReply>();
+    clients.add(reply);
+    telemetryClients.set(deviceId, clients);
+
+    // Send the current snapshot immediately so the integration does not wait for
+    // the next MQTT publish to populate.
+    const initial = telemetryPayloadForDevice(device);
+    if (initial) writeTelemetryEvent(reply, 'telemetry', initial);
+
+    request.raw.on('close', () => {
+      // Re-fetch the live Set: a write-failure path may have already pruned the
+      // entry captured at subscribe time.
+      const live = telemetryClients.get(deviceId);
+      if (!live) return;
+      live.delete(reply);
+      if (live.size === 0) telemetryClients.delete(deviceId);
+    });
+    return reply;
   });
 
   app.get('/api/frame/:deviceId/events', async (request, reply) => {

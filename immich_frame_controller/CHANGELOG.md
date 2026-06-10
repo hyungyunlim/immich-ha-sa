@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.79
+
+- Push FreeKiosk telemetry to Home Assistant in real time over a new controller SSE stream (`/api/frames/<id>/telemetry/events`): motion, screen state, and online/offline now reach Home Assistant in about a second instead of waiting for the 30-second poll, making camera-based presence automations practical. The integration keeps polling as a fallback and reconnects automatically; older controllers without the stream degrade gracefully to polling.
+
 ## 0.1.78
 
 - Fix device management (add/edit/delete, MQTT bind/unbind) failing from the Home Assistant ingress panel: the console now builds API request URLs from the `X-Ingress-Path` header the Supervisor provides, so they route back to the add-on instead of resolving against the panel URL and never arriving. Direct LAN access is unchanged.

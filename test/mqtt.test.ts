@@ -1,5 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
-import { createServer as createHttpServer } from 'node:http';
+import { createServer as createHttpServer, request as httpRequest } from 'node:http';
 import { createServer as createNetServer, type Server as NetServer } from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -69,6 +69,39 @@ const MQTT_ONLY_STATE = {
   wifi: { ssid: 'TestNet', signalLevel: 70 },
   device: { version: '1.2.12' },
 };
+
+function readSseEvents(
+  port: number,
+  path: string,
+  onEvent: (event: string, data: string) => void,
+): { close: () => void } {
+  const req = httpRequest(
+    { host: '127.0.0.1', port, path, headers: { accept: 'text/event-stream' } },
+    (res) => {
+      res.setEncoding('utf8');
+      let buffer = '';
+      res.on('data', (chunk: string) => {
+        buffer += chunk;
+        let boundary = buffer.indexOf('\n\n');
+        while (boundary !== -1) {
+          const frame = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          let event = 'message';
+          let data = '';
+          for (const line of frame.split('\n')) {
+            if (line.startsWith('event:')) event = line.slice(6).trim();
+            else if (line.startsWith('data:')) data += line.slice(5).trim();
+          }
+          if (data) onEvent(event, data);
+          boundary = buffer.indexOf('\n\n');
+        }
+      });
+    },
+  );
+  req.on('error', () => undefined);
+  req.end();
+  return { close: () => req.destroy() };
+}
 
 async function startMockFreeKiosk(
   handler: (url: string) => { status?: number; body: unknown },
@@ -527,6 +560,67 @@ describe('FreeKiosk MQTT bridge', () => {
     expect(response.statusCode).toBe(502);
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(received).toEqual([]);
+  });
+
+  it('pushes telemetry over SSE on every MQTT update, including motion', async () => {
+    const { server, fake } = await setupMqttWorld();
+    await server.listen({ port: 0, host: '127.0.0.1' });
+    const port = (server.server.address() as AddressInfo).port;
+
+    const events: Array<{ event: string; data: any }> = [];
+    const sse = readSseEvents(port, '/api/frames/lenovo/telemetry/events', (event, data) => {
+      events.push({ event, data: JSON.parse(data) });
+    });
+    cleanups.push(async () => sse.close());
+
+    // The current snapshot is delivered on connect, no MQTT publish needed.
+    await waitFor(() => events.some((e) => e.event === 'telemetry'), 'initial telemetry');
+    const initial = events.find((e) => e.event === 'telemetry');
+    expect(initial?.data.source).toBe('mqtt');
+    expect(initial?.data.availability).toBe('online');
+    expect(initial?.data.status.screen.brightness).toBe(37);
+    expect(initial?.data.status.webview.motionDetected).toBe(false);
+
+    // A motion event publishes a fresh state; the controller must push it immediately.
+    const motionState = {
+      ...FREEKIOSK_STATE,
+      webview: { ...FREEKIOSK_STATE.webview, motionDetected: true },
+    };
+    fake.publish('freekiosk/lobby/state', JSON.stringify(motionState), { retain: true, qos: 0 });
+
+    await waitFor(
+      () => events.some((e) => e.event === 'telemetry' && e.data.status?.webview?.motionDetected === true),
+      'motion telemetry push',
+    );
+  });
+
+  it('pushes an offline telemetry event when the device drops', async () => {
+    const { server, fake } = await setupMqttWorld();
+    await server.listen({ port: 0, host: '127.0.0.1' });
+    const port = (server.server.address() as AddressInfo).port;
+
+    const events: Array<{ event: string; data: any }> = [];
+    const sse = readSseEvents(port, '/api/frames/lenovo/telemetry/events', (event, data) => {
+      events.push({ event, data: JSON.parse(data) });
+    });
+    cleanups.push(async () => sse.close());
+    await waitFor(() => events.some((e) => e.event === 'telemetry'), 'initial telemetry');
+
+    fake.publish('freekiosk/lobby/availability', 'offline', { retain: true, qos: 1 });
+
+    await waitFor(
+      () => events.some((e) => e.event === 'telemetry' && e.data.availability === 'offline'),
+      'offline telemetry push',
+    );
+  });
+
+  it('returns 404 telemetry stream for an unknown frame', async () => {
+    const { server } = await setupMqttWorld();
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/frames/ghost/telemetry/events',
+    });
+    expect(response.statusCode).toBe(404);
   });
 
   it('fails hardware commands fast when the device is offline and REST is unreachable', async () => {

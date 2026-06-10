@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+
 from aiohttp import ClientError
 import voluptuous as vol
 
@@ -10,7 +13,7 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import aiohttp_client, config_validation as cv
 
-from .api import ImmichFrameApiError, ImmichFrameClient
+from .api import ImmichFrameApiError, ImmichFrameClient, TelemetryStreamUnsupported
 from .const import (
     CONF_API_TOKEN,
     CONF_CONTROLLER_URL,
@@ -37,6 +40,11 @@ from .profile_helpers import (
     profile_id_for_save,
     profile_name_for_save,
 )
+
+LOGGER = logging.getLogger(__name__)
+
+TELEMETRY_BACKOFF_START = 5
+TELEMETRY_BACKOFF_MAX = 60
 
 PLATFORMS = [
     Platform.BINARY_SENSOR,
@@ -111,7 +119,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Push real-time remote-status updates (motion, screen, availability) between
+    # the coordinator's periodic polls. Falls back silently to polling when the
+    # controller has no telemetry stream.
+    entry.async_create_background_task(
+        hass,
+        _telemetry_push_listener(client, coordinator),
+        name=f"{DOMAIN}_telemetry_{entry.entry_id}",
+    )
     return True
+
+
+async def _telemetry_push_listener(client: ImmichFrameClient, coordinator: ImmichFrameCoordinator) -> None:
+    backoff = TELEMETRY_BACKOFF_START
+    while True:
+        try:
+            async for payload in client.stream_telemetry():
+                if coordinator.data is not None:
+                    coordinator.async_set_updated_data({**coordinator.data, "remote_status": payload})
+                backoff = TELEMETRY_BACKOFF_START
+        except TelemetryStreamUnsupported:
+            LOGGER.debug("Controller has no telemetry stream; using polling only")
+            return
+        except asyncio.CancelledError:
+            raise
+        except (ClientError, TimeoutError) as err:
+            LOGGER.debug("Telemetry stream disconnected (%s); reconnecting in %ss", err, backoff)
+        except Exception:  # noqa: BLE001 - keep the listener alive across unexpected errors
+            LOGGER.exception("Unexpected telemetry stream error; reconnecting in %ss", backoff)
+        await asyncio.sleep(backoff)
+        backoff = min(backoff * 2, TELEMETRY_BACKOFF_MAX)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

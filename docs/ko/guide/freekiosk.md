@@ -59,6 +59,20 @@ Number 엔티티:
 - **Motion** — FreeKiosk 카메라 모션 (`webview.motionDetected`). 상시 보고가 필요하면 FreeKiosk의 *Always-on Motion Detection*을 켜세요
 - **Battery**, **Battery Charging**, **WiFi Signal** — 진단 센서
 
+> [!NOTE]
+> **Motion** 센서는 카메라가 있는 기기에서만 동작합니다. 카메라 없는 액자(대부분의 디지털 액자)는 모션이 보고되지 않으니, 쓰지 않으면 엔티티를 비활성화하세요.
+
+### MQTT 실시간 업데이트
+
+프레임이 MQTT로 바인딩되면, 기기가 변화를 publish하는 즉시 컨트롤러가 텔레메트리를 Home Assistant로 스트리밍합니다. 그래서 모션·화면 상태·online/offline이 통합의 30초 폴링을 기다리지 않고 약 1초 안에 반영돼요. "사람이 다가오면 화면 켜기" 같은 presence 자동화가 쓸만해지는 게 이 덕분입니다.
+
+카메라 기기에서 모션 지연을 최소화하려면:
+
+- FreeKiosk MQTT 설정에서 **Always-on Motion Detection**을 켜세요 (안 켜면 모션은 screensaver 중에만 동작). 켜두면 모션 변화가 발생 즉시 publish됩니다.
+- 주기적 **Status Interval**(기본 30초)은 배터리/WiFi/조도 같은 정기 텔레메트리만 좌우합니다. 모션은 별도로 즉시 푸시되므로 보통 낮출 필요 없어요.
+
+MQTT 없이(REST 전용 프레임)는 통합이 계속 30초 폴링합니다 — 푸시 스트림의 소스가 없을 뿐이에요. 30초 폴링은 항상 폴백으로 돌기 때문에 스트림이 끊겨도 자동 복구됩니다.
+
 버튼:
 
 - **Next**, **Previous**, **Play/Pause**, **Reload**

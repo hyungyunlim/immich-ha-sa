@@ -59,6 +59,20 @@ Status entities (when FreeKiosk telemetry is available over REST or MQTT):
 - **Motion** — FreeKiosk camera motion (`webview.motionDetected`); enable *Always-on Motion Detection* in FreeKiosk for continuous reporting
 - **Battery**, **Battery Charging**, **WiFi Signal** — diagnostic sensors
 
+> [!NOTE]
+> The **Motion** sensor needs a device with a camera. Camera-less frames (most digital photo frames) report no motion — disable the entity if it is not useful.
+
+### Real-time updates over MQTT
+
+When a frame is bound over MQTT, the controller streams its telemetry to Home Assistant the instant the device publishes a change, so motion, screen state, and online/offline reach Home Assistant in about a second instead of waiting for the integration's 30-second poll. This is what makes presence automations ("turn the screen on when someone approaches") usable.
+
+For the lowest motion latency on a camera device:
+
+- Enable **Always-on Motion Detection** in the FreeKiosk MQTT settings (otherwise motion only runs during the screensaver). With it on, FreeKiosk publishes motion changes as they happen.
+- The periodic **Status Interval** (default 30s) only governs the routine battery/WiFi/light telemetry; motion is pushed out-of-band, so you usually do not need to lower it.
+
+Without MQTT (REST-only frames), the integration keeps polling every 30 seconds — the push stream simply has no source. The 30-second poll always runs as a fallback, so a dropped stream self-heals.
+
 Buttons:
 
 - **Next**, **Previous**, **Play/Pause**, **Reload**
