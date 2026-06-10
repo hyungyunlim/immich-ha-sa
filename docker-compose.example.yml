@@ -24,6 +24,11 @@ services:
       DEFAULT_NETWORK_MODE: auto
       POLL_INTERVAL_SECONDS: "20"
       CONTROLLER_API_TOKEN: "${CONTROLLER_API_TOKEN}"
+
+      MQTT_BROKER_URL: "${MQTT_BROKER_URL:-}"
+      MQTT_USERNAME: "${MQTT_USERNAME:-}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD:-}"
+      MQTT_BASE_TOPIC: "${MQTT_BASE_TOPIC:-freekiosk}"
     volumes:
       - ./data:/data
     networks:

@@ -1,11 +1,13 @@
 {
   "domain": "immich_frame",
   "name": "Immich Frame Controller",
-  "version": "0.1.75",
+  "version": "0.1.76",
   "config_flow": true,
   "documentation": "https://github.com/hyungyunlim/immich-ha-sa",
   "issue_tracker": "https://github.com/hyungyunlim/immich-ha-sa/issues",
   "iot_class": "local_push",
   "requirements": [],
-  "codeowners": ["@hyungyunlim"]
+  "codeowners": [
+    "@hyungyunlim"
+  ]
 }

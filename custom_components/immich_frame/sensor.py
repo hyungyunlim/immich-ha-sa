@@ -5,11 +5,13 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DATA_COORDINATOR, DOMAIN
 from .coordinator import ImmichFrameCoordinator
 from .entity_helpers import frame_device_info, frame_label, frame_unique_id
+from .remote_status import remote_status_number
 
 SENSITIVE_QUERY_PARAMS = {"api_key", "apikey", "key", "password", "secret", "token"}
 MAX_STATE_LENGTH = 255
@@ -24,6 +26,8 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ImmichFrameRendererUrlSensor(coordinator),
             ImmichFrameResolvedNetworkModeSensor(coordinator),
             ImmichFrameRemoteLightSensor(coordinator),
+            ImmichFrameRemoteBatterySensor(coordinator),
+            ImmichFrameRemoteWifiSignalSensor(coordinator),
         ]
     )
 
@@ -174,6 +178,50 @@ class ImmichFrameRemoteLightSensor(CoordinatorEntity[ImmichFrameCoordinator], Se
             return None
         value = sensors.get("light")
         return float(value) if isinstance(value, (int, float)) else None
+
+
+class ImmichFrameRemoteBatterySensor(CoordinatorEntity[ImmichFrameCoordinator], SensorEntity):
+    _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Battery"
+        self._attr_unique_id = frame_unique_id(device_id, "remote_battery_level")
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
+
+    @property
+    def native_value(self) -> float | None:
+        return remote_status_number(self.coordinator.data, ["battery", "level"])
+
+
+class ImmichFrameRemoteWifiSignalSensor(CoordinatorEntity[ImmichFrameCoordinator], SensorEntity):
+    _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:wifi"
+
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame WiFi Signal"
+        self._attr_unique_id = frame_unique_id(device_id, "remote_wifi_signal")
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
+
+    @property
+    def native_value(self) -> float | None:
+        return remote_status_number(self.coordinator.data, ["wifi", "signalLevel"])
 
 
 def redact_sensitive_query_params(url: str) -> str:

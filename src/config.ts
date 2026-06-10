@@ -1,11 +1,19 @@
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { normalizeMqttBrokerUrl } from './mqttClient.js';
 import type { FrameDevice, NetworkMode, PreviewOrientation } from './types.js';
 
 const NetworkModeSchema = z.enum(['auto', 'local', 'external']);
 const OptionalUrlSchema = z.preprocess(
   (value) => (value === '' ? undefined : value),
+  z.string().url().optional(),
+);
+
+const OptionalMqttBrokerUrlSchema = z.preprocess(
+  (value) => (typeof value === 'string'
+    ? (value.trim() === '' ? undefined : normalizeMqttBrokerUrl(value))
+    : value),
   z.string().url().optional(),
 );
 
@@ -26,7 +34,18 @@ const EnvSchema = z.object({
   POLL_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(300).default(20),
   ALBUM_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(0).max(86400).default(900),
   CONTROLLER_API_TOKEN: z.string().optional(),
+  MQTT_BROKER_URL: OptionalMqttBrokerUrlSchema,
+  MQTT_USERNAME: z.string().optional(),
+  MQTT_PASSWORD: z.string().optional(),
+  MQTT_BASE_TOPIC: z.string().default('freekiosk'),
 });
+
+export interface MqttConfig {
+  brokerUrl: string;
+  username?: string;
+  password?: string;
+  baseTopic: string;
+}
 
 export interface AppConfig {
   port: number;
@@ -39,6 +58,7 @@ export interface AppConfig {
   defaultDevice: FrameDevice;
   controllerApiToken?: string;
   albumRefreshIntervalSeconds?: number;
+  mqtt?: MqttConfig;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -78,6 +98,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     defaultDevice,
     controllerApiToken: parsed.CONTROLLER_API_TOKEN || undefined,
     albumRefreshIntervalSeconds: parsed.ALBUM_REFRESH_INTERVAL_SECONDS,
+    mqtt: parsed.MQTT_BROKER_URL
+      ? {
+        brokerUrl: parsed.MQTT_BROKER_URL,
+        username: parsed.MQTT_USERNAME || undefined,
+        password: parsed.MQTT_PASSWORD || undefined,
+        baseTopic: parsed.MQTT_BASE_TOPIC.trim() || 'freekiosk',
+      }
+      : undefined,
   };
 }
 

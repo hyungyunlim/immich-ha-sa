@@ -21,6 +21,23 @@ def remote_status_bool(data: dict[str, Any], path: list[str]) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+def remote_status_number(data: dict[str, Any], path: list[str]) -> float | None:
+    value = remote_status_value(data, path)
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def remote_availability(data: dict[str, Any]) -> str | None:
+    remote_status = data.get("remote_status") or {}
+    value = remote_status.get("availability")
+    return value if value in ("online", "offline") else None
+
+
+def remote_status_source(data: dict[str, Any]) -> str | None:
+    remote_status = data.get("remote_status") or {}
+    value = remote_status.get("source")
+    return value if isinstance(value, str) else None
+
+
 def remote_effective_muted(data: dict[str, Any]) -> bool | None:
     muted = remote_status_bool(data, ["audio", "muted"])
     if muted is not None:

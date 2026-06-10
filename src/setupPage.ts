@@ -8,8 +8,27 @@ interface SetupPageParams {
   personCount: number;
   personRefreshedAt?: string;
   globalKioskPasswordConfigured: boolean;
+  mqtt: SetupPageMqttStatus;
   frameClaims: SetupPageFrameClaim[];
   devices: SetupPageDevice[];
+}
+
+interface SetupPageMqttDevice {
+  topicId: string;
+  availability: 'online' | 'offline' | 'unknown';
+  ip?: string;
+  stateReceivedAt?: string;
+  boundDeviceId?: string;
+  suggestedDeviceId?: string;
+}
+
+interface SetupPageMqttStatus {
+  enabled: boolean;
+  connected: boolean;
+  brokerUrl?: string;
+  baseTopic?: string;
+  lastError?: string;
+  devices: SetupPageMqttDevice[];
 }
 
 interface SetupPageFrameClaim {
@@ -54,6 +73,8 @@ interface SetupPageDevice {
   lastSeenIp?: string;
   lastSeenAt?: string;
   remoteApiKeyConfigured?: boolean;
+  mqttTopicId?: string;
+  remoteAvailability?: string;
   isDefault: boolean;
   localFrameUrl: string;
   localStableFrameUrl: string;
@@ -944,12 +965,14 @@ export function renderSetupPage(params: SetupPageParams): string {
       </form>
     </section>
 
+    ${renderMqttSection(params.mqtt, params.devices)}
+
     <div class="section-title">
       <h2>Frames</h2>
       <span class="pill">${params.devices.length} configured</span>
     </div>
     <section class="device-grid">
-      ${params.devices.map(renderDeviceCard).join('')}
+      ${params.devices.map((device) => renderDeviceCard(device, params.mqtt)).join('')}
     </section>
 
     <div class="section-title">
@@ -1133,6 +1156,9 @@ export function renderSetupPage(params: SetupPageParams): string {
       if (remoteApiKey) {
         payload.remoteApiKey = remoteApiKey;
       }
+      if (formData.has('mqttTopicId')) {
+        payload.mqttTopicId = optionalValue(formData, 'mqttTopicId') ?? (includeId ? undefined : null);
+      }
       if (includeId) {
         payload.id = String(formData.get('id') || '').trim().toLowerCase();
       }
@@ -1262,6 +1288,51 @@ export function renderSetupPage(params: SetupPageParams): string {
       });
     }
 
+    function setMqttRowStatus(row, message, failed) {
+      const status = row?.querySelector('[data-mqtt-status]');
+      if (!status) return;
+      status.textContent = message || '';
+      status.style.color = failed ? '#991b1b' : '#697586';
+    }
+
+    for (const button of document.querySelectorAll('[data-mqtt-bind]')) {
+      button.addEventListener('click', async () => {
+        const topicId = button.getAttribute('data-mqtt-bind') || '';
+        const row = button.closest('[data-mqtt-row]');
+        const deviceId = row?.querySelector('[data-mqtt-device-select]')?.value;
+        if (!deviceId) return;
+        setMqttRowStatus(row, 'Binding...', false);
+        try {
+          await requestJson('/api/devices/' + encodeURIComponent(deviceId), {
+            method: 'PATCH',
+            body: JSON.stringify({ mqttTopicId: topicId, remoteControlType: 'freekiosk' }),
+          });
+          setMqttRowStatus(row, 'Bound. Reloading...', false);
+          reloadSoon();
+        } catch (error) {
+          setMqttRowStatus(row, error instanceof Error ? error.message : String(error), true);
+        }
+      });
+    }
+
+    for (const button of document.querySelectorAll('[data-mqtt-unbind]')) {
+      button.addEventListener('click', async () => {
+        const deviceId = button.getAttribute('data-mqtt-unbind') || '';
+        const row = button.closest('[data-mqtt-row]');
+        setMqttRowStatus(row, 'Unbinding...', false);
+        try {
+          await requestJson('/api/devices/' + encodeURIComponent(deviceId), {
+            method: 'PATCH',
+            body: JSON.stringify({ mqttTopicId: null }),
+          });
+          setMqttRowStatus(row, 'Unbound. Reloading...', false);
+          reloadSoon();
+        } catch (error) {
+          setMqttRowStatus(row, error instanceof Error ? error.message : String(error), true);
+        }
+      });
+    }
+
     for (const button of document.querySelectorAll('[data-delete-device]')) {
       button.addEventListener('click', async () => {
         const deviceId = button.getAttribute('data-delete-device') || '';
@@ -1323,7 +1394,73 @@ export function renderSetupBlockedPage(): string {
 </html>`;
 }
 
-function renderDeviceCard(device: SetupPageDevice): string {
+function renderMqttSection(mqtt: SetupPageMqttStatus, devices: SetupPageDevice[]): string {
+  const statusPill = !mqtt.enabled
+    ? '<span class="pill">Off</span>'
+    : mqtt.connected
+      ? '<span class="pill ok">Connected</span>'
+      : '<span class="pill warn">Disconnected</span>';
+  const lead = mqtt.enabled
+    ? `Broker <code>${escapeHtml(mqtt.brokerUrl ?? '')}</code> / base topic <code>${escapeHtml(mqtt.baseTopic ?? 'freekiosk')}</code>. FreeKiosk frames that publish to this broker appear below; bind one to a frame to get push hardware control, online/offline status, and live telemetry without IP discovery.`
+    : 'MQTT is off. Set <code>mqtt_broker_url</code> in the add-on options (auto-detected when the Mosquitto add-on is installed) or the <code>MQTT_BROKER_URL</code> env for standalone Docker, then enable MQTT inside the FreeKiosk app on the frame.';
+  const errorRow = mqtt.enabled && !mqtt.connected && mqtt.lastError
+    ? `<div class="claim-row"><span>Last connection error: ${escapeHtml(mqtt.lastError)}</span></div>`
+    : '';
+  return `<div class="section-title">
+      <h2>MQTT Bridge</h2>
+      ${statusPill}
+    </div>
+    <section class="panel">
+      <div class="form-grid">
+        <p class="form-lead">${lead}</p>
+        <datalist id="mqtt-topic-options">
+          ${mqtt.devices.map((entry) => `<option value="${escapeAttribute(entry.topicId)}"></option>`).join('')}
+        </datalist>
+        ${mqtt.enabled ? renderMqttDeviceRows(mqtt, devices) : ''}
+        ${errorRow}
+      </div>
+    </section>`;
+}
+
+function renderMqttDeviceRows(mqtt: SetupPageMqttStatus, devices: SetupPageDevice[]): string {
+  if (mqtt.devices.length === 0) {
+    return `<div class="claim-list"><div class="claim-row"><span>No FreeKiosk devices seen on the broker yet. In the FreeKiosk app open Advanced &gt; MQTT, point it at the same broker, set a Device Name, and press Connect.</span></div></div>`;
+  }
+  const rows = mqtt.devices.map((entry) => {
+    const availabilityPill = entry.availability === 'online'
+      ? '<span class="pill ok">online</span>'
+      : entry.availability === 'offline'
+        ? '<span class="pill warn">offline</span>'
+        : '<span class="pill">unknown</span>';
+    const details = [
+      entry.ip ? `IP ${entry.ip}` : '',
+      entry.stateReceivedAt ? `state ${formatTimestamp(entry.stateReceivedAt)}` : '',
+    ].filter(Boolean).join(' / ');
+    const bound = entry.boundDeviceId
+      ? devices.find((device) => device.id === entry.boundDeviceId)
+      : undefined;
+    const action = bound
+      ? `<span class="muted">Bound to <strong>${escapeHtml(bound.name)}</strong></span>
+        <button type="button" data-mqtt-unbind="${escapeAttribute(entry.boundDeviceId ?? '')}">Unbind</button>`
+      : `<select data-mqtt-device-select>
+          ${devices.map((device) => `<option value="${escapeAttribute(device.id)}"${device.id === entry.suggestedDeviceId ? ' selected' : ''}>${escapeHtml(device.name)}</option>`).join('')}
+        </select>
+        <button type="button" class="primary" data-mqtt-bind="${escapeAttribute(entry.topicId)}">Bind</button>`;
+    const suggestion = !bound && entry.suggestedDeviceId
+      ? `<span class="help-text">IP matches frame ${escapeHtml(entry.suggestedDeviceId)}.</span>`
+      : '';
+    return `<div class="claim-row" data-mqtt-row>
+      <span><strong>${escapeHtml(entry.topicId)}</strong> ${availabilityPill}${details ? ` <span class="muted">${escapeHtml(details)}</span>` : ''} ${suggestion}</span>
+      <span class="row" style="gap: 8px;">
+        <span class="form-status" data-mqtt-status></span>
+        ${action}
+      </span>
+    </div>`;
+  }).join('');
+  return `<div class="claim-list">${rows}</div>`;
+}
+
+function renderDeviceCard(device: SetupPageDevice, mqtt: SetupPageMqttStatus): string {
   const rendererUrl = device.rendererUrl
     ? redactSensitiveQueryParams(device.rendererUrl)
     : 'Not resolved yet';
@@ -1412,6 +1549,7 @@ function renderDeviceCard(device: SetupPageDevice): string {
         ${renderKeyValue('Sleep', sleepWindow)}
         ${renderKeyValue('Remote', renderRemoteSummary(device))}
         ${renderKeyValue('Remote Endpoint', renderRemoteEndpointSummary(device))}
+        ${renderKeyValue('MQTT', renderMqttBindingSummary(device, mqtt))}
         </dl>
       </details>
       <details>
@@ -1486,6 +1624,11 @@ function renderDeviceCard(device: SetupPageDevice): string {
           <label class="field full">
             <span class="label">Remote API Key</span>
             <input name="remoteApiKey" type="password" autocomplete="new-password" placeholder="${device.remoteApiKeyConfigured ? 'configured; leave blank to keep' : 'optional'}">
+          </label>
+          <label class="field full">
+            <span class="label">MQTT Topic ID</span>
+            <input name="mqttTopicId" list="mqtt-topic-options" value="${escapeAttribute(device.mqttTopicId ?? '')}" placeholder="FreeKiosk device name, e.g. lobby">
+            <span class="help-text">FreeKiosk Device Name as used in its MQTT topics (<code>freekiosk/&lt;topic&gt;/state</code>). Blank disables MQTT control for this frame; the MQTT Bridge section above can bind this automatically.</span>
           </label>
           <div class="form-actions">
             <span class="form-status" data-form-status></span>
@@ -1595,6 +1738,14 @@ function renderRemoteSummary(device: SetupPageDevice): string {
   if (source === 'manual') return 'freekiosk / manual';
   if (source === 'auto') return 'freekiosk / verified auto';
   return 'freekiosk / waiting for verified IP';
+}
+
+function renderMqttBindingSummary(device: SetupPageDevice, mqtt: SetupPageMqttStatus): string {
+  if (!mqtt.enabled) return 'Bridge off';
+  if ((device.remoteControlType ?? 'none') !== 'freekiosk') return 'Off';
+  if (!device.mqttTopicId) return 'Not bound';
+  const availability = device.remoteAvailability ?? 'unknown';
+  return `${device.mqttTopicId} / ${availability}`;
 }
 
 function renderRemoteEndpointSummary(device: SetupPageDevice): string {

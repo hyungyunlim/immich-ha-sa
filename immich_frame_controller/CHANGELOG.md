@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.76
+
+- Add an optional FreeKiosk MQTT bridge: the controller subscribes to `freekiosk/<topic>/availability` and `/state` on a user-provided broker for push telemetry and device online/offline tracking, and publishes `set/*` hardware commands (screen, brightness, volume, reload) with REST fallback in both directions.
+- Auto-detect the Mosquitto add-on broker through the Supervisor MQTT service (`mqtt_broker_url` stays blank), with manual `mqtt_*` add-on options and `MQTT_*` env vars for standalone Docker.
+- Add an MQTT Bridge section to the setup console that lists FreeKiosk devices seen on the broker and binds them to frames in one click (IP-based suggestions included); MQTT state also keeps the REST auto-discovery IP fresh after DHCP changes.
+- Add Home Assistant entities for frame device online/offline (connectivity), camera motion, battery level, battery charging, and WiFi signal, sourced from FreeKiosk telemetry over MQTT or REST.
+- Serve `remote/status` from the MQTT cache when the FreeKiosk REST API is unreachable, and shorten REST timeouts while MQTT reports the device offline.
+
 ## 0.1.75
 
 - Add Home Assistant weather detail override selects for immich-kiosk weather forecast, humidity, wind, wind direction, visibility, temperature range, and rounded temperature URL queries.

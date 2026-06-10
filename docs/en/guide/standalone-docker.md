@@ -25,10 +25,14 @@ EXTERNAL_PUBLIC_CONTROLLER_URL=https://frame.example.com
 EXTERNAL_PUBLIC_KIOSK_URL=https://frame.example.com/kiosk
 ALBUM_REFRESH_INTERVAL_SECONDS=900
 CONTROLLER_API_TOKEN=
+MQTT_BROKER_URL=
+MQTT_USERNAME=
+MQTT_PASSWORD=
 ```
 
 - `PORT` is the internal app port; `CONTROLLER_HOST_PORT` is the Docker host port. If `8082` is taken, pick another and update `LOCAL_PUBLIC_CONTROLLER_URL`, the integration's controller URL, and the frame URL to match.
 - `CONTROLLER_API_TOKEN` is an optional static fallback — leave it blank and use the [pairing flow](./pairing) instead.
+- `MQTT_BROKER_URL` is optional and enables [FreeKiosk MQTT push control](./freekiosk#_3-optional-mqtt-push-control). Accepts a bare host (`192.168.1.10`) or `mqtt://host:1883`; blank keeps MQTT off.
 
 ## 2. Start the container
 

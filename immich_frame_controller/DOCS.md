@@ -17,6 +17,14 @@ The add-on is the runtime. The Home Assistant integration remains the control su
 
 The default controller port is `8082`. If you change the add-on network port, update `local_public_controller_url` and the Home Assistant integration controller URL to match.
 
+## Optional MQTT (FreeKiosk push control)
+
+When the Mosquitto broker add-on is installed, this add-on auto-detects it through the Supervisor and connects automatically — no configuration needed. FreeKiosk frames that publish to the same broker appear in the Web UI's **MQTT Bridge** section, where one click binds them to a frame for push hardware control, online/offline tracking, and live telemetry (battery, motion, WiFi signal).
+
+- `mqtt_broker_url`: set only to override auto-detection or use an external broker. Accepts a host (`192.168.1.10`) or `mqtt://host:1883`.
+- `mqtt_username` / `mqtt_password`: broker credentials; auto-filled from Mosquitto when auto-detected.
+- `mqtt_base_topic`: FreeKiosk base topic. Leave blank for the default `freekiosk`.
+
 ## Pairing With Home Assistant
 
 The `Immich Frame Controller` integration is installed separately through HACS. See the [installation steps in the repository README](https://github.com/hyungyunlim/immich-ha-sa#step-2---install-the-integration-hacs).

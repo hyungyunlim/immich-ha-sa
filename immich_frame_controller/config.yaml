@@ -1,5 +1,5 @@
 name: Immich Frame Controller
-version: "0.1.75"
+version: "0.1.76"
 slug: immich_frame_controller
 description: Home Assistant managed controller for Immich, immich-kiosk, and a fixed-URL digital frame.
 url: https://github.com/hyungyunlim/immich-ha-sa
@@ -21,6 +21,9 @@ ports_description:
   8080/tcp: Controller frame URL, setup page, and API
 webui: http://[HOST]:[PORT:8080]/
 watchdog: http://[HOST]:[PORT:8080]/api/health
+hassio_api: true
+services:
+  - mqtt:want
 options:
   immich_internal_url: null
   immich_api_key: null
@@ -48,3 +51,7 @@ schema:
   poll_interval_seconds: int(5,300)
   album_refresh_interval_seconds: int(0,86400)
   controller_api_token: password?
+  mqtt_broker_url: str?
+  mqtt_username: str?
+  mqtt_password: password?
+  mqtt_base_topic: str?

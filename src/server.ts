@@ -12,6 +12,7 @@ import { renderFrameClaimPage } from './frameClaimPage.js';
 import { renderFramePage } from './framePage.js';
 import { fail, ok, requestContext } from './http.js';
 import { ImmichClient } from './immichClient.js';
+import { FreeKioskMqttBridge, type FreeKioskMqttSnapshot } from './mqttClient.js';
 import { buildProxiedRendererUrl, buildRendererUrl, controllerBaseUrlForContext } from './rendererUrl.js';
 import { renderSetupBlockedPage, renderSetupPage } from './setupPage.js';
 import { JsonStore } from './store.js';
@@ -20,6 +21,11 @@ import type { AlbumCache, FrameClaim, FrameCommand, FrameDevice, FrameState, Per
 const REMOTE_DISCOVERY_RETRY_MS = 30_000;
 const REMOTE_DISCOVERY_TIMEOUT_MS = 1_500;
 const REMOTE_BRIGHTNESS_RESTORE_DELAY_MS = 500;
+const REMOTE_REQUEST_TIMEOUT_MS = 7_000;
+const REMOTE_REQUEST_OFFLINE_TIMEOUT_MS = 2_000;
+const REMOTE_VOLUME_STEP = 10;
+
+export type RemoteAvailability = 'online' | 'offline' | 'unknown';
 
 const BooleanOverrideSchema = z.enum(['inherit', 'true', 'false']);
 
@@ -234,6 +240,19 @@ const RequiredUrlSchema = z.preprocess(
   z.string().url(),
 );
 
+const MqttTopicIdSchema = z.preprocess(
+  (value) => (typeof value === 'string' ? value.trim() : value),
+  z.string()
+    .min(1)
+    .max(128)
+    .regex(/^[^\s/+#]+$/, 'MQTT topic IDs cannot contain spaces, /, +, or #.'),
+);
+
+const OptionalMqttTopicIdSchema = z.preprocess(
+  (value) => (value === '' || value === null || value === undefined ? undefined : value),
+  MqttTopicIdSchema.optional(),
+);
+
 const DeviceCreateSchema = z.object({
   id: DeviceIdSchema,
   name: DeviceNameSchema,
@@ -250,6 +269,7 @@ const DeviceCreateSchema = z.object({
   remoteApiUrl: OptionalUrlSchema,
   remoteApiAutoPort: z.number().int().min(1).max(65535).default(8080),
   remoteApiKey: OptionalSecretSchema,
+  mqttTopicId: OptionalMqttTopicIdSchema,
 });
 
 const DevicePatchSchema = z.object({
@@ -267,6 +287,7 @@ const DevicePatchSchema = z.object({
   remoteApiUrl: OptionalUrlSchema,
   remoteApiAutoPort: z.number().int().min(1).max(65535).optional(),
   remoteApiKey: OptionalSecretSchema,
+  mqttTopicId: OptionalMqttTopicIdSchema.or(z.null()),
 });
 
 const FrameCommandSchema = z.object({
@@ -306,6 +327,7 @@ export interface ServerDeps {
   events?: FrameEventHub;
   auth?: ControllerAuthManager;
   kioskConnectionChecker?: typeof checkKioskConnection;
+  mqtt?: FreeKioskMqttBridge;
 }
 
 export function createServer(deps: ServerDeps): FastifyInstance {
@@ -326,6 +348,302 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   const remoteDiscoveryInFlight = new Set<string>();
   let albumRefreshInFlight: Promise<AlbumCache> | undefined;
   let personRefreshInFlight: Promise<PersonCache> | undefined;
+
+  const mqtt = deps.mqtt ?? (deps.config.mqtt
+    ? new FreeKioskMqttBridge({
+      brokerUrl: deps.config.mqtt.brokerUrl,
+      username: deps.config.mqtt.username,
+      password: deps.config.mqtt.password,
+      baseTopic: deps.config.mqtt.baseTopic,
+      logger: app.log,
+    })
+    : undefined);
+  mqtt?.onDeviceUpdate((snapshot, kind) => {
+    if (kind === 'state') rememberMqttDeviceIp(snapshot);
+  });
+  mqtt?.connect();
+  app.addHook('onClose', async () => {
+    await mqtt?.close();
+  });
+
+  // Keeps the REST auto-discovery endpoint aligned with the IP the device reports
+  // over MQTT, so REST fallback keeps working after DHCP changes.
+  function rememberMqttDeviceIp(snapshot: FreeKioskMqttSnapshot): void {
+    if (!snapshot.ip) return;
+    const ip = normalizeIp(snapshot.ip);
+    if (!ip || !isAutoRemoteCandidateIp(ip)) return;
+    const device = deviceForMqttTopicId(snapshot.topicId);
+    if (!device || device.lastSeenIp === ip) return;
+    store.markDeviceSeen(device.id, ip);
+    app.log.info({ deviceId: device.id, ip, topicId: snapshot.topicId }, 'FreeKiosk MQTT state updated frame endpoint');
+  }
+
+  function deviceForMqttTopicId(topicId: string): FrameDevice | undefined {
+    return Object.values(store.getData().devices).find((candidate) => (
+      (candidate.remoteControlType ?? 'none') === 'freekiosk' && candidate.mqttTopicId === topicId
+    ));
+  }
+
+  function remoteCommandPathAvailable(device: FrameDevice, command: FrameCommand): boolean {
+    return commandUsesFrameEvents(command)
+      && (device.remoteControlType ?? 'none') === 'freekiosk'
+      && (remoteEndpointCandidates(device).length > 0 || mqttCommandEligible(device));
+  }
+
+  function buildMqttStatusPayload(): {
+    enabled: boolean;
+    connected: boolean;
+    brokerUrl?: string;
+    baseTopic?: string;
+    lastError?: string;
+    devices: Array<{
+      topicId: string;
+      availability: 'online' | 'offline' | 'unknown';
+      ip?: string;
+      stateReceivedAt?: string;
+      boundDeviceId?: string;
+      suggestedDeviceId?: string;
+    }>;
+  } {
+    const devicesById = store.getData().devices;
+    const boundByTopic = new Map<string, string>();
+    for (const device of Object.values(devicesById)) {
+      if ((device.remoteControlType ?? 'none') === 'freekiosk' && device.mqttTopicId) {
+        boundByTopic.set(device.mqttTopicId, device.id);
+      }
+    }
+    const devices = (mqtt?.listDevices() ?? [])
+      .map((snapshot) => {
+        const ip = snapshot.ip ? normalizeIp(snapshot.ip) : undefined;
+        const suggestedDeviceId = !boundByTopic.has(snapshot.topicId) && ip
+          ? Object.values(devicesById).find((candidate) => (
+            (candidate.remoteControlType ?? 'none') === 'freekiosk'
+            && !candidate.mqttTopicId
+            && candidate.lastSeenIp === ip
+          ))?.id
+          : undefined;
+        return {
+          topicId: snapshot.topicId,
+          availability: snapshot.availability ?? 'unknown' as const,
+          ip: snapshot.ip,
+          stateReceivedAt: snapshot.stateReceivedAt,
+          boundDeviceId: boundByTopic.get(snapshot.topicId),
+          suggestedDeviceId,
+        };
+      })
+      .sort((left, right) => left.topicId.localeCompare(right.topicId));
+    return {
+      enabled: Boolean(mqtt),
+      connected: mqtt?.connected ?? false,
+      brokerUrl: mqtt?.redactedBrokerUrl,
+      baseTopic: mqtt?.topicPrefix,
+      lastError: mqtt?.connectionError,
+      devices,
+    };
+  }
+
+  function mqttSnapshotForDevice(device: FrameDevice): FreeKioskMqttSnapshot | undefined {
+    if (!mqtt || (device.remoteControlType ?? 'none') !== 'freekiosk' || !device.mqttTopicId) return undefined;
+    return mqtt.getDevice(device.mqttTopicId);
+  }
+
+  function remoteAvailabilityForDevice(device: FrameDevice): RemoteAvailability {
+    return mqttSnapshotForDevice(device)?.availability ?? 'unknown';
+  }
+
+  function mqttCommandEligible(device: FrameDevice): boolean {
+    return Boolean(mqtt?.connected) && mqttSnapshotForDevice(device)?.availability === 'online';
+  }
+
+  async function publishMqttCommand(
+    device: FrameDevice,
+    command: FrameCommand,
+    publication: { suffix: string; payload: string; volumeCapture?: number },
+  ): Promise<MqttCommandResult> {
+    if (!mqtt || !device.mqttTopicId) {
+      throw new RemoteCommandError('REMOTE_NOT_CONFIGURED', `Frame ${device.id} has no MQTT binding.`, 400);
+    }
+    const published = await mqtt.publishCommand(device.mqttTopicId, publication.suffix, publication.payload);
+    if (publication.volumeCapture !== undefined) {
+      store.updateDevice(device.id, { remoteVolumeRestoreValue: publication.volumeCapture });
+    }
+    return {
+      provider: 'freekiosk',
+      command,
+      transport: 'mqtt',
+      topic: published.topic,
+      source: 'mqtt',
+      result: { published: true, payload: published.payload },
+    };
+  }
+
+  async function dispatchRemoteCommand(
+    device: FrameDevice,
+    command: FrameCommand,
+  ): Promise<MqttCommandResult | Awaited<ReturnType<typeof sendRemoteCommand>>> {
+    const eligible = mqttCommandEligible(device);
+    const snapshot = eligible ? mqttSnapshotForDevice(device) : undefined;
+    const publication = eligible
+      ? freeKioskMqttCommandPublication(command, snapshot?.state, device)
+      : undefined;
+
+    if (publication && !commandPrefersRestTransport(command)) {
+      try {
+        return await publishMqttCommand(device, command, publication);
+      } catch (error) {
+        app.log.warn({
+          deviceId: device.id,
+          command,
+          error: error instanceof Error ? error.message : String(error),
+        }, 'FreeKiosk MQTT command publish failed; falling back to REST');
+      }
+    }
+
+    try {
+      return await sendRemoteCommand(device, command, remoteTimeoutForDevice(device));
+    } catch (error) {
+      if (publication && commandPrefersRestTransport(command) && restFailureSafeForMqttFallback(error)) {
+        return publishMqttCommand(device, command, publication);
+      }
+      throw error;
+    }
+  }
+
+  async function dispatchRemoteLevel(
+    device: FrameDevice,
+    property: 'brightness' | 'volume',
+    value: number,
+  ): Promise<MqttLevelResult | Awaited<ReturnType<typeof setRemoteLevel>>> {
+    if (mqttCommandEligible(device) && mqtt && device.mqttTopicId) {
+      try {
+        const published = await mqtt.publishCommand(device.mqttTopicId, property, String(value));
+        return {
+          provider: 'freekiosk',
+          property,
+          value,
+          transport: 'mqtt',
+          topic: published.topic,
+          source: 'mqtt',
+          result: { published: true },
+        };
+      } catch (error) {
+        app.log.warn({
+          deviceId: device.id,
+          property,
+          error: error instanceof Error ? error.message : String(error),
+        }, 'FreeKiosk MQTT level publish failed; falling back to REST');
+      }
+    }
+    return setRemoteLevel(device, property, value, remoteTimeoutForDevice(device));
+  }
+
+  // When MQTT reports the device offline, shorten the REST attempt so HA polling
+  // does not burn the full timeout on a device that is almost certainly asleep.
+  function remoteTimeoutForDevice(device: FrameDevice): number {
+    return remoteAvailabilityForDevice(device) === 'offline'
+      ? REMOTE_REQUEST_OFFLINE_TIMEOUT_MS
+      : REMOTE_REQUEST_TIMEOUT_MS;
+  }
+
+  async function remoteStatusForDevice(device: FrameDevice): Promise<Record<string, unknown>> {
+    const snapshot = mqttSnapshotForDevice(device);
+    try {
+      const rest = await getRemoteStatus(device, remoteTimeoutForDevice(device));
+      return { ...rest, availability: 'online' satisfies RemoteAvailability };
+    } catch (error) {
+      if (snapshot?.availability === 'online' && snapshot.state) {
+        return {
+          provider: 'freekiosk',
+          source: 'mqtt',
+          availability: 'online' satisfies RemoteAvailability,
+          status: snapshot.state,
+          statusReceivedAt: snapshot.stateReceivedAt,
+          capabilities: inferFreeKioskCapabilities(snapshot.state),
+        };
+      }
+      if (snapshot?.availability === 'offline') {
+        return {
+          provider: 'freekiosk',
+          source: 'mqtt',
+          availability: 'offline' satisfies RemoteAvailability,
+          status: undefined,
+          lastStateAt: snapshot.stateReceivedAt,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+      throw error;
+    }
+  }
+
+  async function prepareScreenOff(device: FrameDevice): Promise<RemoteScreenOffPreparationResult> {
+    const snapshot = mqttSnapshotForDevice(device);
+    if (snapshot?.availability === 'online' && snapshot.state) {
+      const brightness = remoteBrightnessValue(snapshot.state);
+      if (brightness !== undefined) {
+        store.updateDevice(device.id, { remoteBrightnessRestoreValue: brightness });
+      }
+      const muted = remoteDeviceMutedValue(snapshot.state);
+      let deviceMute: RemoteDeviceMuteResult = {
+        action: 'mute',
+        muted: muted === true,
+        changed: false,
+        source: 'mqtt',
+        reason: muted === undefined ? 'mute-state-unavailable' : undefined,
+      };
+      if (muted === false) {
+        try {
+          await dispatchRemoteLevel(device, 'volume', 0);
+          deviceMute = { action: 'mute', muted: true, changed: true, source: 'mqtt' };
+        } catch (error) {
+          deviceMute = {
+            action: 'mute',
+            muted: false,
+            changed: false,
+            reason: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }
+      return {
+        brightnessRestore: {
+          action: 'capture',
+          captured: brightness !== undefined,
+          value: brightness,
+          source: 'mqtt',
+          reason: brightness === undefined ? 'brightness-unavailable' : undefined,
+        },
+        deviceMute,
+      };
+    }
+    return prepareRemoteScreenOff(store, device);
+  }
+
+  async function restoreBrightnessAfterScreenOn(deviceId: string): Promise<RemoteBrightnessRestoreResult> {
+    const device = store.getDevice(deviceId);
+    const value = device?.remoteBrightnessRestoreValue;
+    if (!device || typeof value !== 'number' || !Number.isInteger(value)) {
+      return { action: 'restore', restored: false, reason: 'brightness-unavailable' };
+    }
+    await delay(REMOTE_BRIGHTNESS_RESTORE_DELAY_MS);
+    try {
+      const result = await dispatchRemoteLevel(device, 'brightness', value);
+      return {
+        action: 'restore',
+        restored: true,
+        value,
+        source: result.source,
+        ...('endpoint' in result
+          ? { endpoint: result.endpoint, baseUrl: result.baseUrl, statusCode: result.statusCode }
+          : {}),
+      };
+    } catch (error) {
+      return {
+        action: 'restore',
+        restored: false,
+        value,
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
 
   app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'buffer' }, (_request, body, done) => {
     done(null, body);
@@ -391,6 +709,11 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         remoteApiConfigured: remoteEndpointSummary(device).configured,
         remoteApiEffectiveSource: remoteEndpointSummary(device).effectiveSource,
       }])),
+      mqtt: {
+        enabled: Boolean(mqtt),
+        connected: mqtt?.connected ?? false,
+        deviceCount: mqtt?.listDevices().length ?? 0,
+      },
       auth: auth.status(),
     });
   });
@@ -403,6 +726,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     }
     const pairing = auth.ensurePairingCode();
     const data = store.getData();
+    const mqttStatus = buildMqttStatusPayload();
     const kioskConnectionChecker = deps.kioskConnectionChecker ?? checkKioskConnection;
     const kioskDiagnostics = await Promise.all(Object.values(data.devices).map(async (candidate) => [
       candidate.id,
@@ -419,6 +743,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       personCount: data.personCache.items.length,
       personRefreshedAt: data.personCache.refreshedAt,
       globalKioskPasswordConfigured: Boolean(deps.config.kioskPassword),
+      mqtt: mqttStatus,
       frameClaims: store.getFrameClaims().map((claim) => publicFrameClaim(claim)),
       devices: Object.values(data.devices).map((candidate) => {
         const frameState = store.getFrameState(candidate.id);
@@ -447,6 +772,8 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           lastSeenIp: candidate.lastSeenIp,
           lastSeenAt: candidate.lastSeenAt,
           remoteApiKeyConfigured: Boolean(candidate.remoteApiKey),
+          mqttTopicId: candidate.mqttTopicId,
+          remoteAvailability: remoteAvailabilityForDevice(candidate),
           isDefault: candidate.id === deps.config.defaultDevice.id,
           localFrameUrl: buildFrameUrl(candidate.localControllerBaseUrl, candidate.id),
           localStableFrameUrl: buildStableFrameUrl(candidate.localControllerBaseUrl, candidate),
@@ -697,6 +1024,8 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           : undefined,
         remoteControlType: device.remoteControlType ?? 'none',
         remoteApiConfigured: remoteEndpointSummary(device).configured,
+        mqttTopicId: device.mqttTopicId,
+        remoteAvailability: remoteAvailabilityForDevice(device),
         frameEventClients: events.connectedClientCount(device.id),
         isDefault: device.id === deps.config.defaultDevice.id,
       })),
@@ -873,9 +1202,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
       return;
     }
-    if (commandPrefersRemotePress(parsed.data.command) && remoteFallbackAvailable(device, parsed.data.command)) {
+    if (commandPrefersRemotePress(parsed.data.command) && remoteCommandPathAvailable(device, parsed.data.command)) {
       try {
-        const remoteFallback = await sendRemoteCommand(device, parsed.data.command);
+        const remoteFallback = await dispatchRemoteCommand(device, parsed.data.command);
         return ok({
           command: parsed.data.command,
           frameEvent: null,
@@ -901,9 +1230,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         connectedClients: events.connectedClientCount(deviceId),
         delivered,
       };
-      if (delivered === 0 && remoteFallbackAvailable(device, parsed.data.command)) {
+      if (delivered === 0 && remoteCommandPathAvailable(device, parsed.data.command)) {
         try {
-          const remoteFallback = await sendRemoteCommand(device, parsed.data.command);
+          const remoteFallback = await dispatchRemoteCommand(device, parsed.data.command);
           return ok({
             command: parsed.data.command,
             frameEvent,
@@ -925,21 +1254,20 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     }
     try {
       const screenOffPreparation = parsed.data.command === 'screen-off'
-        ? await prepareRemoteScreenOff(store, device)
+        ? await prepareScreenOff(device)
         : undefined;
-      const result = await sendRemoteCommand(device, parsed.data.command);
+      const result = await dispatchRemoteCommand(device, parsed.data.command);
       app.log.info({
         deviceId,
         command: parsed.data.command,
-        endpoint: result.endpoint,
-        baseUrl: result.baseUrl,
         source: result.source,
+        target: 'endpoint' in result ? result.endpoint : result.topic,
         screenOffPreparation,
       }, 'FreeKiosk command completed');
       if (parsed.data.command === 'screen-on') {
         return ok({
           ...result,
-          brightnessRestore: await restoreRemoteBrightnessAfterScreenOn(store, deviceId),
+          brightnessRestore: await restoreBrightnessAfterScreenOn(deviceId),
         });
       }
       return ok(screenOffPreparation ? { ...result, ...screenOffPreparation } : result);
@@ -960,7 +1288,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       return;
     }
     try {
-      return ok(await getRemoteStatus(device));
+      return ok(await remoteStatusForDevice(device));
     } catch (error) {
       const remoteError = error instanceof RemoteCommandError
         ? error
@@ -983,7 +1311,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       return;
     }
     try {
-      const result = await setRemoteLevel(device, 'brightness', parsed.data.value);
+      const result = await dispatchRemoteLevel(device, 'brightness', parsed.data.value);
       store.updateDevice(deviceId, { remoteBrightnessRestoreValue: parsed.data.value });
       return ok({ ...result, brightnessRestoreValue: parsed.data.value });
     } catch (error) {
@@ -1008,7 +1336,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       return;
     }
     try {
-      return ok(await setRemoteLevel(device, 'volume', parsed.data.value));
+      return ok(await dispatchRemoteLevel(device, 'volume', parsed.data.value));
     } catch (error) {
       const remoteError = error instanceof RemoteCommandError
         ? error
@@ -1038,6 +1366,11 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         : new RemoteCommandError('REMOTE_COMMAND_FAILED', error instanceof Error ? error.message : String(error));
       reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
     }
+  });
+
+  app.get('/api/mqtt/status', async (request, reply) => {
+    if (!requireLocalConsoleAccess(request, reply)) return;
+    return ok(buildMqttStatusPayload());
   });
 
   app.get('/api/frame/:deviceId/events', async (request, reply) => {
@@ -1509,12 +1842,16 @@ class RemoteCommandError extends Error {
     public readonly code: string,
     message: string,
     public readonly statusCode = 502,
+    // True when the FreeKiosk device answered the request (so the command was
+    // definitely NOT executed); false when delivery itself is uncertain.
+    public readonly responseReceived = false,
   ) {
     super(message);
   }
 }
 
 type RemoteRequestMethod = 'GET' | 'POST';
+type RemoteTransportSource = 'manual' | 'auto' | 'mqtt';
 
 interface RemoteRequestResult {
   endpoint: string;
@@ -1524,9 +1861,103 @@ interface RemoteRequestResult {
   result: unknown;
 }
 
+interface MqttCommandResult {
+  provider: 'freekiosk';
+  command: FrameCommand;
+  transport: 'mqtt';
+  topic: string;
+  source: 'mqtt';
+  result: unknown;
+}
+
+interface MqttLevelResult {
+  provider: 'freekiosk';
+  property: 'brightness' | 'volume';
+  value: number;
+  transport: 'mqtt';
+  topic: string;
+  source: 'mqtt';
+  result: unknown;
+}
+
+interface MqttCommandPublication {
+  suffix: string;
+  payload: string;
+  volumeCapture?: number;
+}
+
+// Volume stepping and mute keep their REST keyboard semantics when the device is
+// reachable; MQTT only emulates them (via set/volume) as a fallback.
+function commandPrefersRestTransport(command: FrameCommand): boolean {
+  return command === 'volume-up' || command === 'volume-down' || command === 'device-mute-toggle';
+}
+
+// Key-event commands are not idempotent: a timed-out REST request may still have
+// executed on the device, so re-issuing over MQTT could double-apply it. Only fall
+// back when the failure proves the command never ran.
+function restFailureSafeForMqttFallback(error: unknown): boolean {
+  return error instanceof RemoteCommandError
+    && (error.code === 'REMOTE_NOT_CONFIGURED' || error.responseReceived);
+}
+
+function freeKioskMqttCommandPublication(
+  command: FrameCommand,
+  cachedState: Record<string, unknown> | undefined,
+  device: FrameDevice,
+): MqttCommandPublication | undefined {
+  switch (command) {
+    case 'next':
+    case 'previous':
+    case 'play-pause':
+    case 'mute-toggle': {
+      const script = freeKioskJavaScriptCommand(command);
+      return script ? { suffix: 'execute_js', payload: script } : undefined;
+    }
+    case 'reload':
+      return { suffix: 'reload', payload: 'PRESS' };
+    case 'dpad-up':
+      return { suffix: 'remote_up', payload: 'PRESS' };
+    case 'screen-on':
+      return { suffix: 'screen', payload: 'ON' };
+    case 'screen-off':
+      return { suffix: 'screen', payload: 'OFF' };
+    case 'volume-up':
+    case 'volume-down': {
+      const volume = remoteVolumeValue(cachedState);
+      if (volume === undefined) return undefined;
+      const next = Math.max(0, Math.min(100, volume + (command === 'volume-up' ? REMOTE_VOLUME_STEP : -REMOTE_VOLUME_STEP)));
+      return { suffix: 'volume', payload: String(next) };
+    }
+    case 'device-mute-toggle': {
+      const muted = remoteDeviceMutedValue(cachedState);
+      if (muted === undefined) return undefined;
+      if (muted) {
+        const restore = device.remoteVolumeRestoreValue;
+        const value = typeof restore === 'number' && restore > 0 && restore <= 100 ? restore : 50;
+        return { suffix: 'volume', payload: String(value) };
+      }
+      return {
+        suffix: 'volume',
+        payload: '0',
+        volumeCapture: remoteVolumeValue(cachedState),
+      };
+    }
+  }
+}
+
+function remoteVolumeValue(status: unknown): number | undefined {
+  if (!isRecord(status) || !isRecord(status.audio)) return undefined;
+  const value = status.audio.volume;
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const rounded = Math.round(value);
+  if (rounded < 0 || rounded > 100) return undefined;
+  return rounded;
+}
+
 async function sendRemoteCommand(
   device: FrameDevice,
   command: FrameCommand,
+  timeoutMs = REMOTE_REQUEST_TIMEOUT_MS,
 ): Promise<{
   provider: 'freekiosk';
   command: FrameCommand;
@@ -1542,6 +1973,7 @@ async function sendRemoteCommand(
       const remote = await sendRemoteRequest(device, '/api/js', {
         method: 'POST',
         body: { code: script },
+        timeoutMs,
       });
       return {
         provider: 'freekiosk',
@@ -1561,7 +1993,7 @@ async function sendRemoteCommand(
   }
 
   const endpoint = freeKioskEndpoint(command);
-  const remote = await sendRemoteRequest(device, endpoint, { method: 'POST' });
+  const remote = await sendRemoteRequest(device, endpoint, { method: 'POST', timeoutMs });
   return {
     provider: 'freekiosk',
     command,
@@ -1579,7 +2011,7 @@ interface RemoteBrightnessCaptureResult {
   value?: number;
   endpoint?: string;
   baseUrl?: string;
-  source?: 'manual' | 'auto';
+  source?: RemoteTransportSource;
   statusCode?: number;
   reason?: string;
 }
@@ -1590,7 +2022,7 @@ interface RemoteBrightnessRestoreResult {
   value?: number;
   endpoint?: string;
   baseUrl?: string;
-  source?: 'manual' | 'auto';
+  source?: RemoteTransportSource;
   statusCode?: number;
   reason?: string;
 }
@@ -1601,7 +2033,7 @@ interface RemoteDeviceMuteResult {
   changed: boolean;
   endpoint?: string;
   baseUrl?: string;
-  source?: 'manual' | 'auto';
+  source?: RemoteTransportSource;
   statusCode?: number;
   reason?: string;
 }
@@ -1614,9 +2046,10 @@ interface RemoteScreenOffPreparationResult {
 async function prepareRemoteScreenOff(
   store: JsonStore,
   device: FrameDevice,
+  timeoutMs = REMOTE_REQUEST_TIMEOUT_MS,
 ): Promise<RemoteScreenOffPreparationResult> {
   try {
-    const remote = await sendRemoteRequest(device, '/api/status', { method: 'GET' });
+    const remote = await sendRemoteRequest(device, '/api/status', { method: 'GET', timeoutMs });
     return {
       brightnessRestore: captureRemoteBrightnessFromStatus(store, device, remote),
       deviceMute: await ensureRemoteDeviceMutedFromStatus(device, remote),
@@ -1635,42 +2068,6 @@ async function prepareRemoteScreenOff(
         changed: false,
         reason,
       },
-    };
-  }
-}
-
-async function restoreRemoteBrightnessAfterScreenOn(
-  store: JsonStore,
-  deviceId: string,
-): Promise<RemoteBrightnessRestoreResult> {
-  const device = store.getDevice(deviceId);
-  const value = device?.remoteBrightnessRestoreValue;
-  if (!device || typeof value !== 'number' || !Number.isInteger(value)) {
-    return {
-      action: 'restore',
-      restored: false,
-      reason: 'brightness-unavailable',
-    };
-  }
-
-  await delay(REMOTE_BRIGHTNESS_RESTORE_DELAY_MS);
-  try {
-    const remote = await setRemoteLevel(device, 'brightness', value);
-    return {
-      action: 'restore',
-      restored: true,
-      value,
-      endpoint: remote.endpoint,
-      baseUrl: remote.baseUrl,
-      source: remote.source,
-      statusCode: remote.statusCode,
-    };
-  } catch (error) {
-    return {
-      action: 'restore',
-      restored: false,
-      value,
-      reason: error instanceof Error ? error.message : String(error),
     };
   }
 }
@@ -1872,7 +2269,7 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
 })();`.trim();
 }
 
-async function getRemoteStatus(device: FrameDevice): Promise<{
+async function getRemoteStatus(device: FrameDevice, timeoutMs = REMOTE_REQUEST_TIMEOUT_MS): Promise<{
   provider: 'freekiosk';
   endpoint: string;
   baseUrl: string;
@@ -1881,8 +2278,8 @@ async function getRemoteStatus(device: FrameDevice): Promise<{
   status: unknown;
   capabilities: ReturnType<typeof inferFreeKioskCapabilities>;
 }> {
-  const remote = await sendRemoteRequest(device, '/api/status', { method: 'GET' });
-  const capabilities = await getRemoteCapabilities(device, remote.result);
+  const remote = await sendRemoteRequest(device, '/api/status', { method: 'GET', timeoutMs });
+  const capabilities = await getRemoteCapabilities(device, remote.result, timeoutMs);
   return {
     provider: 'freekiosk',
     endpoint: remote.endpoint,
@@ -1898,6 +2295,7 @@ async function setRemoteLevel(
   device: FrameDevice,
   property: 'brightness' | 'volume',
   value: number,
+  timeoutMs = REMOTE_REQUEST_TIMEOUT_MS,
 ): Promise<{
   provider: 'freekiosk';
   property: 'brightness' | 'volume';
@@ -1912,6 +2310,7 @@ async function setRemoteLevel(
   const remote = await sendRemoteRequest(device, endpoint, {
     method: 'POST',
     body: { value },
+    timeoutMs,
   });
   return {
     provider: 'freekiosk',
@@ -1960,6 +2359,7 @@ async function sendRemoteRequest(
   options: {
     method: RemoteRequestMethod;
     body?: Record<string, unknown>;
+    timeoutMs?: number;
   },
 ): Promise<RemoteRequestResult> {
   if ((device.remoteControlType ?? 'none') !== 'freekiosk') {
@@ -1986,7 +2386,7 @@ async function sendRemoteRequest(
         method: options.method,
         headers,
         body: options.body ? JSON.stringify(options.body) : undefined,
-        signal: AbortSignal.timeout(7000),
+        signal: AbortSignal.timeout(options.timeoutMs ?? REMOTE_REQUEST_TIMEOUT_MS),
       });
       const text = await response.text();
       const payload = parseJsonOrText(text);
@@ -1994,7 +2394,7 @@ async function sendRemoteRequest(
       if (!response.ok || (isRecord(payload) && payload.success === false)) {
         const message = remoteErrorMessage(payload, response.status);
         const code = response.status === 404 ? 'REMOTE_UNSUPPORTED' : 'REMOTE_COMMAND_FAILED';
-        throw new RemoteCommandError(code, `${message} (${candidate.source}: ${candidate.baseUrl})`, response.status === 404 ? 404 : 502);
+        throw new RemoteCommandError(code, `${message} (${candidate.source}: ${candidate.baseUrl})`, response.status === 404 ? 404 : 502, true);
       }
 
       return {
@@ -2021,9 +2421,10 @@ async function sendRemoteRequest(
 async function getRemoteCapabilities(
   device: FrameDevice,
   status: unknown,
+  timeoutMs = REMOTE_REQUEST_TIMEOUT_MS,
 ): Promise<ReturnType<typeof inferFreeKioskCapabilities>> {
   try {
-    const root = await sendRemoteRequest(device, '/', { method: 'GET' });
+    const root = await sendRemoteRequest(device, '/', { method: 'GET', timeoutMs });
     return inferFreeKioskCapabilities(status, root.result);
   } catch {
     return inferFreeKioskCapabilities(status);
@@ -2112,12 +2513,6 @@ function commandPrefersRemotePress(command: FrameCommand): boolean {
   return command === 'mute-toggle';
 }
 
-function remoteFallbackAvailable(device: FrameDevice, command: FrameCommand): boolean {
-  return commandUsesFrameEvents(command)
-    && (device.remoteControlType ?? 'none') === 'freekiosk'
-    && remoteEndpointCandidates(device).length > 0;
-}
-
 function parseJsonOrText(value: string): unknown {
   if (!value) return undefined;
   try {
@@ -2128,7 +2523,7 @@ function parseJsonOrText(value: string): unknown {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object';
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function proxyRequestHeaders(request: FastifyRequest): Record<string, string> {
@@ -2933,6 +3328,7 @@ function createDeviceFromInput(
     remoteApiUrl: input.remoteApiUrl ? trimTrailingSlash(input.remoteApiUrl) : undefined,
     remoteApiAutoPort: input.remoteApiAutoPort,
     remoteApiKey: input.remoteApiKey,
+    mqttTopicId: input.mqttTopicId,
   };
 }
 
@@ -2973,6 +3369,7 @@ function normalizeDevicePatch(input: z.infer<typeof DevicePatchSchema>): Partial
   }
   if (hasPatchKey(input, 'remoteApiAutoPort')) patch.remoteApiAutoPort = input.remoteApiAutoPort;
   if (hasPatchKey(input, 'remoteApiKey')) patch.remoteApiKey = input.remoteApiKey;
+  if (hasPatchKey(input, 'mqttTopicId')) patch.mqttTopicId = input.mqttTopicId ?? undefined;
 
   return patch;
 }

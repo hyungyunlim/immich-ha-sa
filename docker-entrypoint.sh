@@ -52,6 +52,52 @@ if [ -f "$OPTIONS_PATH" ]; then
   set_env_from_option POLL_INTERVAL_SECONDS poll_interval_seconds
   set_env_from_option ALBUM_REFRESH_INTERVAL_SECONDS album_refresh_interval_seconds
   set_env_from_option CONTROLLER_API_TOKEN controller_api_token
+  set_env_from_option MQTT_BROKER_URL mqtt_broker_url
+  set_env_from_option MQTT_USERNAME mqtt_username
+  set_env_from_option MQTT_PASSWORD mqtt_password
+  set_env_from_option MQTT_BASE_TOPIC mqtt_base_topic
+fi
+
+# With no manual broker URL, ask the Supervisor for the shared MQTT service
+# (provided by the Mosquitto add-on when `services: mqtt:want` is declared).
+if [ -z "${MQTT_BROKER_URL:-}" ] && [ -n "${SUPERVISOR_TOKEN:-}" ]; then
+  mqtt_service="$(node -e '
+const token = process.env.SUPERVISOR_TOKEN;
+fetch("http://supervisor/services/mqtt", {
+  headers: { Authorization: "Bearer " + token },
+})
+  .then(async (response) => {
+    if (!response.ok) return;
+    const payload = await response.json();
+    const data = payload && payload.data;
+    if (!data || !data.host) return;
+    const protocol = data.ssl ? "mqtts" : "mqtt";
+    const port = data.port || 1883;
+    process.stdout.write([
+      protocol + "://" + data.host + ":" + port,
+      data.username || "",
+      data.password || "",
+    ].join("\n"));
+  })
+  .catch(() => {});
+' 2>/dev/null || true)"
+  if [ -n "$mqtt_service" ]; then
+    MQTT_BROKER_URL="$(printf '%s\n' "$mqtt_service" | sed -n '1p')"
+    export MQTT_BROKER_URL
+    if [ -z "${MQTT_USERNAME:-}" ]; then
+      mqtt_service_username="$(printf '%s\n' "$mqtt_service" | sed -n '2p')"
+      if [ -n "$mqtt_service_username" ]; then
+        export MQTT_USERNAME="$mqtt_service_username"
+      fi
+    fi
+    if [ -z "${MQTT_PASSWORD:-}" ]; then
+      mqtt_service_password="$(printf '%s\n' "$mqtt_service" | sed -n '3p')"
+      if [ -n "$mqtt_service_password" ]; then
+        export MQTT_PASSWORD="$mqtt_service_password"
+      fi
+    fi
+    echo "MQTT broker auto-detected from Supervisor: $MQTT_BROKER_URL"
+  fi
 fi
 
 exec "$@"

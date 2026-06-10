@@ -38,6 +38,8 @@ export interface FrameDevice {
   lastSeenAt?: string;
   remoteApiKey?: string;
   remoteBrightnessRestoreValue?: number;
+  remoteVolumeRestoreValue?: number;
+  mqttTopicId?: string;
 }
 
 export interface FrameState {

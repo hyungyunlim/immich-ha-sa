@@ -38,5 +38,17 @@ configuration:
   controller_api_token:
     name: Static controller API token
     description: 선택 fallback token입니다. 대부분의 사용자는 비워두고 Home Assistant pairing을 쓰면 됩니다.
+  mqtt_broker_url:
+    name: MQTT broker URL
+    description: FreeKiosk push 제어와 telemetry용 MQTT broker입니다. 비워두면 Mosquitto add-on을 자동 감지하고, 직접 지정하려면 192.168.1.10 또는 mqtt://broker:1883 형식을 사용합니다.
+  mqtt_username:
+    name: MQTT username
+    description: 선택 MQTT username입니다. broker 자동 감지 시 Mosquitto add-on 계정이 자동으로 채워집니다.
+  mqtt_password:
+    name: MQTT password
+    description: 선택 MQTT password입니다. broker 자동 감지 시 Mosquitto add-on 계정이 자동으로 채워집니다.
+  mqtt_base_topic:
+    name: MQTT base topic
+    description: FreeKiosk가 publish하는 base topic입니다. 비워두면 FreeKiosk 기본값 `freekiosk`를 사용합니다.
 network:
   8080/TCP: Controller frame URL, setup page, API
