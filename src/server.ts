@@ -467,12 +467,23 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       && (remoteEndpointCandidates(device).length > 0 || mqttCommandEligible(device));
   }
 
+  function telemetrySubscriberCount(deviceId: string): number {
+    return telemetryClients.get(deviceId)?.size ?? 0;
+  }
+
+  function totalTelemetrySubscribers(): number {
+    let total = 0;
+    for (const clients of telemetryClients.values()) total += clients.size;
+    return total;
+  }
+
   function buildMqttStatusPayload(): {
     enabled: boolean;
     connected: boolean;
     brokerUrl?: string;
     baseTopic?: string;
     lastError?: string;
+    telemetrySubscribers: number;
     devices: Array<{
       topicId: string;
       availability: 'online' | 'offline' | 'unknown';
@@ -480,6 +491,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       stateReceivedAt?: string;
       boundDeviceId?: string;
       suggestedDeviceId?: string;
+      telemetrySubscribers: number;
     }>;
   } {
     const devicesById = store.getData().devices;
@@ -499,13 +511,15 @@ export function createServer(deps: ServerDeps): FastifyInstance {
             && candidate.lastSeenIp === ip
           ))?.id
           : undefined;
+        const boundDeviceId = boundByTopic.get(snapshot.topicId);
         return {
           topicId: snapshot.topicId,
           availability: snapshot.availability ?? 'unknown' as const,
           ip: snapshot.ip,
           stateReceivedAt: snapshot.stateReceivedAt,
-          boundDeviceId: boundByTopic.get(snapshot.topicId),
+          boundDeviceId,
           suggestedDeviceId,
+          telemetrySubscribers: boundDeviceId ? telemetrySubscriberCount(boundDeviceId) : 0,
         };
       })
       .sort((left, right) => left.topicId.localeCompare(right.topicId));
@@ -515,6 +529,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       brokerUrl: mqtt?.redactedBrokerUrl,
       baseTopic: mqtt?.topicPrefix,
       lastError: mqtt?.connectionError,
+      telemetrySubscribers: totalTelemetrySubscribers(),
       devices,
     };
   }

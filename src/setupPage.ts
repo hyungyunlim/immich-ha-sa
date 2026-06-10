@@ -21,6 +21,7 @@ interface SetupPageMqttDevice {
   stateReceivedAt?: string;
   boundDeviceId?: string;
   suggestedDeviceId?: string;
+  telemetrySubscribers?: number;
 }
 
 interface SetupPageMqttStatus {
@@ -29,6 +30,7 @@ interface SetupPageMqttStatus {
   brokerUrl?: string;
   baseTopic?: string;
   lastError?: string;
+  telemetrySubscribers?: number;
   devices: SetupPageMqttDevice[];
 }
 
@@ -1414,9 +1416,15 @@ function renderMqttSection(mqtt: SetupPageMqttStatus, devices: SetupPageDevice[]
   const errorRow = mqtt.enabled && !mqtt.connected && mqtt.lastError
     ? `<div class="claim-row"><span>Last connection error: ${escapeHtml(mqtt.lastError)}</span></div>`
     : '';
+  const pushSubscribers = mqtt.telemetrySubscribers ?? 0;
+  const pushPill = mqtt.enabled
+    ? (pushSubscribers > 0
+      ? `<span class="pill ok">Real-time push: active (${pushSubscribers})</span>`
+      : '<span class="pill warn">Real-time push: idle</span>')
+    : '';
   return `<div class="section-title">
       <h2>MQTT Bridge</h2>
-      ${statusPill}
+      <span class="row" style="gap: 8px;">${pushPill}${statusPill}</span>
     </div>
     <section class="panel">
       <div class="form-grid">
@@ -1447,8 +1455,11 @@ function renderMqttDeviceRows(mqtt: SetupPageMqttStatus, devices: SetupPageDevic
     const bound = entry.boundDeviceId
       ? devices.find((device) => device.id === entry.boundDeviceId)
       : undefined;
+    const pushNote = bound && (entry.telemetrySubscribers ?? 0) > 0
+      ? ' <span class="pill ok">push</span>'
+      : '';
     const action = bound
-      ? `<span class="muted">Bound to <strong>${escapeHtml(bound.name)}</strong></span>
+      ? `<span class="muted">Bound to <strong>${escapeHtml(bound.name)}</strong>${pushNote}</span>
         <button type="button" data-mqtt-unbind="${escapeAttribute(entry.boundDeviceId ?? '')}">Unbind</button>`
       : `<select data-mqtt-device-select>
           ${devices.map((device) => `<option value="${escapeAttribute(device.id)}"${device.id === entry.suggestedDeviceId ? ' selected' : ''}>${escapeHtml(device.name)}</option>`).join('')}

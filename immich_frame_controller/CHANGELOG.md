@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.80
+
+- Show whether the real-time telemetry push is active: the setup console MQTT Bridge section now reports a "Real-time push" pill plus a per-frame `push` badge, and `/api/mqtt/status` exposes `telemetrySubscribers` counts. This lets you confirm at a glance that the Home Assistant integration is consuming the live stream rather than falling back to polling.
+
 ## 0.1.79
 
 - Push FreeKiosk telemetry to Home Assistant in real time over a new controller SSE stream (`/api/frames/<id>/telemetry/events`): motion, screen state, and online/offline now reach Home Assistant in about a second instead of waiting for the 30-second poll, making camera-based presence automations practical. The integration keeps polling as a fallback and reconnects automatically; older controllers without the stream degrade gracefully to polling.

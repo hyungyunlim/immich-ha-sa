@@ -614,6 +614,27 @@ describe('FreeKiosk MQTT bridge', () => {
     );
   });
 
+  it('reports telemetry subscriber count in the MQTT status', async () => {
+    const { server } = await setupMqttWorld();
+    await server.listen({ port: 0, host: '127.0.0.1' });
+    const port = (server.server.address() as AddressInfo).port;
+
+    const before = await server.inject({ method: 'GET', url: '/api/mqtt/status' });
+    expect(before.json().data.telemetrySubscribers).toBe(0);
+    expect(before.json().data.devices[0].telemetrySubscribers).toBe(0);
+
+    const events: Array<{ event: string; data: any }> = [];
+    const sse = readSseEvents(port, '/api/frames/lenovo/telemetry/events', (event, data) => {
+      events.push({ event, data: JSON.parse(data) });
+    });
+    cleanups.push(async () => sse.close());
+    await waitFor(() => events.some((e) => e.event === 'telemetry'), 'sse connected');
+
+    const during = await server.inject({ method: 'GET', url: '/api/mqtt/status' });
+    expect(during.json().data.telemetrySubscribers).toBe(1);
+    expect(during.json().data.devices[0].telemetrySubscribers).toBe(1);
+  });
+
   it('returns 404 telemetry stream for an unknown frame', async () => {
     const { server } = await setupMqttWorld();
     const response = await server.inject({
