@@ -2,6 +2,8 @@
 
 This project controls an Android photo frame, such as a Lenovo Smart Frame running Fully Kiosk Browser or FreeKiosk, from Home Assistant while preserving the existing `immich-kiosk` rendering experience.
 
+Documentation: [immich-frame-docs.pages.dev](https://immich-frame-docs.pages.dev/) ([English](https://immich-frame-docs.pages.dev/en/guide/) / [한국어](https://immich-frame-docs.pages.dev/ko/guide/))
+
 The frame keeps one fixed URL:
 
 ```text
@@ -263,7 +265,7 @@ http://localhost:8080/frame/lenovo
 http://localhost:8080/setup
 ```
 
-For code-change, validation, and production rollout workflow, see [Development and Production Deployment Guide](docs/development-guide.md).
+For code-change, validation, and production rollout workflow, see [Development and Production Deployment Guide](docs/internal/development-guide.md).
 
 ### Verification Checklist
 
