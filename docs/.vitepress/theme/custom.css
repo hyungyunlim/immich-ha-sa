@@ -173,14 +173,17 @@
   margin: 0 auto;
   aspect-ratio: 3 / 4;
   background: var(--vp-c-bg);
-  border: 1.5px solid var(--vp-c-text-3);
-  border-radius: 2px;
-  padding: 12px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+  border: 7px solid var(--vp-c-text-1);
+  padding: 14px;
+  box-shadow:
+    inset 0 0 0 1px rgba(128, 128, 128, 0.25),
+    0 10px 24px rgba(0, 0, 0, 0.1);
 }
 
 .dark .frame-mat {
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 0 0 1px rgba(128, 128, 128, 0.3),
+    0 10px 24px rgba(0, 0, 0, 0.45);
 }
 
 .frame-mat svg {
