@@ -9,9 +9,9 @@ onMounted(() => {
   const browserLang = navigator.language.toLowerCase()
 
   if (browserLang.startsWith('ko')) {
-    window.location.replace('/ko/guide/')
+    window.location.replace('/ko/')
   } else {
-    window.location.replace('/en/guide/')
+    window.location.replace('/en/')
   }
 })
 </script>

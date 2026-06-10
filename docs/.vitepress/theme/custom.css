@@ -23,3 +23,267 @@
 .vp-doc table {
   font-size: 0.9em;
 }
+
+/* ---------- Landing page ---------- */
+
+.landing {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 40px 24px 96px;
+}
+
+.landing-hero {
+  text-align: center;
+  padding: 40px 0 8px;
+}
+
+.landing-hero h1 {
+  font-size: 2.3rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.landing-tagline {
+  margin-top: 14px;
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--vp-c-text-1);
+}
+
+.landing-sub {
+  margin-top: 8px;
+  font-size: 0.95rem;
+  color: var(--vp-c-text-2);
+}
+
+.landing-actions {
+  margin-top: 26px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.landing-btn {
+  display: inline-block;
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  border: 1px solid var(--vp-c-divider);
+  color: var(--vp-c-text-1);
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.landing-btn:hover {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+}
+
+.landing-btn-primary {
+  background: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+  color: #fff;
+}
+
+.landing-btn-primary:hover {
+  background: var(--vp-c-brand-2);
+  border-color: var(--vp-c-brand-2);
+  color: #fff;
+}
+
+/* Concept diagram */
+
+.landing-diagram {
+  margin-top: 48px;
+}
+
+.diagram-node {
+  max-width: 400px;
+  margin: 0 auto;
+  text-align: center;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  padding: 13px 22px;
+  background: var(--vp-c-bg-soft);
+}
+
+.diagram-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.diagram-desc {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--vp-c-text-2);
+  margin-top: 2px;
+}
+
+.diagram-controller {
+  border-color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+}
+
+.diagram-vline {
+  width: 1px;
+  height: 26px;
+  background: var(--vp-c-divider);
+  margin: 0 auto;
+}
+
+.diagram-frames {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  padding-top: 26px;
+}
+
+.diagram-frames::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16.67%;
+  right: 16.67%;
+  height: 1px;
+  background: var(--vp-c-divider);
+}
+
+.diagram-frame {
+  position: relative;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+  background: var(--vp-c-bg);
+}
+
+.diagram-frame::before {
+  content: '';
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  width: 1px;
+  height: 26px;
+  background: var(--vp-c-divider);
+}
+
+.frame-screen {
+  aspect-ratio: 16 / 10;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.frame-screen-a {
+  background: linear-gradient(135deg, #fbbf24, #f87171);
+}
+
+.frame-screen-b {
+  background: linear-gradient(135deg, #34d399, #0ea5e9);
+}
+
+.frame-screen-c {
+  background: linear-gradient(135deg, #a78bfa, #f472b6);
+}
+
+.frame-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.frame-url {
+  display: inline-block;
+  margin-top: 4px;
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.72rem;
+  color: var(--vp-c-text-2);
+  background: var(--vp-c-bg-soft);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.frame-note {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--vp-c-text-3);
+  margin-top: 4px;
+}
+
+.diagram-caption {
+  text-align: center;
+  margin-top: 22px;
+  font-size: 0.92rem;
+  color: var(--vp-c-text-1);
+}
+
+.diagram-foot {
+  text-align: center;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--vp-c-text-3);
+}
+
+/* Utility points */
+
+.landing-points {
+  margin-top: 56px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.landing-point {
+  border-top: 1px solid var(--vp-c-divider);
+  padding-top: 14px;
+}
+
+.landing-point h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.landing-point p {
+  font-size: 0.85rem;
+  color: var(--vp-c-text-2);
+  line-height: 1.55;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .landing-hero h1 {
+    font-size: 1.8rem;
+  }
+
+  .diagram-frames {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding-top: 14px;
+  }
+
+  .diagram-frames::before {
+    display: none;
+  }
+
+  .diagram-frame {
+    max-width: 300px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .diagram-frame::before {
+    top: -14px;
+    height: 14px;
+  }
+
+  .frame-screen {
+    aspect-ratio: 16 / 8;
+  }
+
+  .landing-points {
+    grid-template-columns: 1fr;
+  }
+}
