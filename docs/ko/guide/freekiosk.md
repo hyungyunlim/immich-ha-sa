@@ -69,7 +69,10 @@ Number 엔티티:
 
 Next, Previous, Play/Pause, Reload는 컨트롤러 이벤트 스트림으로 고정 프레임 페이지에 전달된 뒤 same-origin immich-kiosk iframe으로 브리지됩니다. 프레임 브라우저가 연결되어 있지 않으면 FreeKiosk 디바이스 경로로 폴백합니다.
 
-화면, 밝기, 볼륨 제어는 FreeKiosk 디바이스로 직접 갑니다. 액자가 MQTT로 바인딩되어 있고 online이면 컨트롤러가 FreeKiosk 명령 토픽(`set/screen`, `set/brightness`, `set/volume`, `set/reload`)에 먼저 publish하고, 아니면 REST 엔드포인트(`/api/screen/on`, `/api/screen/off`, `/api/brightness`, `/api/volume`)를 호출합니다. 볼륨 스텝과 기기 음소거는 REST가 도달 가능할 때는 키 이벤트 시맨틱(`/api/remote/keyboard/*`)을 유지하고, 불가능할 때만 MQTT 볼륨 에뮬레이션으로 폴백합니다. 자동 밝기 제어는 REST 전용입니다 — FreeKiosk가 MQTT 토픽을 제공하지 않습니다.
+화면, 밝기, 볼륨 제어는 FreeKiosk 디바이스로 직접 갑니다. **컨트롤러는 디바이스에 도달 가능하면 항상 REST API를 우선합니다** (수동 Remote API URL, 또는 프레임 텔레메트리에서 검증된 FreeKiosk IP). REST는 명령이 실제로 실행됐음을 확인해 주고, 디바이스 측 MQTT 명령 결함을 피할 수 있기 때문입니다. MQTT로 명령을 보내는 경우는 컨트롤러가 도달 가능한 REST 엔드포인트가 없을 때 — broker를 통해서만 닿는 원격 프레임 — 또는 REST 시도가 재시도해도 안전한 방식으로 실패했을 때(화면 on/off와 reload는 MQTT로 재시도, 상대 볼륨 스텝과 음소거 토글은 이중 적용 방지를 위해 재시도 안 함)뿐입니다. 자동 밝기 제어는 REST 전용입니다.
+
+> [!NOTE]
+> 그래서 MQTT 바인딩은 로컬 프레임의 신뢰성을 절대 떨어뜨리지 않습니다: 액추에이션은 여전히 REST로 흐르고, MQTT는 presence(online/offline)·모션·텔레메트리를 더해줍니다. FreeKiosk 릴리스가 특정 MQTT 명령(예: 화면 전원)을 망가뜨려도 로컬 프레임은 REST로 계속 동작합니다.
 
 ::: warning 내비게이션을 켜두세요
 Next/Previous 버튼을 쓰려면 프레임의 `disableNavigation` 렌더러 옵션을 **꺼두세요**. immich-kiosk의 `disable_navigation`은 터치, 키보드, 메뉴 내비게이션을 모두 차단하므로, 켜져 있으면 브리지된 명령이 무시됩니다.

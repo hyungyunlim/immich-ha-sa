@@ -69,7 +69,10 @@ Buttons:
 
 Next, previous, play/pause, and reload are sent to the fixed frame page over the controller event stream, then bridged into the same-origin immich-kiosk iframe. If no frame browser is connected, these commands fall back to the FreeKiosk device path.
 
-Screen, brightness, and volume controls go to the FreeKiosk device directly. When the frame is bound over MQTT and online, the controller publishes to FreeKiosk's command topics (`set/screen`, `set/brightness`, `set/volume`, `set/reload`) first; otherwise it calls the REST endpoints (`/api/screen/on`, `/api/screen/off`, `/api/brightness`, `/api/volume`). Volume step and device mute keep their REST key-event semantics (`/api/remote/keyboard/*`) while REST is reachable and fall back to MQTT volume emulation when it is not. Auto-brightness control is REST-only — FreeKiosk exposes no MQTT topic for it.
+Screen, brightness, and volume controls go to the FreeKiosk device directly. **The controller prefers the REST API whenever it can reach the device** (a manual Remote API URL, or a FreeKiosk IP verified from the frame's own telemetry): REST confirms the command actually executed and avoids device-side MQTT command quirks. MQTT carries these commands only when the controller has no reachable REST endpoint — a remote frame reached through the broker — or as a fallback when a REST attempt fails in a way that is safe to retry (screen on/off and reload are retried over MQTT; relative volume steps and mute toggles are not, to avoid double-applying). Auto-brightness control is REST-only.
+
+> [!NOTE]
+> This is why MQTT binding never reduces reliability for local frames: actuation still flows over REST, while MQTT adds presence (online/offline), motion, and telemetry. If a FreeKiosk release regresses an MQTT command (for example screen power), local frames keep working over REST.
 
 ::: warning Keep navigation enabled
 Keep the frame's `disableNavigation` renderer option **off** when using the next/previous buttons. immich-kiosk's `disable_navigation` blocks touch, keyboard, and menu navigation, so bridged commands are ignored when it is enabled.

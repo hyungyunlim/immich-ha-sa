@@ -62,6 +62,32 @@ const FREEKIOSK_STATE = {
   webview: { currentUrl: 'http://10.0.0.10:18082/frame/lenovo', motionDetected: false },
 };
 
+// A frame reachable only through the broker: no routable IP, so the controller has
+// no REST endpoint and uses MQTT for commands.
+const MQTT_ONLY_STATE = {
+  ...FREEKIOSK_STATE,
+  wifi: { ssid: 'TestNet', signalLevel: 70 },
+  device: { version: '1.2.12' },
+};
+
+async function startMockFreeKiosk(
+  handler: (url: string) => { status?: number; body: unknown },
+): Promise<{ url: string; requests: string[] }> {
+  const requests: string[] = [];
+  const server = createHttpServer((request, response) => {
+    requests.push(`${request.method} ${request.url}`);
+    const { status = 200, body } = handler(request.url ?? '');
+    response.statusCode = status;
+    response.setHeader('content-type', 'application/json');
+    response.end(JSON.stringify(body));
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  cleanups.push(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+  return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, requests };
+}
+
 interface MqttWorld {
   server: ReturnType<typeof createServer>;
   store: JsonStore;
@@ -205,8 +231,8 @@ describe('FreeKiosk MQTT bridge', () => {
     expect(data.status).toBeUndefined();
   });
 
-  it('publishes screen-off over MQTT with brightness capture and mute', async () => {
-    const { server, store, received } = await setupMqttWorld();
+  it('publishes screen-off over MQTT with brightness capture and mute (broker-only frame)', async () => {
+    const { server, store, received } = await setupMqttWorld({ state: MQTT_ONLY_STATE });
 
     const response = await server.inject({
       method: 'POST',
@@ -229,8 +255,8 @@ describe('FreeKiosk MQTT bridge', () => {
     ]);
   });
 
-  it('publishes screen-on and restores brightness over MQTT', async () => {
-    const { server, store, received } = await setupMqttWorld();
+  it('publishes screen-on and restores brightness over MQTT (broker-only frame)', async () => {
+    const { server, store, received } = await setupMqttWorld({ state: MQTT_ONLY_STATE });
     store.updateDevice('lenovo', { remoteBrightnessRestoreValue: 37 });
 
     const response = await server.inject({
@@ -251,15 +277,8 @@ describe('FreeKiosk MQTT bridge', () => {
     ]);
   });
 
-  it('falls back to MQTT volume stepping from cached telemetry when REST is not configured', async () => {
-    // No IP in the state payload keeps REST auto-discovery empty, so the REST
-    // attempt fails with REMOTE_NOT_CONFIGURED (provably never executed).
-    const stateWithoutIp = {
-      ...FREEKIOSK_STATE,
-      device: { version: '1.2.12' },
-      wifi: { ssid: 'TestNet', signalLevel: 70 },
-    };
-    const { server, received } = await setupMqttWorld({ state: stateWithoutIp });
+  it('steps volume over MQTT from cached telemetry for a broker-only frame', async () => {
+    const { server, received } = await setupMqttWorld({ state: MQTT_ONLY_STATE });
 
     const response = await server.inject({
       method: 'POST',
@@ -276,8 +295,8 @@ describe('FreeKiosk MQTT bridge', () => {
     ]);
   });
 
-  it('sets brightness over MQTT through the remote level endpoint', async () => {
-    const { server, received } = await setupMqttWorld();
+  it('sets brightness over MQTT for a broker-only frame', async () => {
+    const { server, received } = await setupMqttWorld({ state: MQTT_ONLY_STATE });
 
     const response = await server.inject({
       method: 'PUT',
@@ -292,6 +311,57 @@ describe('FreeKiosk MQTT bridge', () => {
     expect(received).toEqual([
       { topic: 'freekiosk/lobby/set/brightness', payload: '55' },
     ]);
+  });
+
+  it('prefers REST for screen-off when the frame is REST-reachable, not MQTT', async () => {
+    const mock = await startMockFreeKiosk((url) => {
+      if (url === '/api/status') {
+        return { body: { success: true, data: { screen: { on: true, brightness: 37 }, audio: { volume: 33 } } } };
+      }
+      return { body: { success: true, data: { executed: true } } };
+    });
+    const { server, received } = await setupMqttWorld({
+      state: MQTT_ONLY_STATE,
+      deviceOverrides: { remoteApiUrl: mock.url },
+    });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'screen-off' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const data = response.json().data;
+    expect(data.transport).toBeUndefined();
+    expect(data.endpoint).toBe('/api/screen/off');
+    expect(data.source).toBe('manual');
+    // Brightness captured + mute applied over REST, and screen-off via REST.
+    expect(mock.requests).toContain('GET /api/status');
+    expect(mock.requests).toContain('POST /api/screen/off');
+    // No screen command leaked onto MQTT.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(received.some((m) => m.topic === 'freekiosk/lobby/set/screen')).toBe(false);
+  });
+
+  it('falls back to MQTT for idempotent screen-off when REST is unreachable', async () => {
+    // Manual REST URL points at a closed port, so REST fails; screen-off is
+    // idempotent, so the controller retries over MQTT.
+    const { server, received } = await setupMqttWorld({
+      state: MQTT_ONLY_STATE,
+      deviceOverrides: { remoteApiUrl: 'http://127.0.0.1:1' },
+    });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'screen-off' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data.transport).toBe('mqtt');
+    await waitFor(() => received.some((m) => m.topic === 'freekiosk/lobby/set/screen'), 'mqtt screen fallback');
+    expect(received.some((m) => m.topic === 'freekiosk/lobby/set/screen' && m.payload === 'OFF')).toBe(true);
   });
 
   it('lists discovered devices with binding info and updates lastSeenIp from state', async () => {
@@ -351,6 +421,42 @@ describe('FreeKiosk MQTT bridge', () => {
     });
     expect(unbind.statusCode).toBe(200);
     expect(store.getDevice('lenovo')?.mqttTopicId).toBeUndefined();
+  });
+
+  it('rejects binding the same MQTT topic to a second frame', async () => {
+    const { server, store } = await setupMqttWorld();
+    expect(store.getDevice('lenovo')?.mqttTopicId).toBe('lobby');
+
+    const created = await server.inject({
+      method: 'POST',
+      url: '/api/devices',
+      payload: { id: 'kitchen', name: 'Kitchen Frame' },
+    });
+    expect(created.statusCode).toBe(200);
+
+    const conflict = await server.inject({
+      method: 'PATCH',
+      url: '/api/devices/kitchen',
+      payload: { mqttTopicId: 'lobby', remoteControlType: 'freekiosk' },
+    });
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json().error.code).toBe('MQTT_TOPIC_BOUND');
+    expect(store.getDevice('kitchen')?.mqttTopicId).toBeUndefined();
+
+    const createConflict = await server.inject({
+      method: 'POST',
+      url: '/api/devices',
+      payload: { id: 'hallway', name: 'Hallway Frame', mqttTopicId: 'lobby' },
+    });
+    expect(createConflict.statusCode).toBe(409);
+
+    // Re-saving the already-bound frame with its own topic stays allowed.
+    const resave = await server.inject({
+      method: 'PATCH',
+      url: '/api/devices/lenovo',
+      payload: { mqttTopicId: 'lobby' },
+    });
+    expect(resave.statusCode).toBe(200);
   });
 
   it('falls back to MQTT when REST answers but rejects the command', async () => {

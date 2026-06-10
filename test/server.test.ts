@@ -447,6 +447,7 @@ describe('controller API', () => {
     expect(response.body).toContain('fetch(controllerPath(path),');
     expect(response.body).toContain("'Request failed' + status");
     expect(response.body).not.toContain('fetch(path,');
+    expect(response.headers['cache-control']).toBe('no-store, max-age=0');
     await server.close();
   });
 

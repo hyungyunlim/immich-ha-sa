@@ -384,6 +384,15 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     ));
   }
 
+  // One physical FreeKiosk device maps to one frame; a shared topic would make
+  // two frames mirror the same telemetry and fight over commands.
+  function mqttTopicConflict(topicId: string | undefined, deviceId: string): FrameDevice | undefined {
+    if (!topicId) return undefined;
+    return Object.values(store.getData().devices).find((candidate) => (
+      candidate.id !== deviceId && candidate.mqttTopicId === topicId
+    ));
+  }
+
   function remoteCommandPathAvailable(device: FrameDevice, command: FrameCommand): boolean {
     return commandUsesFrameEvents(command)
       && (device.remoteControlType ?? 'none') === 'freekiosk'
@@ -477,6 +486,30 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     };
   }
 
+  function publishMqttLevel(
+    device: FrameDevice,
+    property: 'brightness' | 'volume',
+    value: number,
+  ): Promise<MqttLevelResult> {
+    if (!mqtt || !device.mqttTopicId) {
+      throw new RemoteCommandError('REMOTE_NOT_CONFIGURED', `Frame ${device.id} has no MQTT binding.`, 400);
+    }
+    return mqtt.publishCommand(device.mqttTopicId, property, String(value)).then((published) => ({
+      provider: 'freekiosk' as const,
+      property,
+      value,
+      transport: 'mqtt' as const,
+      topic: published.topic,
+      source: 'mqtt' as const,
+      result: { published: true },
+    }));
+  }
+
+  // Actuation prefers REST when the controller can reach the device: REST confirms
+  // real execution synchronously and sidesteps device-side MQTT command quirks
+  // (e.g. FreeKiosk screen on/off regressions). MQTT carries commands only when
+  // REST has no reachable endpoint (remote frames reached through the broker), or
+  // as a fallback when a REST attempt fails in a way that is safe to retry.
   async function dispatchRemoteCommand(
     device: FrameDevice,
     command: FrameCommand,
@@ -487,26 +520,27 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       ? freeKioskMqttCommandPublication(command, snapshot?.state, device)
       : undefined;
 
-    if (publication && !commandPrefersRestTransport(command)) {
+    if (remoteEndpointCandidates(device).length > 0) {
       try {
-        return await publishMqttCommand(device, command, publication);
+        return await sendRemoteCommand(device, command, remoteTimeoutForDevice(device));
       } catch (error) {
-        app.log.warn({
-          deviceId: device.id,
-          command,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'FreeKiosk MQTT command publish failed; falling back to REST');
+        if (publication && mqttRetrySafeAfterRestFailure(command, error)) {
+          app.log.warn({
+            deviceId: device.id,
+            command,
+            error: error instanceof Error ? error.message : String(error),
+          }, 'FreeKiosk REST command failed; falling back to MQTT');
+          return publishMqttCommand(device, command, publication);
+        }
+        throw error;
       }
     }
 
-    try {
-      return await sendRemoteCommand(device, command, remoteTimeoutForDevice(device));
-    } catch (error) {
-      if (publication && commandPrefersRestTransport(command) && restFailureSafeForMqttFallback(error)) {
-        return publishMqttCommand(device, command, publication);
-      }
-      throw error;
+    if (publication) {
+      return publishMqttCommand(device, command, publication);
     }
+    // No reachable transport — let REST surface the canonical "not configured" error.
+    return sendRemoteCommand(device, command, remoteTimeoutForDevice(device));
   }
 
   async function dispatchRemoteLevel(
@@ -514,25 +548,27 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     property: 'brightness' | 'volume',
     value: number,
   ): Promise<MqttLevelResult | Awaited<ReturnType<typeof setRemoteLevel>>> {
-    if (mqttCommandEligible(device) && mqtt && device.mqttTopicId) {
+    const mqttReady = mqttCommandEligible(device) && Boolean(mqtt) && Boolean(device.mqttTopicId);
+
+    if (remoteEndpointCandidates(device).length > 0) {
       try {
-        const published = await mqtt.publishCommand(device.mqttTopicId, property, String(value));
-        return {
-          provider: 'freekiosk',
-          property,
-          value,
-          transport: 'mqtt',
-          topic: published.topic,
-          source: 'mqtt',
-          result: { published: true },
-        };
+        return await setRemoteLevel(device, property, value, remoteTimeoutForDevice(device));
       } catch (error) {
-        app.log.warn({
-          deviceId: device.id,
-          property,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'FreeKiosk MQTT level publish failed; falling back to REST');
+        // Absolute brightness/volume writes are idempotent, so an MQTT retry is safe.
+        if (mqttReady) {
+          app.log.warn({
+            deviceId: device.id,
+            property,
+            error: error instanceof Error ? error.message : String(error),
+          }, 'FreeKiosk REST level failed; falling back to MQTT');
+          return publishMqttLevel(device, property, value);
+        }
+        throw error;
       }
+    }
+
+    if (mqttReady) {
+      return publishMqttLevel(device, property, value);
     }
     return setRemoteLevel(device, property, value, remoteTimeoutForDevice(device));
   }
@@ -576,6 +612,11 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   }
 
   async function prepareScreenOff(device: FrameDevice): Promise<RemoteScreenOffPreparationResult> {
+    // Mirror dispatch: capture brightness/mute over REST when reachable, otherwise
+    // fall back to the cached MQTT telemetry for broker-only remote frames.
+    if (remoteEndpointCandidates(device).length > 0) {
+      return prepareRemoteScreenOff(store, device, remoteTimeoutForDevice(device));
+    }
     const snapshot = mqttSnapshotForDevice(device);
     if (snapshot?.availability === 'online' && snapshot.state) {
       const brightness = remoteBrightnessValue(snapshot.state);
@@ -733,7 +774,10 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       await kioskConnectionChecker(candidate, kioskPasswordForDevice(candidate, deps.config.kioskPassword)),
     ] as const));
     const kioskDiagnosticsByDevice = Object.fromEntries(kioskDiagnostics);
-    reply.type('text/html; charset=utf-8').send(renderSetupPage({
+    // The console reflects live device/MQTT state and reloads itself after
+    // mutations, so it must never be served from cache (notably inside the HA
+    // ingress iframe, where a cached copy survives a reload).
+    reply.header('cache-control', 'no-store, max-age=0').type('text/html; charset=utf-8').send(renderSetupPage({
       controllerUrl: device.localControllerBaseUrl,
       deviceId: device.id,
       pairingCode: pairing.code,
@@ -863,7 +907,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     const context = requestContext(request);
     const { claim, code } = createFrameClaimForRequest(request);
     const setupUrl = `${controllerBaseUrlForContext(context, deps.config.defaultDevice.localControllerBaseUrl)}/setup`;
-    reply.type('text/html; charset=utf-8').send(renderFrameClaimPage({
+    reply.header('cache-control', 'no-store, max-age=0').type('text/html; charset=utf-8').send(renderFrameClaimPage({
       claimId: claim.id,
       code,
       expiresAt: claim.expiresAt,
@@ -1040,6 +1084,11 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       return;
     }
     const device = createDeviceFromInput(parsed.data, deps.config.defaultDevice);
+    const topicConflict = mqttTopicConflict(device.mqttTopicId, device.id);
+    if (topicConflict) {
+      reply.status(409).send(fail('MQTT_TOPIC_BOUND', `MQTT topic "${device.mqttTopicId}" is already bound to device ${topicConflict.id}. Unbind it there first.`));
+      return;
+    }
     const created = store.createDevice(device);
     if (!created) {
       reply.status(409).send(fail('DEVICE_EXISTS', `Device already exists: ${device.id}`));
@@ -1073,7 +1122,13 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid device.'));
       return;
     }
-    const updated = store.updateDevice(parsedDeviceId.data, normalizeDevicePatch(parsed.data));
+    const patch = normalizeDevicePatch(parsed.data);
+    const topicConflict = mqttTopicConflict(patch.mqttTopicId, parsedDeviceId.data);
+    if (topicConflict) {
+      reply.status(409).send(fail('MQTT_TOPIC_BOUND', `MQTT topic "${patch.mqttTopicId}" is already bound to device ${topicConflict.id}. Unbind it there first.`));
+      return;
+    }
+    const updated = store.updateDevice(parsedDeviceId.data, patch);
     if (!updated) {
       reply.status(404).send(fail('DEVICE_NOT_FOUND', `Device not found: ${parsedDeviceId.data}`));
       return;
@@ -1886,18 +1941,22 @@ interface MqttCommandPublication {
   volumeCapture?: number;
 }
 
-// Volume stepping and mute keep their REST keyboard semantics when the device is
-// reachable; MQTT only emulates them (via set/volume) as a fallback.
-function commandPrefersRestTransport(command: FrameCommand): boolean {
-  return command === 'volume-up' || command === 'volume-down' || command === 'device-mute-toggle';
+// Setting a fixed end state (screen on/off, reload) is idempotent, so retrying it
+// over MQTT after a REST failure is always safe. Key-event/relative commands
+// (volume step, mute toggle, navigation) are not: a REST request that times out
+// may still have executed on the device, so re-issuing over MQTT could double it.
+// Those only retry when the REST failure proves the command never reached the device.
+function commandIsIdempotent(command: FrameCommand): boolean {
+  return command === 'screen-on' || command === 'screen-off' || command === 'reload';
 }
 
-// Key-event commands are not idempotent: a timed-out REST request may still have
-// executed on the device, so re-issuing over MQTT could double-apply it. Only fall
-// back when the failure proves the command never ran.
-function restFailureSafeForMqttFallback(error: unknown): boolean {
-  return error instanceof RemoteCommandError
-    && (error.code === 'REMOTE_NOT_CONFIGURED' || error.responseReceived);
+function mqttRetrySafeAfterRestFailure(command: FrameCommand, error: unknown): boolean {
+  if (commandIsIdempotent(command)) return true;
+  if (!(error instanceof RemoteCommandError)) return false;
+  // Safe when the device never received the request (no endpoint) or answered with
+  // an explicit rejection (it decided not to act). Unsafe only when a sent request
+  // produced no response — the device may have executed it before the link dropped.
+  return error.code === 'REMOTE_NOT_CONFIGURED' || error.responseReceived;
 }
 
 function freeKioskMqttCommandPublication(

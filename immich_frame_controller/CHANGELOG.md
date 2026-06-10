@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.77
+
+- Prefer the FreeKiosk REST API for hardware commands (screen, brightness, volume) whenever the controller can reach the device; MQTT now carries commands only for broker-only remote frames or as a safe retry. REST confirms real execution and keeps local frames working even when a FreeKiosk release regresses an MQTT command (e.g. screen power). Telemetry, presence, and motion still come over MQTT.
+- Reject binding the same MQTT topic to more than one frame (409 `MQTT_TOPIC_BOUND`) so two frames can no longer mirror one device's telemetry and fight over commands.
+- Send `Cache-Control: no-store` on the setup console and frame-claim pages so the Home Assistant ingress iframe always reflects live state after bind/unbind/save instead of serving a cached copy.
+
 ## 0.1.76
 
 - Add an optional FreeKiosk MQTT bridge: the controller subscribes to `freekiosk/<topic>/availability` and `/state` on a user-provided broker for push telemetry and device online/offline tracking, and publishes `set/*` hardware commands (screen, brightness, volume, reload) with REST fallback in both directions.
