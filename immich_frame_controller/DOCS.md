@@ -19,6 +19,8 @@ The default controller port is `8082`. If you change the add-on network port, up
 
 ## Pairing With Home Assistant
 
+The `Immich Frame Controller` integration is installed separately through HACS. See the [installation steps in the repository README](https://github.com/hyungyunlim/immich-ha-sa#step-2---install-the-integration-hacs).
+
 1. Start the add-on.
 2. Open the add-on Web UI or `http://<home-assistant-host>:8082/`.
 3. Add the `Immich Frame Controller` integration.
