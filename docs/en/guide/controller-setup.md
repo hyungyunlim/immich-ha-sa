@@ -28,6 +28,17 @@ For each new device the controller creates:
 
 Add the Home Assistant integration once per device ID; the config flow reads the controller's device list after pairing and offers the devices as choices.
 
+## MQTT bridge
+
+When an MQTT broker is configured, the console gains an **MQTT Bridge** section. It lists every FreeKiosk frame publishing to the broker with its availability, IP, and last-seen time, and a **Bind** button to link a discovered device to a frame (the controller preselects a match when the IP lines up with a known frame). Binding gives that frame push hardware control, online/offline presence, and live telemetry without IP discovery — see [FreeKiosk](./freekiosk#_3-optional-mqtt-push-control).
+
+The section header shows two pills:
+
+- **Connected / Disconnected** — the controller's link to the broker.
+- **Real-time push: active (N) / idle** — how many Home Assistant integration listeners are consuming the live telemetry stream. `idle` means the integration is polling instead; update it to match the add-on version and restart Home Assistant.
+
+One MQTT topic binds to one frame; binding a topic already used elsewhere is rejected.
+
 ## URLs and network modes
 
 The controller separates URLs the **services** can reach from URLs the **frame browser** can reach:

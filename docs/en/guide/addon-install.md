@@ -40,6 +40,13 @@ Find **Immich Frame Controller** in the store and install it.
 | `poll_interval_seconds` | yes | Frame polling fallback interval (5–300) |
 | `album_refresh_interval_seconds` | yes | How often the controller refreshes Immich albums in the background; `0` disables automatic refresh |
 | `controller_api_token` | no | Optional static API token; most users should leave it blank and use [pairing](./pairing) |
+| `mqtt_broker_url` | no | MQTT broker for [FreeKiosk push control](./freekiosk#_3-optional-mqtt-push-control); leave blank to auto-detect the Mosquitto add-on |
+| `mqtt_username`, `mqtt_password` | no | Broker credentials; auto-filled from the Mosquitto add-on when the broker is auto-detected |
+| `mqtt_base_topic` | no | FreeKiosk base topic; leave blank for the default `freekiosk` |
+
+::: tip MQTT is optional and auto-detected
+Install the **Mosquitto broker** add-on and the controller connects to it automatically — no `mqtt_*` options needed. MQTT adds push hardware control, device presence, and live telemetry for FreeKiosk frames; without it the controller works exactly as before. See [FreeKiosk](./freekiosk#_3-optional-mqtt-push-control).
+:::
 
 ## 4. Start and verify
 

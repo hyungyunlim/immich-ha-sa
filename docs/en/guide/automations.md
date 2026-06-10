@@ -11,11 +11,13 @@ Each frame device gets a Home Assistant device page with entities for everything
 | Profiles | Profile selection and the profile services below |
 | Display | Renderer option entities — clock, date, weather, font size, background blur, image metadata (date/time, album, person, camera, EXIF, location, rating, owner, user), progress bar |
 | Media | **Show Videos** switch, **Show Archived** switch, **Kiosk Video Mute** button |
-| Hardware ([FreeKiosk](./freekiosk)) | **Display Brightness**, **Media Volume** numbers; **Light Level**, **Auto Brightness Active** status; navigation, screen, and volume buttons |
+| Hardware ([FreeKiosk](./freekiosk)) | **Display Brightness**, **Media Volume** numbers; navigation, screen, and volume buttons |
+| Telemetry ([FreeKiosk](./freekiosk)) | **Device Online** (connectivity), **Motion** (camera devices), **Screen On**, **Device Muted**, **Battery**, **Battery Charging**, **WiFi Signal**, **Light Level**, **Auto Brightness Active** |
 | Maintenance | **Refresh Albums**, **Refresh People** buttons, **Network Mode** select |
 
 Notes:
 
+- The telemetry entities come from [FreeKiosk](./freekiosk#what-you-get-in-home-assistant), over MQTT or REST. With an [MQTT binding](./freekiosk#_3-optional-mqtt-push-control), **Device Online** and **Motion** update in about a second (real-time push); without it the integration polls every 30 seconds. **Motion** needs a device with a camera.
 - When no album filter is active, the **Album** select shows `No Album Filter`. Choose it before selecting a person when you want person-only source selection.
 - The **Albums** / **People** text entities accept names or IDs, comma-separated. `all` selects all named people; blank or `none` clears the filter.
 - immich-kiosk documents `require_all_people` as incompatible with other source buckets (albums, date ranges) — avoid combining them when deterministic results matter.
@@ -83,4 +85,35 @@ action:
     data:
       filterDate: last-30-days
       albumOrder: newest
+```
+
+Wake the screen when someone approaches a camera-equipped frame (needs [FreeKiosk MQTT](./freekiosk#real-time-updates-over-mqtt) with Always-on Motion Detection):
+
+```yaml
+alias: Frame screen on motion
+trigger:
+  - platform: state
+    entity_id: binary_sensor.lenovo_frame_motion
+    to: "on"
+action:
+  - service: button.press
+    target:
+      entity_id: button.lenovo_frame_screen_on
+```
+
+Screen off at night, back on in the morning:
+
+```yaml
+alias: Frame screen schedule
+trigger:
+  - platform: time
+    at: "23:00:00"
+    id: "off"
+  - platform: time
+    at: "07:00:00"
+    id: "on"
+action:
+  - service: button.press
+    target:
+      entity_id: "button.lenovo_frame_screen_{{ trigger.id }}"
 ```

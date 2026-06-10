@@ -28,6 +28,17 @@ http://<controller-host>:8082/
 
 Home Assistant 통합은 디바이스 ID마다 한 번씩 추가합니다. 페어링 후 config flow가 컨트롤러의 디바이스 목록을 읽어 선택지로 제공합니다.
 
+## MQTT bridge
+
+MQTT broker가 설정되면 콘솔에 **MQTT Bridge** 섹션이 생깁니다. broker에 publish하는 모든 FreeKiosk 프레임을 가용성·IP·마지막 수신 시각과 함께 나열하고, 발견된 디바이스를 프레임에 연결하는 **Bind** 버튼을 제공합니다 (IP가 알려진 프레임과 일치하면 컨트롤러가 미리 선택해 줍니다). 바인딩하면 그 프레임은 IP 발견 없이 푸시 하드웨어 제어·online/offline presence·실시간 텔레메트리를 얻습니다 — [FreeKiosk](./freekiosk#_3-선택-mqtt-push-제어) 참고.
+
+섹션 헤더에 필 두 개가 표시됩니다:
+
+- **Connected / Disconnected** — 컨트롤러와 broker의 연결.
+- **Real-time push: active (N) / idle** — 실시간 텔레메트리 스트림을 소비하는 Home Assistant 통합 리스너 수. `idle`은 통합이 폴링 중이라는 뜻이니, 애드온과 같은 버전으로 업데이트하고 Home Assistant를 재시작하세요.
+
+MQTT 토픽 하나는 프레임 하나에만 바인딩되며, 이미 다른 곳에 쓰인 토픽을 바인딩하려 하면 거부됩니다.
+
 ## URL과 네트워크 모드
 
 컨트롤러는 **서비스**가 접근하는 URL과 **액자 브라우저**가 접근하는 URL을 분리합니다:

@@ -26,6 +26,40 @@ Weather API keys and locations live in immich-kiosk's `config.yaml`, not in the 
 
 Through a tunnel, SSE can be unreliable; the frame falls back to polling every `poll_interval_seconds` (default 20). This is expected — lower the interval if you need faster reaction.
 
+## MQTT Bridge shows Disconnected
+
+The controller could not reach the broker. On Home Assistant OS it auto-detects the Mosquitto add-on — install and start it. To use another broker, set `mqtt_broker_url` (add-on option) or `MQTT_BROKER_URL` (standalone Docker). The add-on log prints the broker it connected to; the **Last connection error** line in the [MQTT Bridge](./controller-setup#mqtt-bridge) section shows auth/connection failures.
+
+## My FreeKiosk frame never appears in the MQTT Bridge
+
+The frame is not publishing to the topic the controller watches. In the FreeKiosk app, **Advanced → MQTT**:
+
+- **Base Topic** must be `freekiosk` (the controller subscribes to `freekiosk/+/...`). A custom base topic like `mykiosk` is invisible to the controller.
+- **Broker URL** must be the broker's **LAN IP** (for example `192.168.1.10`), not `core-mosquitto` — that name only resolves inside Home Assistant.
+- **Username / password**: with the Mosquitto add-on, create a Home Assistant user and use those credentials. Then press **Connect**.
+
+Set a **Device Name** (for example `lobby`); it becomes the topic id you bind to.
+
+## Bind / Unbind (or device add/edit) does nothing in the add-on panel
+
+Update the add-on to **0.1.78 or newer**. Earlier versions built console API requests relative to the ingress panel URL, so they never reached the controller. After updating, the buttons work through the Home Assistant ingress panel.
+
+## "Real-time push: idle" in the MQTT Bridge
+
+The controller's telemetry stream has no subscriber — the integration is not consuming it. Update the **integration** (HACS) to match the add-on version and restart Home Assistant. The listener connects on startup; "active (N)" then shows the number of connected frames. Push is optional — without it the integration still polls every 30 seconds.
+
+## Motion sensor is always off or unavailable
+
+FreeKiosk motion uses the device camera. Camera-less frames (most digital photo frames) never report motion — disable the **Motion** entity. On a camera device, enable **Always-on Motion Detection** in the FreeKiosk MQTT settings (otherwise motion only runs during the screensaver).
+
+## Battery / WiFi / screen state lags ~30 seconds
+
+FreeKiosk publishes its routine telemetry on the **Status Interval** (default 30s). The controller pushes each update instantly, but the device's publish cadence is the floor. Lower the Status Interval in FreeKiosk for fresher diagnostics. Availability (online/offline) and motion are event-driven and not bound by this interval.
+
+## Screen on/off works over REST but not when I expect MQTT
+
+Some FreeKiosk releases regress MQTT screen commands. The controller prefers REST for hardware commands whenever it can reach the device and only uses MQTT for frames reachable solely through the broker, so a bound local frame keeps working over REST regardless. Nothing to configure.
+
 ## I changed the controller port and things broke
 
 Update all three places together: `local_public_controller_url` (add-on option / env), the integration's controller URL, and the frame browser's fixed URL.

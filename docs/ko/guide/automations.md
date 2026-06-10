@@ -11,11 +11,13 @@
 | 프로필 | 프로필 선택과 아래 프로필 서비스 |
 | 디스플레이 | 렌더러 옵션 엔티티 — 시계, 날짜, 날씨, 폰트 크기, 배경 블러, 이미지 메타데이터(촬영 일시, 앨범, 인물, 카메라, EXIF, 위치, 평점, 소유자, 사용자), 진행 바 |
 | 미디어 | **Show Videos** switch, **Show Archived** switch, **Kiosk Video Mute** 버튼 |
-| 하드웨어 ([FreeKiosk](./freekiosk)) | **Display Brightness**, **Media Volume** number; **Light Level**, **Auto Brightness Active** 상태; 내비게이션·화면·볼륨 버튼 |
+| 하드웨어 ([FreeKiosk](./freekiosk)) | **Display Brightness**, **Media Volume** number; 내비게이션·화면·볼륨 버튼 |
+| 텔레메트리 ([FreeKiosk](./freekiosk)) | **Device Online**(연결), **Motion**(카메라 기기), **Screen On**, **Device Muted**, **Battery**, **Battery Charging**, **WiFi Signal**, **Light Level**, **Auto Brightness Active** |
 | 유지보수 | **Refresh Albums**, **Refresh People** 버튼, **Network Mode** select |
 
 참고:
 
+- 텔레메트리 엔티티는 [FreeKiosk](./freekiosk#home-assistant에-생기는-것)에서 MQTT 또는 REST로 옵니다. [MQTT 바인딩](./freekiosk#_3-선택-mqtt-push-제어)이 있으면 **Device Online**과 **Motion**이 약 1초 안에 갱신되고(실시간 푸시), 없으면 통합이 30초마다 폴링합니다. **Motion**은 카메라가 있는 기기에서만 동작합니다.
 - 앨범 필터가 없을 때 **Album** select는 `No Album Filter`를 표시합니다. 인물 단독 소스 선택을 원하면 인물을 고르기 전에 이것을 먼저 선택하세요.
 - **Albums** / **People** text 엔티티는 이름 또는 ID를 쉼표로 구분해 받습니다. `all`은 이름이 있는 모든 인물을 선택하고, 빈 값 또는 `none`은 필터를 지웁니다.
 - immich-kiosk 문서상 `require_all_people`은 앨범·날짜 범위 같은 다른 소스 버킷과 호환되지 않습니다 — 결정적인 결과가 필요하면 함께 쓰지 마세요.
@@ -83,4 +85,35 @@ action:
     data:
       filterDate: last-30-days
       albumOrder: newest
+```
+
+카메라가 있는 액자 앞에 사람이 다가오면 화면 켜기 ([FreeKiosk MQTT](./freekiosk#mqtt-실시간-업데이트) + Always-on Motion Detection 필요):
+
+```yaml
+alias: Frame screen on motion
+trigger:
+  - platform: state
+    entity_id: binary_sensor.lenovo_frame_motion
+    to: "on"
+action:
+  - service: button.press
+    target:
+      entity_id: button.lenovo_frame_screen_on
+```
+
+밤에 화면 끄고 아침에 켜기:
+
+```yaml
+alias: Frame screen schedule
+trigger:
+  - platform: time
+    at: "23:00:00"
+    id: "off"
+  - platform: time
+    at: "07:00:00"
+    id: "on"
+action:
+  - service: button.press
+    target:
+      entity_id: "button.lenovo_frame_screen_{{ trigger.id }}"
 ```

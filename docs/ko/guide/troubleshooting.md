@@ -26,6 +26,40 @@
 
 터널에서는 SSE가 불안정할 수 있고, 그 경우 프레임은 `poll_interval_seconds`(기본 20초) 주기 폴링으로 폴백합니다. 정상 동작입니다 — 더 빠른 반응이 필요하면 주기를 줄이세요.
 
+## MQTT Bridge가 Disconnected로 떠요
+
+컨트롤러가 broker에 도달하지 못한 겁니다. Home Assistant OS에서는 Mosquitto 애드온을 자동 감지하니 설치·시작하세요. 다른 broker를 쓰려면 `mqtt_broker_url`(애드온 옵션) 또는 `MQTT_BROKER_URL`(standalone Docker)을 설정합니다. 애드온 로그에 연결된 broker가 찍히고, [MQTT Bridge](./controller-setup#mqtt-bridge) 섹션의 **Last connection error** 줄에 인증·연결 실패가 표시됩니다.
+
+## FreeKiosk 액자가 MQTT Bridge에 안 나타나요
+
+액자가 컨트롤러가 구독하는 토픽으로 publish하지 않는 겁니다. FreeKiosk 앱 **Advanced → MQTT**에서:
+
+- **Base Topic**은 반드시 `freekiosk`여야 합니다 (컨트롤러는 `freekiosk/+/...`를 구독). `mykiosk` 같은 커스텀 base topic은 컨트롤러에 보이지 않습니다.
+- **Broker URL**은 broker의 **LAN IP**(예: `192.168.1.10`)여야 합니다. `core-mosquitto`는 Home Assistant 내부에서만 풀리는 이름이라 안 됩니다.
+- **사용자/비밀번호**: Mosquitto 애드온은 Home Assistant 사용자 계정을 만들어 그 자격증명을 쓰면 됩니다. 그다음 **Connect**를 누르세요.
+
+**Device Name**(예: `lobby`)을 설정하세요 — 이게 바인딩할 토픽 ID가 됩니다.
+
+## 애드온 패널에서 Bind/Unbind(또는 디바이스 추가·수정)가 동작하지 않아요
+
+애드온을 **0.1.78 이상**으로 업데이트하세요. 그 이전 버전은 콘솔 API 요청을 ingress 패널 URL 기준으로 만들어서 컨트롤러에 도달하지 못했습니다. 업데이트하면 Home Assistant ingress 패널에서도 버튼이 동작합니다.
+
+## MQTT Bridge에 "Real-time push: idle"이 떠요
+
+컨트롤러 텔레메트리 스트림에 구독자가 없는 겁니다 — 통합이 소비하지 않고 있어요. **통합**(HACS)을 애드온과 같은 버전으로 업데이트하고 Home Assistant를 재시작하세요. 리스너는 시작 시 연결되며, 그러면 "active (N)"이 연결된 프레임 수를 보여줍니다. 푸시는 선택이고, 없어도 통합은 30초마다 폴링합니다.
+
+## Motion 센서가 항상 off이거나 unavailable이에요
+
+FreeKiosk 모션은 기기 카메라를 씁니다. 카메라 없는 액자(대부분의 디지털 액자)는 모션을 보고하지 않으니 **Motion** 엔티티를 비활성화하세요. 카메라 기기에서는 FreeKiosk MQTT 설정의 **Always-on Motion Detection**을 켜세요 (안 켜면 모션은 screensaver 중에만 동작).
+
+## 배터리/WiFi/화면 상태가 ~30초 늦어요
+
+FreeKiosk는 정기 텔레메트리를 **Status Interval**(기본 30초)에 맞춰 publish합니다. 컨트롤러는 받는 즉시 푸시하지만, 기기의 publish 주기가 바닥입니다. 진단값을 더 신선하게 원하면 FreeKiosk에서 Status Interval을 낮추세요. 가용성(online/offline)과 모션은 이벤트 기반이라 이 주기에 묶이지 않습니다.
+
+## 화면 on/off가 REST로는 되는데 MQTT일 거라 기대한 상황에서 안 돼요
+
+일부 FreeKiosk 릴리스는 MQTT 화면 명령을 회귀시킵니다. 컨트롤러는 디바이스에 도달 가능하면 하드웨어 명령에 REST를 우선하고, broker로만 닿는 프레임에만 MQTT를 쓰므로, 바인딩된 로컬 프레임은 그와 무관하게 REST로 계속 동작합니다. 설정할 것 없습니다.
+
 ## 컨트롤러 포트를 바꿨더니 동작이 깨졌어요
 
 세 곳을 함께 수정해야 합니다: `local_public_controller_url`(애드온 옵션 / env), 통합의 컨트롤러 URL, 액자 브라우저의 고정 URL.

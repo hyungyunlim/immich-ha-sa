@@ -40,6 +40,13 @@ https://github.com/hyungyunlim/immich-ha-sa
 | `poll_interval_seconds` | 예 | 프레임 폴링 폴백 주기 (5–300초) |
 | `album_refresh_interval_seconds` | 예 | 컨트롤러가 백그라운드에서 Immich 앨범을 새로고침하는 주기. `0`이면 자동 새로고침 비활성화 |
 | `controller_api_token` | 아니오 | 선택적 고정 API 토큰. 대부분 비워두고 [페어링](./pairing)을 사용하세요 |
+| `mqtt_broker_url` | 아니오 | [FreeKiosk 푸시 제어](./freekiosk#_3-선택-mqtt-push-제어)용 MQTT broker. 비워두면 Mosquitto 애드온을 자동 감지 |
+| `mqtt_username`, `mqtt_password` | 아니오 | broker 자격증명. broker 자동 감지 시 Mosquitto 애드온 계정이 자동으로 채워집니다 |
+| `mqtt_base_topic` | 아니오 | FreeKiosk base topic. 비워두면 기본값 `freekiosk` |
+
+::: tip MQTT는 선택이며 자동 감지됩니다
+**Mosquitto broker** 애드온을 설치하면 컨트롤러가 자동으로 연결합니다 — `mqtt_*` 옵션 불필요. MQTT는 FreeKiosk 프레임에 푸시 하드웨어 제어·디바이스 presence·실시간 텔레메트리를 더해주며, 없어도 컨트롤러는 기존과 똑같이 동작합니다. [FreeKiosk](./freekiosk#_3-선택-mqtt-push-제어) 참고.
+:::
 
 ## 4. 시작 및 확인
 
