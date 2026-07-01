@@ -38,6 +38,65 @@
 | `immich_frame.set_renderer_options` | 아래 참고 |
 | `immich_frame.set_network_mode` | `network_mode`: `auto` / `local` / `external` (필수) |
 
+### 프로필 저장
+
+프로필은 현재 프레임 상태의 스냅샷입니다. 먼저 Home Assistant 엔티티나 서비스로 프레임 설정을 바꾼 뒤, 그 상태를 프로필로 저장합니다.
+
+저장되는 항목:
+
+- 소스 필터: 활성 앨범, 활성 인물, 날짜/최신순 필터, `requireAllPeople`
+- 슬라이드쇼와 레이아웃 옵션: duration, transition, layout, image fit, background blur, font size, image effect
+- 표시 오버레이: 시계, 날짜, 날씨, 이미지 메타데이터, progress bar, sleep, burn-in 옵션
+- 미디어와 네트워크 선호값: 영상 표시, 보관 항목 표시, 영상 길이 제한, preferred network mode
+
+현재 기기 밝기, 볼륨, 화면 전원, 배터리, 모션 상태처럼 하드웨어 상태에 가까운 값은 저장하지 않습니다.
+
+현재 설정으로 새 프로필을 만들려면 `immich_frame.save_profile`을 `name`과 함께 호출합니다:
+
+```yaml
+service: immich_frame.save_profile
+data:
+  name: Morning
+  profile_id: morning
+  overwrite: true
+```
+
+`profile_id`는 선택사항이지만, 자동화에서 계속 참조할 값이므로 명시하는 것을 권장합니다. 생략하면 통합이 `name`에서 ID를 만들어 씁니다.
+
+디바이스 페이지에서도 만들 수 있습니다:
+
+1. 디바이스 페이지의 엔티티로 프레임 설정을 바꿉니다.
+2. **Profile Name**에 새 프로필 이름을 입력합니다.
+3. 필요하면 **Profile ID**에 자동화에서 쓸 ID를 입력합니다.
+4. **Save Profile** 버튼을 누릅니다.
+
+**Save Profile** 버튼은 누르는 순간 이름을 입력받을 수 없습니다. **Profile Name**이 비어 있고 재사용할 기존 active profile 이름도 없으면 Home Assistant에 `Profile name is required` 오류가 표시됩니다.
+
+기존 프로필을 업데이트하려면 먼저 해당 프로필을 로드하고, 설정을 바꾼 뒤 같은 `profile_id`로 다시 저장합니다:
+
+```yaml
+service: immich_frame.set_profile
+data:
+  profile_id: morning
+```
+
+```yaml
+service: immich_frame.set_renderer_options
+data:
+  durationSeconds: 45
+  showWeather: true
+  albumOrder: newest
+```
+
+```yaml
+service: immich_frame.save_profile
+data:
+  profile_id: morning
+  overwrite: true
+```
+
+프로필이 이미 active 상태라면 엔티티로 설정을 바꾼 뒤 **Save Profile** 버튼을 눌러도 그 active profile이 업데이트됩니다. 자동화에서는 대상이 모호하지 않도록 `profile_id`를 명시하는 편이 안전합니다.
+
 ### `set_renderer_options`
 
 렌더러 오버라이드 전체를 하나의 서비스로 제어합니다. 필드 그룹:

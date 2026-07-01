@@ -38,6 +38,65 @@ All services accept an optional `device_id` (defaults to the configured device).
 | `immich_frame.set_renderer_options` | See below |
 | `immich_frame.set_network_mode` | `network_mode`: `auto` / `local` / `external` (required) |
 
+### Saving profiles
+
+A profile is a snapshot of the current frame state. To build one, first change the frame through the Home Assistant entities or services, then save the state as a profile.
+
+The saved snapshot includes:
+
+- Source filters: active albums, active people, date/newest filters, and `requireAllPeople`
+- Slideshow and layout options: duration, transitions, layout, image fit, background blur, font size, and image effects
+- Display overlays: clock, date, weather, image metadata, progress bar, sleep, and burn-in options
+- Media and network preferences: videos, archived media, video duration limit, and preferred network mode
+
+It does not save hardware-only state such as the current device brightness, volume, screen power, battery, or motion status.
+
+To create a new profile from the current settings, call `immich_frame.save_profile` with a name:
+
+```yaml
+service: immich_frame.save_profile
+data:
+  name: Morning
+  profile_id: morning
+  overwrite: true
+```
+
+`profile_id` is optional, but setting it explicitly makes automations stable. If you omit it, the integration derives an ID from `name`.
+
+You can also use the device page:
+
+1. Change the frame settings with the entities on the device page.
+2. Set **Profile Name** to the new profile name.
+3. Optionally set **Profile ID** to the ID you want automations to use.
+4. Press **Save Profile**.
+
+The **Save Profile** button cannot ask for a name at press time. If **Profile Name** is blank and no existing active profile name can be reused, Home Assistant shows `Profile name is required`.
+
+To update an existing profile, load it first, change the settings, then save it again with the same `profile_id`:
+
+```yaml
+service: immich_frame.set_profile
+data:
+  profile_id: morning
+```
+
+```yaml
+service: immich_frame.set_renderer_options
+data:
+  durationSeconds: 45
+  showWeather: true
+  albumOrder: newest
+```
+
+```yaml
+service: immich_frame.save_profile
+data:
+  profile_id: morning
+  overwrite: true
+```
+
+When a profile is already active, pressing **Save Profile** after changing entities updates that active profile. For automation flows, prefer passing `profile_id` explicitly so the target profile is unambiguous.
+
 ### `set_renderer_options`
 
 One service covers all renderer overrides. Field groups:
