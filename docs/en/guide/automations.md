@@ -10,7 +10,7 @@ Each frame device gets a Home Assistant device page with entities for everything
 | Filters | **Date Filter Preset** select, **Filter Start Date** / **Filter End Date** date pickers, **Date Filter** text (raw values like `last-30-days`), **Newest Filter** number, **Album Order** select |
 | Profiles | Profile selection and the profile services below |
 | Display | Renderer option entities — clock, date, weather, font size, background blur, image metadata (date/time, album, person, camera, EXIF, location, rating, owner, user), progress bar |
-| Media | **Show Videos** switch, **Show Archived** switch, **Kiosk Video Mute** button |
+| Media | **Show Videos** switch, **Show Archived** switch, **Kiosk Video Mute** switch/button |
 | Hardware ([FreeKiosk](./freekiosk)) | **Display Brightness**, **Media Volume** numbers; navigation, screen, and volume buttons |
 | Telemetry ([FreeKiosk](./freekiosk)) | **Device Online** (connectivity), **Motion** (camera devices), **Screen On**, **Device Muted**, **Battery**, **Battery Charging**, **WiFi Signal**, **Light Level**, **Auto Brightness Active** |
 | Maintenance | **Refresh Albums**, **Refresh People** buttons, **Network Mode** select |

@@ -95,7 +95,7 @@ Next/Previous 버튼을 쓰려면 프레임의 `disableNavigation` 렌더러 옵
 ## 오디오: 기기 음소거 vs 비디오 음소거
 
 - **Device Mute Toggle**, **Volume Up/Down** — FreeKiosk를 통해 키 이벤트로 전달되는 안드로이드 기기 오디오. 액자 전체 오디오 상태를 신뢰성 있게 제어하려면 이쪽을 사용하세요.
-- **Kiosk Video Mute** — immich-kiosk 자체 비디오 음소거를 제어하는 press 버튼. kiosk의 `.navigation--mute` 컨트롤을 먼저 클릭하고, 실패하면 비디오 요소의 muted 상태를 직접 토글합니다. immich-kiosk가 신뢰할 수 있는 음소거 상태를 노출하지 않기 때문에 스위치가 아닌 press 버튼입니다.
+- **Kiosk Video Mute** — immich-kiosk 자체 비디오 음소거 상태를 제어하는 스위치와 빠른 토글용 press 버튼입니다. 스위치는 controller bridge를 통해 명시적인 mute/unmute 명령을 보내고, 가능하면 immich-kiosk의 browser video API를 사용합니다. Android device volume은 바꾸지 않습니다.
 
 ## 알려진 FreeKiosk 제약
 

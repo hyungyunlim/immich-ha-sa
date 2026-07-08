@@ -69,15 +69,16 @@ describe('Home Assistant integration files', () => {
     expect(source).not.toContain('"dpad-up"');
   });
 
-  it('exposes kiosk video mute as a regular press button', () => {
+  it('exposes kiosk video mute as a stateful switch and a regular press button', () => {
     const buttonSource = readFileSync(join(root, 'custom_components/immich_frame/button.py'), 'utf8');
     const switchSource = readFileSync(join(root, 'custom_components/immich_frame/switch.py'), 'utf8');
 
     expect(buttonSource).toContain('"kiosk_video_mute"');
     expect(buttonSource).toContain('"Kiosk Video Mute"');
     expect(buttonSource).toContain('"mute-toggle"');
-    expect(switchSource).not.toContain('"kiosk_video_mute"');
-    expect(switchSource).not.toContain('"Kiosk Video Mute"');
+    expect(switchSource).toContain('"kiosk_video_mute"');
+    expect(switchSource).toContain('Frame Kiosk Video Mute');
+    expect(switchSource).toContain('"mute-on" if muted else "mute-off"');
   });
 
   it('exposes FreeKiosk screen and audio status controls', () => {
@@ -126,8 +127,10 @@ describe('Home Assistant integration files', () => {
     expect(serverSource).toContain("return command === 'mute-toggle'");
     expect(serverSource).toContain("if (command === 'mute-toggle') return false;");
     expect(serverSource).toContain("if (command === 'mute-toggle') selector");
+    expect(serverSource).toContain("command === 'mute-on'");
+    expect(serverSource).toContain("command === 'mute-off'");
+    expect(serverSource).toContain('api.setMuted(muted)');
     expect(serverSource).not.toContain('commandNeedsRemoteReconciliation');
-    expect(serverSource).not.toContain("'REMOTE_EXPLICIT_MUTE_UNAVAILABLE'");
   });
 
   it('exposes friendly media content and orientation controls', () => {

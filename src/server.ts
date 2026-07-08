@@ -291,7 +291,7 @@ const DevicePatchSchema = z.object({
 });
 
 const FrameCommandSchema = z.object({
-  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'mute-toggle', 'screen-on', 'screen-off', 'volume-up', 'volume-down', 'device-mute-toggle', 'dpad-up']),
+  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'mute-toggle', 'mute-on', 'mute-off', 'screen-on', 'screen-off', 'volume-up', 'volume-down', 'device-mute-toggle', 'dpad-up']),
 });
 
 const RemoteLevelSchema = z.object({
@@ -402,6 +402,15 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       status: undefined,
       lastStateAt: snapshot.stateReceivedAt,
     };
+  }
+
+  function rememberKioskVideoMuteCommand(deviceId: string, command: FrameCommand): void {
+    const muted = kioskVideoMutedForCommand(command);
+    if (muted === undefined) return;
+    store.updateFrameState(deviceId, (state) => ({
+      ...state,
+      kioskVideoMuted: muted,
+    }));
   }
 
   function writeTelemetryEvent(reply: FastifyReply, event: string, data: unknown): boolean {
@@ -1347,6 +1356,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     if (commandPrefersRemotePress(parsed.data.command) && remoteCommandPathAvailable(device, parsed.data.command)) {
       try {
         const remoteFallback = await dispatchRemoteCommand(device, parsed.data.command);
+        rememberKioskVideoMuteCommand(deviceId, parsed.data.command);
         return ok({
           command: parsed.data.command,
           frameEvent: null,
@@ -1375,6 +1385,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       if (delivered === 0 && remoteCommandPathAvailable(device, parsed.data.command)) {
         try {
           const remoteFallback = await dispatchRemoteCommand(device, parsed.data.command);
+          rememberKioskVideoMuteCommand(deviceId, parsed.data.command);
           return ok({
             command: parsed.data.command,
             frameEvent,
@@ -1388,6 +1399,14 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           return;
         }
       }
+      if (delivered === 0 && kioskVideoMutedForCommand(parsed.data.command) !== undefined) {
+        reply.status(409).send(fail(
+          'FRAME_COMMAND_UNDELIVERED',
+          'No connected frame browser or FreeKiosk remote path is available to set kiosk video mute state.',
+        ));
+        return;
+      }
+      rememberKioskVideoMuteCommand(deviceId, parsed.data.command);
       return ok({
         command: parsed.data.command,
         frameEvent,
@@ -2082,7 +2101,11 @@ interface MqttCommandPublication {
 // may still have executed on the device, so re-issuing over MQTT could double it.
 // Those only retry when the REST failure proves the command never reached the device.
 function commandIsIdempotent(command: FrameCommand): boolean {
-  return command === 'screen-on' || command === 'screen-off' || command === 'reload';
+  return command === 'screen-on'
+    || command === 'screen-off'
+    || command === 'reload'
+    || command === 'mute-on'
+    || command === 'mute-off';
 }
 
 function mqttRetrySafeAfterRestFailure(command: FrameCommand, error: unknown): boolean {
@@ -2103,7 +2126,9 @@ function freeKioskMqttCommandPublication(
     case 'next':
     case 'previous':
     case 'play-pause':
-    case 'mute-toggle': {
+    case 'mute-toggle':
+    case 'mute-on':
+    case 'mute-off': {
       const script = freeKioskJavaScriptCommand(command);
       return script ? { suffix: 'execute_js', payload: script } : undefined;
     }
@@ -2187,6 +2212,12 @@ async function sendRemoteCommand(
   }
 
   const endpoint = freeKioskEndpoint(command);
+  if (!endpoint) {
+    throw new RemoteCommandError(
+      'REMOTE_EXPLICIT_MUTE_UNAVAILABLE',
+      'FreeKiosk JavaScript execution is required to set immich-kiosk video mute state.',
+    );
+  }
   const remote = await sendRemoteRequest(device, endpoint, { method: 'POST', timeoutMs });
   return {
     provider: 'freekiosk',
@@ -2375,6 +2406,8 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     && command !== 'previous'
     && command !== 'play-pause'
     && command !== 'mute-toggle'
+    && command !== 'mute-on'
+    && command !== 'mute-off'
   ) {
     return null;
   }
@@ -2400,6 +2433,10 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
       return null;
     }
   }
+  function targetWindow() {
+    var win = iframeWindow();
+    return win || window;
+  }
   function iframeDocument() {
     var win = iframeWindow();
     try {
@@ -2407,6 +2444,60 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     } catch (error) {
       return null;
     }
+  }
+  function targetDocument() {
+    return iframeDocument() || document;
+  }
+  function kioskVideoApi() {
+    var win = targetWindow();
+    try {
+      return win && win.immichKiosk && win.immichKiosk.video;
+    } catch (error) {
+      return null;
+    }
+  }
+  function setMutedWithApi(muted) {
+    var api = kioskVideoApi();
+    if (!api || typeof api.setMuted !== 'function') return false;
+    try {
+      var result = api.setMuted(muted);
+      if (typeof result === 'boolean' && result !== muted) return false;
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+  function readMutedState() {
+    var api = kioskVideoApi();
+    if (api && typeof api.getMuted === 'function') {
+      try {
+        return Boolean(api.getMuted());
+      } catch (error) {}
+    }
+    var doc = targetDocument();
+    var control = doc && doc.querySelector('.navigation--mute');
+    if (control && control.classList) return control.classList.contains('is-muted');
+    return false;
+  }
+  function applyMutedState(muted) {
+    if (setMutedWithApi(muted)) return true;
+    var doc = targetDocument();
+    if (!doc) return false;
+    var control = doc.querySelector('.navigation--mute');
+    if (control && control.classList && control.classList.contains('is-muted') !== muted && typeof control.click === 'function') {
+      control.click();
+    }
+    var videos = Array.prototype.slice.call(doc.querySelectorAll('video'));
+    videos.forEach(function (video) {
+      video.muted = muted;
+      if (!muted) video.volume = 1;
+    });
+    return Boolean(control || videos.length);
+  }
+  function setExplicitMute() {
+    if (command === 'mute-on') return applyMutedState(true);
+    if (command === 'mute-off') return applyMutedState(false);
+    return false;
   }
   function triggerKioskApi() {
     var win = iframeWindow();
@@ -2418,8 +2509,18 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     } catch (error) {}
     return false;
   }
+  function toggleMutedWithApi() {
+    var api = kioskVideoApi();
+    if (api && typeof api.toggleMuted === 'function') {
+      try {
+        api.toggleMuted();
+        return true;
+      } catch (error) {}
+    }
+    return false;
+  }
   function clickControl() {
-    var doc = iframeDocument();
+    var doc = targetDocument();
     if (!doc) return false;
     var selector = null;
     if (command === 'next') selector = '.navigation--next-asset, [aria-label="Next"], [title="Next"]';
@@ -2430,6 +2531,9 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     if (!control || typeof control.click !== 'function') return false;
     control.click();
     return true;
+  }
+  function toggleMutedDirectly() {
+    return applyMutedState(!readMutedState());
   }
   function dispatchKey() {
     var map = {
@@ -2459,6 +2563,8 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     });
     return true;
   }
+  if (command === 'mute-on' || command === 'mute-off') return callController() || setExplicitMute();
+  if (command === 'mute-toggle') return toggleMutedWithApi() || clickControl() || toggleMutedDirectly() || dispatchKey();
   return callController() || triggerKioskApi() || clickControl() || dispatchKey();
 })();`.trim();
 }
@@ -2668,7 +2774,7 @@ function remoteErrorMessage(payload: unknown, statusCode: number): string {
   return `FreeKiosk command failed with HTTP ${statusCode}.`;
 }
 
-function freeKioskEndpoint(command: FrameCommand): string {
+function freeKioskEndpoint(command: FrameCommand): string | null {
   switch (command) {
     case 'next':
       return '/api/remote/right';
@@ -2680,6 +2786,9 @@ function freeKioskEndpoint(command: FrameCommand): string {
       return '/api/reload';
     case 'mute-toggle':
       return '/api/remote/up';
+    case 'mute-on':
+    case 'mute-off':
+      return null;
     case 'screen-on':
       return '/api/screen/on';
     case 'screen-off':
@@ -2700,7 +2809,15 @@ function commandUsesFrameEvents(command: FrameCommand): boolean {
     || command === 'previous'
     || command === 'play-pause'
     || command === 'reload'
-    || command === 'mute-toggle';
+    || command === 'mute-toggle'
+    || command === 'mute-on'
+    || command === 'mute-off';
+}
+
+function kioskVideoMutedForCommand(command: FrameCommand): boolean | undefined {
+  if (command === 'mute-on') return true;
+  if (command === 'mute-off') return false;
+  return undefined;
 }
 
 function commandPrefersRemotePress(command: FrameCommand): boolean {

@@ -95,7 +95,7 @@ Keep the frame's `disableNavigation` renderer option **off** when using the next
 ## Audio: device mute vs. video mute
 
 - **Device Mute Toggle**, **Volume Up/Down** — Android device audio, sent as key events through FreeKiosk. Use these for reliable frame-wide audio state.
-- **Kiosk Video Mute** — a press button that controls immich-kiosk's own video mute. It clicks the kiosk's `.navigation--mute` control first, then falls back to toggling the video element's muted state. It is a press button (not a switch) because immich-kiosk does not expose a reliable readable mute state.
+- **Kiosk Video Mute** — a switch for immich-kiosk's own video mute state, plus a press button for quick toggles. The switch sends explicit mute/unmute commands through the controller bridge and uses immich-kiosk's browser video API when available; it does not change Android device volume.
 
 ## Known FreeKiosk limitations
 

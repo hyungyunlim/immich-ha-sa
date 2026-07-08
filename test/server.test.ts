@@ -977,6 +977,52 @@ describe('controller API', () => {
       code: expect.stringContaining('mute-toggle'),
     });
 
+    const muteOn = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'mute-on' },
+    });
+
+    expect(muteOn.statusCode).toBe(200);
+    expect(muteOn.json().data.command).toBe('mute-on');
+    expect(muteOn.json().data.frameEvent.delivered).toBe(0);
+    expect(muteOn.json().data.remoteFallback.endpoint).toBe('/api/js');
+    expect(muteOn.json().data.remoteFallback.result.strategy).toBe('webview-js');
+    expect(store.getFrameState('lenovo')?.kioskVideoMuted).toBe(true);
+    expect(requests).toHaveLength(6);
+    expect(requests[5]).toMatchObject({
+      method: 'POST',
+      url: '/api/js',
+      apiKey: 'test-key',
+    });
+    expect(requests[5].body).toMatchObject({
+      code: expect.stringContaining('mute-on'),
+    });
+    expect(requests[5].body).toMatchObject({
+      code: expect.stringContaining('api.setMuted(muted)'),
+    });
+
+    const muteOff = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'mute-off' },
+    });
+
+    expect(muteOff.statusCode).toBe(200);
+    expect(muteOff.json().data.command).toBe('mute-off');
+    expect(muteOff.json().data.frameEvent.delivered).toBe(0);
+    expect(muteOff.json().data.remoteFallback.endpoint).toBe('/api/js');
+    expect(store.getFrameState('lenovo')?.kioskVideoMuted).toBe(false);
+    expect(requests).toHaveLength(7);
+    expect(requests[6]).toMatchObject({
+      method: 'POST',
+      url: '/api/js',
+      apiKey: 'test-key',
+    });
+    expect(requests[6].body).toMatchObject({
+      code: expect.stringContaining('mute-off'),
+    });
+
     await server.close();
     await new Promise<void>((resolve) => remote.close(() => resolve()));
   });

@@ -12,17 +12,16 @@ const device: FrameDevice = {
 };
 
 describe('frame page', () => {
-  it('uses the immich-kiosk mute menu control before keyboard fallback', () => {
+  it('uses the immich-kiosk video mute API before legacy mute fallbacks', () => {
     const html = renderFramePage(device);
 
+    expect(html).toContain('immichKiosk');
+    expect(html).toContain('api.setMuted(muted)');
     expect(html).toContain('.navigation--mute');
     expect(html).toContain('toggleVideoMutedDirectly');
     expect(html).toContain("if (command === 'mute-toggle')");
+    expect(html).toContain("if (command === 'mute-on')");
+    expect(html).toContain("if (command === 'mute-off')");
     expect(html).not.toContain('setTimeout(syncVideoMutedFromKiosk');
-    expect(html).not.toContain('kioskVideoMuted');
-    expect(html).not.toContain('desiredVideoMuted');
-    expect(html).not.toContain("if (command === 'mute-on')");
-    expect(html).not.toContain("if (command === 'mute-off')");
-    expect(html).not.toContain('setVideoMutedDirectly');
   });
 });

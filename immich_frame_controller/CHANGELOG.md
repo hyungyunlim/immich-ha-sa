@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.81
+
+- Add stateful Home Assistant control for immich-kiosk video mute using the browser video API exposed by current immich-kiosk releases. The existing mute button remains available as a quick toggle, while the new switch can explicitly turn kiosk video mute on or off.
+
 ## 0.1.80
 
 - Show whether the real-time telemetry push is active: the setup console MQTT Bridge section now reports a "Real-time push" pill plus a per-frame `push` badge, and `/api/mqtt/status` exposes `telemetrySubscribers` counts. This lets you confirm at a glance that the Home Assistant integration is consuming the live stream rather than falling back to polling.

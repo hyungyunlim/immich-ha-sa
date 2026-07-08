@@ -182,7 +182,7 @@ For frame display, the integration exposes immich-kiosk URL overrides for clock,
 
 For frame display and audio hardware control, configure the FreeKiosk Remote API URL in the add-on device settings. The integration then exposes direct `Display Brightness` and `Media Volume` number entities, plus `Light Level` and `Auto Brightness Active` status entities. FreeKiosk 1.2.16 reports auto-brightness state but does not expose the documented REST toggle endpoints; setting display brightness through `/api/brightness` is the supported manual override path and FreeKiosk disables auto-brightness if needed.
 
-For frame audio buttons, use the `Device Mute Toggle`, `Volume Up`, and `Volume Down` entities when FreeKiosk Remote API is configured. The immich-kiosk video mute control is exposed as a `Kiosk Video Mute` press button because immich-kiosk does not expose a reliable readable mute state to Home Assistant.
+For frame-wide audio buttons, use the `Device Mute Toggle`, `Volume Up`, and `Volume Down` entities when FreeKiosk Remote API is configured. The immich-kiosk video mute control is exposed as a stateful `Kiosk Video Mute` switch backed by the controller's desired state, plus a press button for quick toggles.
 
 Provided services:
 

@@ -10,7 +10,7 @@
 | 필터 | **Date Filter Preset** select, **Filter Start Date** / **Filter End Date** 날짜 선택, **Date Filter** text (`last-30-days` 같은 raw 값), **Newest Filter** number, **Album Order** select |
 | 프로필 | 프로필 선택과 아래 프로필 서비스 |
 | 디스플레이 | 렌더러 옵션 엔티티 — 시계, 날짜, 날씨, 폰트 크기, 배경 블러, 이미지 메타데이터(촬영 일시, 앨범, 인물, 카메라, EXIF, 위치, 평점, 소유자, 사용자), 진행 바 |
-| 미디어 | **Show Videos** switch, **Show Archived** switch, **Kiosk Video Mute** 버튼 |
+| 미디어 | **Show Videos** switch, **Show Archived** switch, **Kiosk Video Mute** 스위치/버튼 |
 | 하드웨어 ([FreeKiosk](./freekiosk)) | **Display Brightness**, **Media Volume** number; 내비게이션·화면·볼륨 버튼 |
 | 텔레메트리 ([FreeKiosk](./freekiosk)) | **Device Online**(연결), **Motion**(카메라 기기), **Screen On**, **Device Muted**, **Battery**, **Battery Charging**, **WiFi Signal**, **Light Level**, **Auto Brightness Active** |
 | 유지보수 | **Refresh Albums**, **Refresh People** 버튼, **Network Mode** select |

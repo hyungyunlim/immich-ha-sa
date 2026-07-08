@@ -98,6 +98,15 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         }
       }
 
+      function kioskVideoApi() {
+        var win = iframeWindow();
+        try {
+          return win && win.immichKiosk && win.immichKiosk.video;
+        } catch (error) {
+          return null;
+        }
+      }
+
       function triggerKioskApi(command) {
         var win = iframeWindow();
         if (!win || !win.kiosk) return false;
@@ -125,6 +134,12 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       }
 
       function readKioskMutedState() {
+        var api = kioskVideoApi();
+        if (api && typeof api.getMuted === 'function') {
+          try {
+            return Boolean(api.getMuted());
+          } catch (error) {}
+        }
         var doc = iframeDocument();
         var win = iframeWindow();
         var control = doc && doc.querySelector('.navigation--mute');
@@ -137,7 +152,21 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         return frameVideoMuted;
       }
 
+      function setVideoMutedWithApi(muted) {
+        var api = kioskVideoApi();
+        if (!api || typeof api.setMuted !== 'function') return false;
+        try {
+          var result = api.setMuted(muted);
+          if (typeof result === 'boolean' && result !== muted) return false;
+          frameVideoMuted = muted;
+          return true;
+        } catch (error) {
+          return false;
+        }
+      }
+
       function applyVideoMutedState(muted) {
+        if (setVideoMutedWithApi(muted)) return true;
         var doc = iframeDocument();
         if (!doc) return false;
         var videos = Array.prototype.slice.call(doc.querySelectorAll('video'));
@@ -174,6 +203,18 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         return applyVideoMutedState(muted);
       }
 
+      function toggleVideoMuted() {
+        var api = kioskVideoApi();
+        if (api && typeof api.toggleMuted === 'function') {
+          try {
+            var muted = api.toggleMuted();
+            if (typeof muted === 'boolean') frameVideoMuted = muted;
+            return true;
+          } catch (error) {}
+        }
+        return clickKioskControl('mute-toggle') || toggleVideoMutedDirectly() || dispatchKioskKey('mute-toggle');
+      }
+
       function dispatchKioskKey(command) {
         var target = keyMap[command];
         var doc = iframeDocument();
@@ -204,8 +245,14 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
             return false;
           }
         }
+        if (command === 'mute-on') {
+          return applyVideoMutedState(true);
+        }
+        if (command === 'mute-off') {
+          return applyVideoMutedState(false);
+        }
         if (command === 'mute-toggle') {
-          return clickKioskControl(command) || toggleVideoMutedDirectly() || dispatchKioskKey(command);
+          return toggleVideoMuted();
         }
         return triggerKioskApi(command) || clickKioskControl(command) || dispatchKioskKey(command);
       }
