@@ -3137,7 +3137,14 @@ const KIOSK_PROXY_COMPAT_CSS = `
 const KIOSK_PROXY_COMPAT_JS = `
 /* Immich Frame Controller: image description overflow helper. */
 ;(function () {
-  if (typeof window === 'undefined' || !window.document || window.__immichFrameDescriptionHelper) return;
+  if (typeof window === 'undefined' || !window.document) return;
+
+  if (!window.__immichFrameProxyAssetLifecycle) {
+    window.__immichFrameProxyAssetLifecycle = true;
+    installProxyAssetLifecycle();
+  }
+
+  if (window.__immichFrameDescriptionHelper) return;
   window.__immichFrameDescriptionHelper = true;
 
   var LONG_CLASS = 'immich-frame-description-is-long';
@@ -3164,6 +3171,50 @@ const KIOSK_PROXY_COMPAT_JS = `
   };
   var animationRules = {};
   var scheduled = false;
+
+  function installProxyAssetLifecycle() {
+    /* Immich Frame Controller: early/proxied immich-kiosk asset request lifecycle compatibility. */
+    var EXACT_ASSET_REQUEST_PATH = /^\\/asset\\/(new|offline|previous)$/;
+    var PROXIED_ASSET_REQUEST_PATH = /^\\/kiosk-proxy\\/[^/]+\\/asset\\/(new|offline|previous)$/;
+    var kioskInitComplete = document.readyState !== 'loading';
+
+    if (!kioskInitComplete) {
+      document.addEventListener('DOMContentLoaded', function () {
+        kioskInitComplete = true;
+      }, { once: true });
+    }
+
+    function requestPath(event) {
+      return event && event.detail && event.detail.pathInfo && event.detail.pathInfo.requestPath
+        ? event.detail.pathInfo.requestPath
+        : '';
+    }
+
+    function shouldStartPolling(event) {
+      var path = requestPath(event);
+      return PROXIED_ASSET_REQUEST_PATH.test(path) || (!kioskInitComplete && EXACT_ASSET_REQUEST_PATH.test(path));
+    }
+
+    function startPolling() {
+      var api = window.kiosk;
+      if (!api || typeof api.startPolling !== 'function') return;
+      api.startPolling();
+    }
+
+    function attach() {
+      var target = document.body || document.documentElement;
+      if (!target || typeof target.addEventListener !== 'function') return;
+      target.addEventListener('htmx:afterRequest', function (event) {
+        if (shouldStartPolling(event)) startPolling();
+      });
+    }
+
+    if (!document.body && document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', attach, { once: true });
+      return;
+    }
+    attach();
+  }
 
   function isFiniteNumber(value) {
     return typeof value === 'number' && isFinite(value);

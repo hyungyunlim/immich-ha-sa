@@ -1397,7 +1397,7 @@ describe('controller API', () => {
       }
       if (request.url?.startsWith('/kiosk.js')) {
         response.setHeader('content-type', 'text/javascript');
-        response.end('const dataAttr = /^data-[\\w]+$/; navigator.serviceWorker.register("/assets/js/sw.js"); if (path.startsWith("/asset/")) startPolling();');
+        response.end('const dataAttr = /^data-[\\w]+$/; navigator.serviceWorker.register("/assets/js/sw.js"); if (/^\\/asset\\/(new|offline|previous)$/.test(path)) startPolling();');
         return;
       }
       if (request.url?.startsWith('/video')) {
@@ -1473,7 +1473,10 @@ describe('controller API', () => {
     expect(javascript.headers['cache-control']).toBe('no-store, max-age=0');
     expect(javascript.body).toContain('const dataAttr = /^data-[\\w]+$/;');
     expect(javascript.body).toContain('register("/kiosk-proxy/lenovo/assets/js/sw.js")');
-    expect(javascript.body).toContain('startsWith("/kiosk-proxy/lenovo/asset/")');
+    expect(javascript.body).toContain('if (/^\\/asset\\/(new|offline|previous)$/.test(path)) startPolling();');
+    expect(javascript.body).toContain('early/proxied immich-kiosk asset request lifecycle compatibility');
+    expect(javascript.body).toContain('EXACT_ASSET_REQUEST_PATH = /^\\/asset\\/(new|offline|previous)$/');
+    expect(javascript.body).toContain('/^\\/kiosk-proxy\\/[^/]+\\/asset\\/(new|offline|previous)$/');
     expect(javascript.body).toContain('image description overflow helper');
     expect(javascript.body).toContain('ifc_description_scroll_duration');
     expect(javascript.body).toContain('ifc_description_scroll_speed');

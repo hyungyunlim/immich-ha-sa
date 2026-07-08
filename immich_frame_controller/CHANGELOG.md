@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.82
+
+- Restore immich-kiosk slideshow auto-advance when served through the controller proxy by restarting polling for early or proxied asset lifecycle events from current immich-kiosk releases.
+
 ## 0.1.81
 
 - Add stateful Home Assistant control for immich-kiosk video mute using the browser video API exposed by current immich-kiosk releases. The existing mute button remains available as a quick toggle, while the new switch can explicitly turn kiosk video mute on or off.
