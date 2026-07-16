@@ -9,10 +9,10 @@ Each frame device gets a Home Assistant device page with entities for everything
 | Source selection | **Album** select, **Albums** text (multi, comma-separated), **Person** select, **People** text, **Require All People** switch |
 | Filters | **Date Filter Preset** select, **Filter Start Date** / **Filter End Date** date pickers, **Date Filter** text (raw values like `last-30-days`), **Newest Filter** number, **Album Order** select |
 | Profiles | Profile selection and the profile services below |
-| Display | Renderer option entities — clock, date, weather, font size, background blur, image metadata (date/time, album, person, camera, EXIF, location, rating, owner, user), progress bar |
+| Display | Renderer option entities — clock, date, weather, font size, background blur, **Custom CSS Class**, image metadata (date/time, album, person, camera, EXIF, location, rating, owner, user), progress bar |
 | Media | **Show Videos** switch, **Show Archived** switch, **Kiosk Video Mute** switch/button |
 | Hardware ([FreeKiosk](./freekiosk)) | **Display Brightness**, **Media Volume** numbers; navigation, screen, and volume buttons |
-| Telemetry ([FreeKiosk](./freekiosk)) | **Device Online** (connectivity), **Motion** (camera devices), **Screen On**, **Device Muted**, **Battery**, **Battery Charging**, **WiFi Signal**, **Light Level**, **Auto Brightness Active** |
+| Telemetry ([FreeKiosk](./freekiosk)) | **Device Online** (connectivity), **Motion** (camera devices), **Screen On**, **Device Muted**, **Battery**, **Battery Charging**, **WiFi Signal**, **Light Level**, **Auto Brightness Active**, **X-Axis Dominant** |
 | Maintenance | **Refresh Albums**, **Refresh People** buttons, **Network Mode** select |
 
 Notes:
@@ -45,7 +45,7 @@ A profile is a snapshot of the current frame state. To build one, first change t
 The saved snapshot includes:
 
 - Source filters: active albums, active people, date/newest filters, and `requireAllPeople`
-- Slideshow and layout options: duration, transitions, layout, image fit, background blur, font size, and image effects
+- Slideshow and layout options: duration, transitions, layout, image fit, background blur, font size, image effects, and custom CSS class
 - Display overlays: clock, date, weather, image metadata, progress bar, sleep, and burn-in options
 - Media and network preferences: videos, archived media, video duration limit, and preferred network mode
 
@@ -102,7 +102,7 @@ When a profile is already active, pressing **Save Profile** after changing entit
 One service covers all renderer overrides. Field groups:
 
 - **Slideshow**: `durationSeconds`, `transition`, `fadeTransitionDuration`, `crossFadeTransitionDuration`, `imageEffect`, `imageEffectAmount`, `albumOrder`
-- **Layout**: `layout`, `imageFit`, `backgroundBlur`, `backgroundBlurAmount`, `fontSize`, `frameless`
+- **Layout**: `layout`, `imageFit`, `backgroundBlur`, `backgroundBlurAmount`, `fontSize`, `frameless`, `customCssClass`
 - **Clock & weather**: `showTime`, `timeFormat`, `showAmPm`, `showSeconds`, `showDate`, `dateFormat`, `clockSource`, `showWeather`, `weatherLocation`, `weatherRotationInterval`, `weatherShowForecast`, `weatherShowHumidity`, `weatherShowWind`, `weatherShowWindDirection`, `weatherShowVisibility`, `weatherShowTemperatureRange`, `weatherRoundTemperature`
 - **Image metadata**: `showImageDate`, `imageDateFormat`, `showImageTime`, `imageTimeFormat`, `showAlbumName`, `showPersonName`, `showPersonAge`, `showImageLocation`, `showImageCamera`, `showImageExif`, `showImageDescription` (plus description scroll tuning), `showImageRating`, `showOwner`, `showUser`, `showImageQr`, `showImageId`, `showMoreInfo`
 - **Sources & filters**: `activePersonIds`, `requireAllPeople`, `filterDate`, `filterNewest`, `showVideos`, `excludeVideosOver`, `showArchived`
@@ -144,6 +144,33 @@ action:
     data:
       filterDate: last-30-days
       albumOrder: newest
+```
+
+Apply an immich-kiosk CSS class before saving or displaying an art profile:
+
+```yaml
+service: immich_frame.set_renderer_options
+data:
+  customCssClass: art-gallery
+```
+
+Follow the frame's physical orientation (this example treats X-dominant as landscape; swap the two options if your device reports the opposite):
+
+```yaml
+alias: Frame content follows rotation
+trigger:
+  - platform: state
+    entity_id: binary_sensor.lenovo_frame_x_axis_dominant
+    to: "on"
+  - platform: state
+    entity_id: binary_sensor.lenovo_frame_x_axis_dominant
+    to: "off"
+action:
+  - service: select.select_option
+    target:
+      entity_id: select.lenovo_frame_orientation
+    data:
+      option: "{{ 'Landscape only' if trigger.to_state.state == 'on' else 'Portrait only' }}"
 ```
 
 Wake the screen when someone approaches a camera-equipped frame (needs [FreeKiosk MQTT](./freekiosk#real-time-updates-over-mqtt) with Always-on Motion Detection):

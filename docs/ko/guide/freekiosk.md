@@ -57,10 +57,13 @@ Number 엔티티:
 - **Auto Brightness Active**
 - **Device Online** — connectivity. MQTT Last Will 또는 REST 상태 조회 성공 기준. MQTT 없이는 on 또는 unavailable만 표시되며, 명시적 off 상태는 MQTT 바인딩이 필요합니다
 - **Motion** — FreeKiosk 카메라 모션 (`webview.motionDetected`). 상시 보고가 필요하면 FreeKiosk의 *Always-on Motion Detection*을 켜세요
+- **X-Axis Dominant** — 가속도계 방향 힌트. ON이면 X축 우세, OFF이면 Y축 우세이며 raw `x`, `y`, `z` 값은 엔티티 속성에서 볼 수 있습니다
 - **Battery**, **Battery Charging**, **WiFi Signal** — 진단 센서
 
 > [!NOTE]
 > **Motion** 센서는 카메라가 있는 기기에서만 동작합니다. 카메라 없는 액자(대부분의 디지털 액자)는 모션이 보고되지 않으니, 쓰지 않으면 엔티티를 비활성화하세요.
+
+축 센서는 어느 상태를 “가로” 또는 “세로”라고 단정하지 않습니다. Android 센서 축은 기기의 기본 방향을 따르며 태블릿은 가로가 기본인 경우가 많으므로, 실제 기기를 돌려 보고 ON/OFF 중 어느 쪽이 가로인지 자동화에서 정하면 됩니다. 기기가 평평하게 놓였거나 가속도계 값이 없거나 45도 부근에서 X와 Y가 비슷할 때는 잘못된 전환과 상태 떨림을 막기 위해 unavailable이 됩니다.
 
 ### MQTT 실시간 업데이트
 

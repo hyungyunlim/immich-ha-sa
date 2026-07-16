@@ -154,6 +154,43 @@ describe('controller API', () => {
     await server.close();
   });
 
+  it('applies a profile custom CSS class to the renderer URL', async () => {
+    // Given
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const server = createTestServer({ config });
+    const saved = await server.inject({
+      method: 'PUT',
+      url: '/api/profiles/art-gallery',
+      payload: {
+        name: 'Art Gallery',
+        albumIds: [],
+        durationSeconds: 45,
+        imageFit: 'contain',
+        customCssClass: 'art-gallery',
+        showTime: false,
+        showWeather: false,
+        albumOrder: 'random',
+        preferredNetworkMode: 'auto',
+      },
+    });
+    expect(saved.statusCode).toBe(200);
+
+    // When
+    const applied = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/apply-profile',
+      payload: { profileId: 'art-gallery' },
+    });
+
+    // Then
+    expect(applied.statusCode).toBe(200);
+    expect(applied.json().data.customCssClass).toBe('art-gallery');
+    expect(applied.json().data.rendererUrl).toContain('custom_css_class=art-gallery');
+    await server.close();
+  });
+
   it('rejects unknown album ids when cache is populated', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);

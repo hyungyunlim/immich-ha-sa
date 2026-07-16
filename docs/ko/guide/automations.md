@@ -9,10 +9,10 @@
 | 소스 선택 | **Album** select, **Albums** text (쉼표 구분 다중 선택), **Person** select, **People** text, **Require All People** switch |
 | 필터 | **Date Filter Preset** select, **Filter Start Date** / **Filter End Date** 날짜 선택, **Date Filter** text (`last-30-days` 같은 raw 값), **Newest Filter** number, **Album Order** select |
 | 프로필 | 프로필 선택과 아래 프로필 서비스 |
-| 디스플레이 | 렌더러 옵션 엔티티 — 시계, 날짜, 날씨, 폰트 크기, 배경 블러, 이미지 메타데이터(촬영 일시, 앨범, 인물, 카메라, EXIF, 위치, 평점, 소유자, 사용자), 진행 바 |
+| 디스플레이 | 렌더러 옵션 엔티티 — 시계, 날짜, 날씨, 폰트 크기, 배경 블러, **Custom CSS Class**, 이미지 메타데이터(촬영 일시, 앨범, 인물, 카메라, EXIF, 위치, 평점, 소유자, 사용자), 진행 바 |
 | 미디어 | **Show Videos** switch, **Show Archived** switch, **Kiosk Video Mute** 스위치/버튼 |
 | 하드웨어 ([FreeKiosk](./freekiosk)) | **Display Brightness**, **Media Volume** number; 내비게이션·화면·볼륨 버튼 |
-| 텔레메트리 ([FreeKiosk](./freekiosk)) | **Device Online**(연결), **Motion**(카메라 기기), **Screen On**, **Device Muted**, **Battery**, **Battery Charging**, **WiFi Signal**, **Light Level**, **Auto Brightness Active** |
+| 텔레메트리 ([FreeKiosk](./freekiosk)) | **Device Online**(연결), **Motion**(카메라 기기), **Screen On**, **Device Muted**, **Battery**, **Battery Charging**, **WiFi Signal**, **Light Level**, **Auto Brightness Active**, **X-Axis Dominant** |
 | 유지보수 | **Refresh Albums**, **Refresh People** 버튼, **Network Mode** select |
 
 참고:
@@ -45,7 +45,7 @@
 저장되는 항목:
 
 - 소스 필터: 활성 앨범, 활성 인물, 날짜/최신순 필터, `requireAllPeople`
-- 슬라이드쇼와 레이아웃 옵션: duration, transition, layout, image fit, background blur, font size, image effect
+- 슬라이드쇼와 레이아웃 옵션: duration, transition, layout, image fit, background blur, font size, image effect, custom CSS class
 - 표시 오버레이: 시계, 날짜, 날씨, 이미지 메타데이터, progress bar, sleep, burn-in 옵션
 - 미디어와 네트워크 선호값: 영상 표시, 보관 항목 표시, 영상 길이 제한, preferred network mode
 
@@ -102,7 +102,7 @@ data:
 렌더러 오버라이드 전체를 하나의 서비스로 제어합니다. 필드 그룹:
 
 - **슬라이드쇼**: `durationSeconds`, `transition`, `fadeTransitionDuration`, `crossFadeTransitionDuration`, `imageEffect`, `imageEffectAmount`, `albumOrder`
-- **레이아웃**: `layout`, `imageFit`, `backgroundBlur`, `backgroundBlurAmount`, `fontSize`, `frameless`
+- **레이아웃**: `layout`, `imageFit`, `backgroundBlur`, `backgroundBlurAmount`, `fontSize`, `frameless`, `customCssClass`
 - **시계·날씨**: `showTime`, `timeFormat`, `showAmPm`, `showSeconds`, `showDate`, `dateFormat`, `clockSource`, `showWeather`, `weatherLocation`, `weatherRotationInterval`, `weatherShowForecast`, `weatherShowHumidity`, `weatherShowWind`, `weatherShowWindDirection`, `weatherShowVisibility`, `weatherShowTemperatureRange`, `weatherRoundTemperature`
 - **이미지 메타데이터**: `showImageDate`, `imageDateFormat`, `showImageTime`, `imageTimeFormat`, `showAlbumName`, `showPersonName`, `showPersonAge`, `showImageLocation`, `showImageCamera`, `showImageExif`, `showImageDescription` (및 설명 스크롤 튜닝), `showImageRating`, `showOwner`, `showUser`, `showImageQr`, `showImageId`, `showMoreInfo`
 - **소스·필터**: `activePersonIds`, `requireAllPeople`, `filterDate`, `filterNewest`, `showVideos`, `excludeVideosOver`, `showArchived`
@@ -144,6 +144,33 @@ action:
     data:
       filterDate: last-30-days
       albumOrder: newest
+```
+
+그림 프로필을 저장하거나 표시하기 전에 immich-kiosk CSS class 적용:
+
+```yaml
+service: immich_frame.set_renderer_options
+data:
+  customCssClass: art-gallery
+```
+
+액자의 실제 방향에 맞춰 표시할 사진 방향도 변경 (아래 예제는 X축 우세를 가로로 봅니다. 기기에서 반대로 나온다면 두 option을 서로 바꾸세요):
+
+```yaml
+alias: Frame content follows rotation
+trigger:
+  - platform: state
+    entity_id: binary_sensor.lenovo_frame_x_axis_dominant
+    to: "on"
+  - platform: state
+    entity_id: binary_sensor.lenovo_frame_x_axis_dominant
+    to: "off"
+action:
+  - service: select.select_option
+    target:
+      entity_id: select.lenovo_frame_orientation
+    data:
+      option: "{{ 'Landscape only' if trigger.to_state.state == 'on' else 'Portrait only' }}"
 ```
 
 카메라가 있는 액자 앞에 사람이 다가오면 화면 켜기 ([FreeKiosk MQTT](./freekiosk#mqtt-실시간-업데이트) + Always-on Motion Detection 필요):

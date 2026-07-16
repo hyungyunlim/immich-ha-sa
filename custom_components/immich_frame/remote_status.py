@@ -4,6 +4,8 @@ from typing import Any
 
 REMOTE_MUTED_SOURCE_PATH = "audio.muted"
 REMOTE_MUTED_SOURCE_VOLUME_ZERO = "audio.volume_zero"
+ORIENTATION_MIN_UPRIGHT_AXIS = 3.0
+ORIENTATION_DOMINANCE_MARGIN = 1.0
 
 
 def remote_status_value(data: dict[str, Any], path: list[str]) -> Any:
@@ -24,6 +26,31 @@ def remote_status_bool(data: dict[str, Any], path: list[str]) -> bool | None:
 def remote_status_number(data: dict[str, Any], path: list[str]) -> float | None:
     value = remote_status_value(data, path)
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def remote_accelerometer_axes(data: dict[str, Any]) -> tuple[float, float, float] | None:
+    x = remote_status_number(data, ["sensors", "accelerometer", "x"])
+    y = remote_status_number(data, ["sensors", "accelerometer", "y"])
+    z = remote_status_number(data, ["sensors", "accelerometer", "z"])
+    if x is None or y is None or z is None:
+        return None
+    return x, y, z
+
+
+def remote_orientation_x_axis_dominant(data: dict[str, Any]) -> bool | None:
+    axes = remote_accelerometer_axes(data)
+    if axes is None:
+        return None
+
+    x, y, z = axes
+    absolute_x = abs(x)
+    absolute_y = abs(y)
+    dominant_axis = max(absolute_x, absolute_y)
+    if dominant_axis < ORIENTATION_MIN_UPRIGHT_AXIS or abs(z) >= dominant_axis:
+        return None
+    if abs(absolute_x - absolute_y) < ORIENTATION_DOMINANCE_MARGIN:
+        return None
+    return absolute_x > absolute_y
 
 
 def remote_availability(data: dict[str, Any]) -> str | None:

@@ -57,10 +57,13 @@ Status entities (when FreeKiosk telemetry is available over REST or MQTT):
 - **Auto Brightness Active**
 - **Device Online** — connectivity, from the MQTT Last Will or a successful REST status read. Without MQTT it can only show on or unavailable; an explicit off state needs the MQTT binding
 - **Motion** — FreeKiosk camera motion (`webview.motionDetected`); enable *Always-on Motion Detection* in FreeKiosk for continuous reporting
+- **X-Axis Dominant** — accelerometer orientation hint. ON means X dominates, OFF means Y dominates; raw `x`, `y`, and `z` values are available as entity attributes
 - **Battery**, **Battery Charging**, **WiFi Signal** — diagnostic sensors
 
 > [!NOTE]
 > The **Motion** sensor needs a device with a camera. Camera-less frames (most digital photo frames) report no motion — disable the entity if it is not useful.
+
+The axis sensor intentionally does not label either state “portrait” or “landscape.” Android sensor axes follow the device's natural orientation, which is often landscape on tablets, so first rotate your own device and note which state represents landscape. The entity is unavailable while the device is flat, the accelerometer is missing, or X and Y are too close near a 45-degree transition. This avoids false orientation changes and rapid state flapping.
 
 ### Real-time updates over MQTT
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.83
+
+- Add a Home Assistant **Custom CSS Class** text entity and `customCssClass` renderer option. The value is sent to immich-kiosk as `custom_css_class` and is included in saved frame profiles, allowing album/profile-specific CSS such as an `art-gallery` layout.
+- Add a FreeKiosk accelerometer-backed **X-Axis Dominant** diagnostic binary sensor. It reports whether the device's X or Y axis is dominant while upright, exposes raw `x`, `y`, and `z` values as attributes, and stays unavailable while flat or near the diagonal transition.
+
 ## 0.1.82
 
 - Restore immich-kiosk slideshow auto-advance when served through the controller proxy by restarting polling for early or proxied asset lifecycle events from current immich-kiosk releases.

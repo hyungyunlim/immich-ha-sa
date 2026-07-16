@@ -147,6 +147,33 @@ describe('Home Assistant integration files', () => {
     expect(numberSource).toContain('"excludeVideosOver"');
   });
 
+  it('exposes custom CSS class state through Home Assistant and profiles', () => {
+    // Given
+    const textSource = readFileSync(join(root, 'custom_components/immich_frame/text.py'), 'utf8');
+    const initSource = readFileSync(join(root, 'custom_components/immich_frame/__init__.py'), 'utf8');
+    const profileSource = readFileSync(join(root, 'custom_components/immich_frame/profile_helpers.py'), 'utf8');
+    const servicesSource = readFileSync(join(root, 'custom_components/immich_frame/services.yaml'), 'utf8');
+
+    // When / Then
+    expect(textSource).toContain('"custom_css_class"');
+    expect(textSource).toContain('"Custom CSS Class"');
+    expect(textSource).toContain('"customCssClass"');
+    expect(initSource).toContain('vol.Optional("customCssClass")');
+    expect(initSource).toContain('vol.Length(max=128)');
+    expect(profileSource).toContain('"customCssClass"');
+    expect(servicesSource).toContain('customCssClass:');
+  });
+
+  it('registers the FreeKiosk accelerometer orientation binary sensor', () => {
+    // Given
+    const source = readFileSync(join(root, 'custom_components/immich_frame/binary_sensor.py'), 'utf8');
+
+    // When / Then
+    expect(source).toContain('ImmichFrameRemoteOrientationAxisBinarySensor(coordinator)');
+    expect(source).toContain('remote_orientation_x_axis_dominant');
+    expect(source).toContain('"remote_orientation_x_axis_dominant"');
+  });
+
   it('exposes image description scroll controls and services', () => {
     const initSource = readFileSync(join(root, 'custom_components/immich_frame/__init__.py'), 'utf8');
     const numberSource = readFileSync(join(root, 'custom_components/immich_frame/number.py'), 'utf8');

@@ -9,9 +9,11 @@ from .const import DATA_COORDINATOR, DOMAIN
 from .coordinator import ImmichFrameCoordinator
 from .entity_helpers import frame_device_info, frame_label, frame_unique_id
 from .remote_status import (
+    remote_accelerometer_axes,
     remote_availability,
     remote_effective_muted,
     remote_effective_muted_source,
+    remote_orientation_x_axis_dominant,
     remote_status_bool,
     remote_status_source,
 )
@@ -27,6 +29,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
             ImmichFrameRemoteOnlineBinarySensor(coordinator),
             ImmichFrameRemoteMotionBinarySensor(coordinator),
             ImmichFrameRemoteChargingBinarySensor(coordinator),
+            ImmichFrameRemoteOrientationAxisBinarySensor(coordinator),
         ]
     )
 
@@ -156,6 +159,39 @@ class ImmichFrameRemoteChargingBinarySensor(
     @property
     def is_on(self) -> bool | None:
         return remote_status_bool(self.coordinator.data, ["battery", "charging"])
+
+
+class ImmichFrameRemoteOrientationAxisBinarySensor(
+    CoordinatorEntity[ImmichFrameCoordinator],
+    BinarySensorEntity,
+):
+    """Report whether the device X axis dominates its upright orientation."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:screen-rotation"
+
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame X-Axis Dominant"
+        self._attr_unique_id = frame_unique_id(device_id, "remote_orientation_x_axis_dominant")
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.is_on is not None
+
+    @property
+    def is_on(self) -> bool | None:
+        return remote_orientation_x_axis_dominant(self.coordinator.data)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, float] | None:
+        axes = remote_accelerometer_axes(self.coordinator.data)
+        if axes is None:
+            return None
+        x, y, z = axes
+        return {"x": x, "y": y, "z": z}
 
 
 class ImmichFrameAutoBrightnessBinarySensor(

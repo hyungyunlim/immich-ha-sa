@@ -10,6 +10,7 @@ PROFILE_SAME_STATE_KEYS = [
     "requireAllPeople",
     "durationSeconds",
     "imageFit",
+    "customCssClass",
     "showTime",
     "timeFormat",
     "showAmPm",

@@ -21,6 +21,7 @@ const state: FrameState = {
   activeProfileId: 'family',
   durationSeconds: 60,
   imageFit: 'contain',
+  customCssClass: '',
   showTime: false,
   timeFormat: '24',
   showAmPm: true,
@@ -123,6 +124,34 @@ describe('renderer URL generation', () => {
   it('adds kiosk password when configured', () => {
     const resolved = buildRendererUrl(device, state, { host: '10.0.0.10:18082' }, { kioskPassword: 'secret' });
     expect(resolved.rendererUrl).toContain('password=secret');
+  });
+
+  it('adds a custom CSS class override when configured', () => {
+    // Given
+    const configuredState = { ...state, customCssClass: 'art-gallery' };
+
+    // When
+    const resolved = buildRendererUrl(device, configuredState);
+
+    // Then
+    expect(resolved.rendererUrl).toContain('custom_css_class=art-gallery');
+  });
+
+  it('clears a custom CSS class inherited from the kiosk base URL', () => {
+    // Given
+    const deviceWithLegacyClass = {
+      ...device,
+      localKioskBaseUrl: 'http://10.0.0.10:3000?custom_css_class=legacy',
+    };
+
+    // When
+    const resolved = buildRendererUrl(deviceWithLegacyClass, {
+      ...state,
+      customCssClass: '   ',
+    });
+
+    // Then
+    expect(new URL(resolved.rendererUrl).searchParams.has('custom_css_class')).toBe(false);
   });
 
   it('adds kiosk arrow action overrides', () => {

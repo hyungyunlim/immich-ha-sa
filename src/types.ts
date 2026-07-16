@@ -50,6 +50,7 @@ export interface FrameState {
   activeProfileId?: string;
   durationSeconds: number;
   imageFit: ImageFit;
+  customCssClass: string;
   showTime: boolean;
   timeFormat: KioskTimeFormat;
   showAmPm: boolean;
@@ -140,6 +141,7 @@ export interface FrameProfile {
   requireAllPeople: boolean;
   durationSeconds: number;
   imageFit: ImageFit;
+  customCssClass: string;
   showTime: boolean;
   timeFormat: KioskTimeFormat;
   showAmPm: boolean;

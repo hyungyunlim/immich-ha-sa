@@ -121,6 +121,10 @@ set_renderer_options:
             - contain
             - cover
             - none
+    customCssClass:
+      required: false
+      selector:
+        text:
     showTime:
       required: false
       selector:

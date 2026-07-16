@@ -56,7 +56,19 @@ describe('JsonStore', () => {
         },
       },
       frames: {},
-      profiles: {},
+      profiles: {
+        gallery: {
+          id: 'gallery',
+          name: 'Gallery',
+          albumIds: [],
+          durationSeconds: 60,
+          imageFit: 'contain',
+          showTime: false,
+          showWeather: false,
+          albumOrder: 'random',
+          preferredNetworkMode: 'auto',
+        },
+      },
       albumCache: { items: [], stale: true },
       auth: { tokens: {} },
     })}\n`);
@@ -64,6 +76,8 @@ describe('JsonStore', () => {
     const store = new JsonStore(path, device);
     expect(store.getDevice('lenovo')?.localKioskBaseUrl).toBe('http://10.0.0.10:3000');
     expect(store.getFrameState('lenovo')?.deviceId).toBe('lenovo');
+    expect(store.getFrameState('lenovo')?.customCssClass).toBe('');
+    expect(store.getProfile('gallery')?.customCssClass).toBe('');
     expect(store.getPersonCache()).toEqual({ items: [], stale: true });
   });
 });

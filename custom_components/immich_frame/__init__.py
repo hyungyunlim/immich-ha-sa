@@ -336,6 +336,7 @@ def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional(CONF_DEVICE_ID): cv.string,
                 vol.Optional("durationSeconds"): cv.positive_int,
                 vol.Optional("imageFit"): vol.In(["contain", "cover", "none"]),
+                vol.Optional("customCssClass"): vol.All(cv.string, vol.Length(max=128)),
                 vol.Optional("showTime"): cv.boolean,
                 vol.Optional("timeFormat"): vol.In(["24", "12"]),
                 vol.Optional("showAmPm"): cv.boolean,
