@@ -111,6 +111,47 @@ One service covers all renderer overrides. Field groups:
 
 The full field list with selectors lives in [`services.yaml`](https://github.com/hyungyunlim/immich-ha-sa/blob/main/custom_components/immich_frame/services.yaml).
 
+### Per-profile custom CSS
+
+Enter only the class name in the frame's **Custom CSS Class** text entity, for example `art-gallery`. Do not include a leading `.` or the `custom_css_class=` query name. The controller appends `custom_css_class=art-gallery` to the renderer URL, and immich-kiosk adds `art-gallery` to the page's `<body>` element.
+
+Add a matching rule to the `custom.css` file mounted into immich-kiosk, then restart immich-kiosk after changing that file. This temporary badge makes the result obvious:
+
+```css
+body.art-gallery::after {
+  content: "ART GALLERY CSS ACTIVE";
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 99999;
+  padding: 12px 18px;
+  background: magenta;
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+}
+```
+
+You can set the same value from an automation or script:
+
+```yaml
+service: immich_frame.set_renderer_options
+data:
+  customCssClass: art-gallery
+```
+
+The badge should appear after the frame reloads. The **Frame Renderer URL** sensor's `url` attribute should also contain `custom_css_class=art-gallery`. Clear the text entity, or send `customCssClass: ""`, to remove the class and the query parameter.
+
+The class is stored with saved profiles, so an art profile can use `art-gallery` while ordinary photo profiles leave it empty. Once the test badge works, replace it with the real profile-specific rules. For example:
+
+```css
+body.art-gallery .asset--metadata--description .asset--metadata--icon {
+  display: none !important;
+}
+```
+
+The controller may already hide the description icon through its compatibility CSS, so use the badge for the first test rather than relying on that icon alone. See the [immich-kiosk custom CSS guide](https://docs.immichkiosk.app/configuration/custom-css/) for container mounting and other selectors.
+
 ## Examples
 
 Switch to a saved profile every morning:
@@ -144,14 +185,6 @@ action:
     data:
       filterDate: last-30-days
       albumOrder: newest
-```
-
-Apply an immich-kiosk CSS class before saving or displaying an art profile:
-
-```yaml
-service: immich_frame.set_renderer_options
-data:
-  customCssClass: art-gallery
 ```
 
 Follow the frame's physical orientation (this example treats X-dominant as landscape; swap the two options if your device reports the opposite):

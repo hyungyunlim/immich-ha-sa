@@ -111,6 +111,47 @@ data:
 
 셀렉터를 포함한 전체 필드 목록은 [`services.yaml`](https://github.com/hyungyunlim/immich-ha-sa/blob/main/custom_components/immich_frame/services.yaml)에 있습니다.
 
+### 프로필별 Custom CSS
+
+액자의 **Custom CSS Class** 텍스트 엔티티에는 `art-gallery`처럼 클래스 이름만 입력합니다. 앞에 `.`을 붙이거나 `custom_css_class=`를 함께 입력하지 마세요. 컨트롤러는 렌더러 URL에 `custom_css_class=art-gallery`를 추가하고, immich-kiosk는 페이지의 `<body>` 요소에 `art-gallery` 클래스를 적용합니다.
+
+immich-kiosk에 마운트한 `custom.css`에 대응하는 규칙을 추가하고, 파일을 수정한 뒤에는 immich-kiosk를 재시작하세요. 처음에는 아래처럼 확실히 보이는 테스트 배지를 사용하는 것이 좋습니다.
+
+```css
+body.art-gallery::after {
+  content: "ART GALLERY CSS ACTIVE";
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 99999;
+  padding: 12px 18px;
+  background: magenta;
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+}
+```
+
+자동화나 스크립트에서도 같은 값을 설정할 수 있습니다.
+
+```yaml
+service: immich_frame.set_renderer_options
+data:
+  customCssClass: art-gallery
+```
+
+액자가 다시 로드되면 테스트 배지가 나타나야 합니다. **Frame Renderer URL** 센서의 `url` 속성에서도 `custom_css_class=art-gallery`를 확인할 수 있습니다. 클래스를 해제하려면 텍스트 엔티티를 비우거나 `customCssClass: ""`를 전송하세요. URL의 query parameter도 함께 제거됩니다.
+
+이 클래스는 저장된 프로필에도 포함됩니다. 그림 프로필에는 `art-gallery`를 저장하고 일반 사진 프로필에는 빈 값을 저장할 수 있습니다. 테스트 배지가 정상적으로 나타난 뒤 실제 프로필용 규칙으로 교체하세요. 예:
+
+```css
+body.art-gallery .asset--metadata--description .asset--metadata--icon {
+  display: none !important;
+}
+```
+
+설명 아이콘은 컨트롤러의 호환성 CSS에서 이미 숨겨질 수 있으므로, 첫 테스트는 아이콘 대신 위 배지로 확인하세요. 컨테이너 마운트 방법과 다른 selector는 [immich-kiosk Custom CSS 가이드](https://docs.immichkiosk.app/configuration/custom-css/)를 참고할 수 있습니다.
+
 ## 예제
 
 매일 아침 저장된 프로필로 전환:
@@ -144,14 +185,6 @@ action:
     data:
       filterDate: last-30-days
       albumOrder: newest
-```
-
-그림 프로필을 저장하거나 표시하기 전에 immich-kiosk CSS class 적용:
-
-```yaml
-service: immich_frame.set_renderer_options
-data:
-  customCssClass: art-gallery
 ```
 
 액자의 실제 방향에 맞춰 표시할 사진 방향도 변경 (아래 예제는 X축 우세를 가로로 봅니다. 기기에서 반대로 나온다면 두 option을 서로 바꾸세요):

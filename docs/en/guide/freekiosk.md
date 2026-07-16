@@ -65,6 +65,8 @@ Status entities (when FreeKiosk telemetry is available over REST or MQTT):
 
 The axis sensor intentionally does not label either state “portrait” or “landscape.” Android sensor axes follow the device's natural orientation, which is often landscape on tablets, so first rotate your own device and note which state represents landscape. The entity is unavailable while the device is flat, the accelerometer is missing, or X and Y are too close near a 45-degree transition. This avoids false orientation changes and rapid state flapping.
 
+Use the [orientation automation example](./automations#examples) to map ON/OFF to **Landscape only** and **Portrait only**. Swap the two options if the result is reversed on your device; this is expected across Android phones, tablets, and digital frames with different natural orientations.
+
 ### Real-time updates over MQTT
 
 When a frame is bound over MQTT, the controller streams its telemetry to Home Assistant the instant the device publishes a change, so motion, screen state, and online/offline reach Home Assistant in about a second instead of waiting for the integration's 30-second poll. This is what makes presence automations ("turn the screen on when someone approaches") usable.

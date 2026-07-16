@@ -137,6 +137,8 @@ The controller also exposes common immich-kiosk URL override settings for frame-
 - Kiosk UI: `disableNavigation`, `hideCursor`, `showProgressBar`, `progressBarPosition`.
 - Display care: `burnInInterval`, `burnInDuration`, `burnInOpacity`.
 
+For profile-specific styling, enter a class name such as `art-gallery` in the frame's **Custom CSS Class** text entity. Enter the name only, without a leading `.` or `custom_css_class=`. The controller adds `custom_css_class=art-gallery` to the renderer URL and saves the value in profiles. Add selectors such as `body.art-gallery ...` to the `custom.css` file mounted into immich-kiosk, restart immich-kiosk after editing that file, and check the **Frame Renderer URL** sensor's `url` attribute to confirm the query value. Clearing the text entity removes the override.
+
 For long image descriptions, `imageDescriptionScrollSpeed` controls the visible scroll speed in pixels per second. `imageDescriptionScrollDuration` is retained as the maximum animation cycle duration so very long descriptions do not create unbounded scroll loops.
 
 Weather locations are still configured in immich-kiosk `config.yaml`. Set the frame's Weather Location text entity to a configured location name, leave it empty to use the kiosk default, or set it to `rotate` to rotate through configured locations. Turning Show Weather off sends `weather=none` so immich-kiosk does not auto-select the default weather location. Weather detail selects use `Use Kiosk Config`, `Show`, and `Hide`; `Use Kiosk Config` omits the URL query and preserves the selected location's config.
