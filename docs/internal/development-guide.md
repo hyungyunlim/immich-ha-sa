@@ -134,6 +134,42 @@ gh run list --repo hyungyunlim/immich-ha-sa --branch main --limit 5
 gh run watch <run-id> --repo hyungyunlim/immich-ha-sa --exit-status
 ```
 
+## Tag and GitHub Release
+
+After the `main` push succeeds, wait for the required GitHub Actions runs and verify the release checks again:
+
+```bash
+npm run typecheck
+npm test
+npm run build
+python3 -m py_compile custom_components/immich_frame/*.py
+gh run list --commit "$(git rev-parse HEAD)" --limit 20
+```
+
+Create a lightweight version tag only after those checks pass, then publish a non-draft, non-prerelease GitHub Release from that tag:
+
+```bash
+version="$(node -p "require('./package.json').version")"
+tag="v${version}"
+git tag "$tag" HEAD
+git push origin "$tag"
+gh release create "$tag" \
+  --repo hyungyunlim/immich-ha-sa \
+  --title "$tag" \
+  --notes-file /path/to/release-notes.md
+```
+
+Release notes should summarize user-visible controller and integration changes together and mention any required Home Assistant Core restart. Do not put credentials, API keys, private hostnames, or temporary test data in release notes.
+
+Verify the published tag, release, and commit all agree:
+
+```bash
+git ls-remote --tags origin "$tag"
+gh release view "$tag" \
+  --repo hyungyunlim/immich-ha-sa \
+  --json tagName,isDraft,isPrerelease,targetCommitish,url
+```
+
 ## Production Add-on Update
 
 The production Home Assistant instance uses the add-on slug:
