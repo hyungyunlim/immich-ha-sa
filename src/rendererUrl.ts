@@ -76,8 +76,9 @@ export function buildRendererUrl(
   url.searchParams.set('duration', String(state.durationSeconds));
   url.searchParams.set('image_fit', state.imageFit);
   url.searchParams.delete('custom_css_class');
-  if (state.customCssClass.trim()) {
-    url.searchParams.set('custom_css_class', state.customCssClass.trim());
+  const customCssClasses = state.customCssClass.trim().replace(/\s+/g, ' ');
+  if (customCssClasses) {
+    url.searchParams.set('custom_css_class', customCssClasses);
   }
   url.searchParams.set('album_order', state.albumOrder);
   url.searchParams.set('show_time', String(state.showTime));

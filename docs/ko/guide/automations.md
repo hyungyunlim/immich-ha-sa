@@ -113,12 +113,12 @@ data:
 
 ### 프로필별 Custom CSS
 
-액자의 **Custom CSS Class** 텍스트 엔티티에는 `art-gallery`처럼 클래스 이름만 입력합니다. 앞에 `.`을 붙이거나 `custom_css_class=`를 함께 입력하지 마세요. 컨트롤러는 렌더러 URL에 `custom_css_class=art-gallery`를 추가하고, immich-kiosk는 페이지의 `<body>` 요소에 `art-gallery` 클래스를 적용합니다.
+액자의 **Custom CSS Class** 텍스트 엔티티에는 클래스 이름을 하나 이상 입력할 수 있습니다. 하나라면 `art-gallery`, 여러 개라면 `art-gallery night-mode`처럼 공백으로 구분하세요. 앞에 `.`을 붙이거나 `custom_css_class=`를 함께 입력하지 마세요. 컨트롤러는 공백을 정규화해 immich-kiosk로 보내고, immich-kiosk는 각 클래스를 렌더러 컨테이너에 적용합니다.
 
 immich-kiosk에 마운트한 `custom.css`에 대응하는 규칙을 추가하고, 파일을 수정한 뒤에는 immich-kiosk를 재시작하세요. 처음에는 아래처럼 확실히 보이는 테스트 배지를 사용하는 것이 좋습니다.
 
 ```css
-body.art-gallery::after {
+.art-gallery::after {
   content: "ART GALLERY CSS ACTIVE";
   position: fixed;
   top: 20px;
@@ -137,15 +137,15 @@ body.art-gallery::after {
 ```yaml
 service: immich_frame.set_renderer_options
 data:
-  customCssClass: art-gallery
+  customCssClass: art-gallery night-mode
 ```
 
-액자가 다시 로드되면 테스트 배지가 나타나야 합니다. **Frame Renderer URL** 센서의 `url` 속성에서도 `custom_css_class=art-gallery`를 확인할 수 있습니다. 클래스를 해제하려면 텍스트 엔티티를 비우거나 `customCssClass: ""`를 전송하세요. URL의 query parameter도 함께 제거됩니다.
+액자가 다시 로드되면 테스트 배지가 나타나야 합니다. **Frame Renderer URL** 센서의 `url` 속성에서도 URL 인코딩된 `custom_css_class=art-gallery+night-mode`를 확인할 수 있습니다. 모든 클래스를 해제하려면 텍스트 엔티티를 비우거나 `customCssClass: ""`를 전송하세요. URL의 query parameter도 함께 제거됩니다.
 
-이 클래스는 저장된 프로필에도 포함됩니다. 그림 프로필에는 `art-gallery`를 저장하고 일반 사진 프로필에는 빈 값을 저장할 수 있습니다. 테스트 배지가 정상적으로 나타난 뒤 실제 프로필용 규칙으로 교체하세요. 예:
+전체 클래스 목록은 저장된 프로필에도 포함됩니다. 그림 프로필에는 `art-gallery night-mode`를 저장하고 일반 사진 프로필에는 빈 값을 저장할 수 있습니다. `.art-gallery`는 해당 클래스가 있을 때 적용되고, `.art-gallery.night-mode`는 같은 렌더러 컨테이너에 두 클래스가 모두 있을 때 적용됩니다. 테스트 배지가 정상적으로 나타난 뒤 실제 프로필용 규칙으로 교체하세요. 예:
 
 ```css
-body.art-gallery .asset--metadata--description .asset--metadata--icon {
+.art-gallery .asset--metadata--description .asset--metadata--icon {
   display: none !important;
 }
 ```

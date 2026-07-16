@@ -113,12 +113,12 @@ The full field list with selectors lives in [`services.yaml`](https://github.com
 
 ### Per-profile custom CSS
 
-Enter only the class name in the frame's **Custom CSS Class** text entity, for example `art-gallery`. Do not include a leading `.` or the `custom_css_class=` query name. The controller appends `custom_css_class=art-gallery` to the renderer URL, and immich-kiosk adds `art-gallery` to the page's `<body>` element.
+Enter one or more class names in the frame's **Custom CSS Class** text entity. Use `art-gallery` for one class or separate multiple classes with whitespace, for example `art-gallery night-mode`. Do not include leading dots or the `custom_css_class=` query name. The controller normalizes the whitespace and sends the value to immich-kiosk, which adds the classes to its renderer container.
 
 Add a matching rule to the `custom.css` file mounted into immich-kiosk, then restart immich-kiosk after changing that file. This temporary badge makes the result obvious:
 
 ```css
-body.art-gallery::after {
+.art-gallery::after {
   content: "ART GALLERY CSS ACTIVE";
   position: fixed;
   top: 20px;
@@ -137,15 +137,15 @@ You can set the same value from an automation or script:
 ```yaml
 service: immich_frame.set_renderer_options
 data:
-  customCssClass: art-gallery
+  customCssClass: art-gallery night-mode
 ```
 
-The badge should appear after the frame reloads. The **Frame Renderer URL** sensor's `url` attribute should also contain `custom_css_class=art-gallery`. Clear the text entity, or send `customCssClass: ""`, to remove the class and the query parameter.
+The badge should appear after the frame reloads. The **Frame Renderer URL** sensor's `url` attribute should also contain the URL-encoded value `custom_css_class=art-gallery+night-mode`. Clear the text entity, or send `customCssClass: ""`, to remove all custom classes and the query parameter.
 
-The class is stored with saved profiles, so an art profile can use `art-gallery` while ordinary photo profiles leave it empty. Once the test badge works, replace it with the real profile-specific rules. For example:
+The complete class list is stored with saved profiles, so an art profile can use `art-gallery night-mode` while ordinary photo profiles leave it empty. A selector such as `.art-gallery` applies when that class is present; `.art-gallery.night-mode` requires both classes on the same renderer container. Once the test badge works, replace it with the real profile-specific rules. For example:
 
 ```css
-body.art-gallery .asset--metadata--description .asset--metadata--icon {
+.art-gallery .asset--metadata--description .asset--metadata--icon {
   display: none !important;
 }
 ```

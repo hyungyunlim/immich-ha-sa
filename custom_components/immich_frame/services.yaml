@@ -123,6 +123,7 @@ set_renderer_options:
             - none
     customCssClass:
       required: false
+      description: Space-separated immich-kiosk custom CSS class names.
       selector:
         text:
     showTime:

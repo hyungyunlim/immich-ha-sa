@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.84
+
+- Explicitly support whitespace-separated values in **Custom CSS Class**, normalizing tabs, line breaks, and repeated spaces before sending multiple classes to immich-kiosk.
+- Correct the CSS examples to target immich-kiosk's renderer container without assuming the custom classes are attached to the `<body>` element, and document single, combined, profile-specific, and clearing behavior.
+
 ## 0.1.83
 
 - Add a Home Assistant **Custom CSS Class** text entity and `customCssClass` renderer option. The value is sent to immich-kiosk as `custom_css_class` and is included in saved frame profiles, allowing album/profile-specific CSS such as an `art-gallery` layout.
