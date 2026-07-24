@@ -41,6 +41,8 @@ const state: FrameState = {
   weatherRoundTemperature: 'inherit',
   showVideos: false,
   kioskVideoMuted: true,
+  playbackState: 'playing',
+  rendererSuspended: false,
   excludeVideosOver: 0,
   showArchived: false,
   filterDate: '',

@@ -322,10 +322,15 @@ Before changing device-control code, test against mocked endpoints in `test/serv
 
 Screen-off behavior should be deterministic:
 
-1. Read `/api/status`.
-2. Capture brightness for later restore when available.
-3. Set device volume to `0` if the frame is not already muted.
-4. Send `/api/screen/off`.
+1. Persist `rendererSuspended=true`, emit the new frame state, and request an acknowledged renderer suspension when a frame browser is connected.
+2. Read `/api/status`.
+3. Capture brightness for later restore when available.
+4. Set device volume to `0` if the frame is not already muted.
+5. Send `/api/screen/off`.
+
+Screen-on reverses the sequence: turn on the physical display, set playback to `playing`, persist `rendererSuspended=false`, require a renderer-resume acknowledgement when connected, and restore captured brightness.
+
+If suspension is rejected or the physical screen-off command definitely failed before execution, roll the renderer state back to active. If transport fails after screen-off dispatch begins and execution is uncertain, keep it suspended so the hidden frame does not resume NAS/Immich traffic.
 
 Avoid relying on Android mute key toggles for screen-off preparation because toggle state is hard to infer reliably across devices.
 

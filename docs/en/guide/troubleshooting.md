@@ -18,6 +18,12 @@ The selected album probably contains only archived assets. immich-kiosk excludes
 
 Keep the frame's `disableNavigation` renderer option **off**. immich-kiosk's `disable_navigation` blocks touch, keyboard, and menu navigation, so bridged commands and physical key events are ignored while it is enabled.
 
+Previous also needs an earlier asset in immich-kiosk's history. A failure is expected just after opening the frame or on the first slide. If a connected frame cannot apply a command, the controller no longer reports it as successful; check the Home Assistant error and controller log for the reason.
+
+## The NAS is still active after turning off the screen
+
+Update both the controller and Home Assistant integration to **0.1.85 or newer**. Starting with this version, Screen Off unmounts the entire immich-kiosk iframe before turning off the physical display, stopping image requests and slideshow timers. FreeKiosk's own Screen Off or sleep feature alone may leave WebView JavaScript running, so use this integration's **Screen** switch or **Screen Off** button in automations.
+
 ## Wrong or unwanted weather location
 
 Weather API keys and locations live in immich-kiosk's `config.yaml`, not in the controller. Set the frame's **Weather Location** text entity to a configured location name, leave it empty for the kiosk default, or `rotate` to cycle through configured locations. Turning **Show Weather** off sends `weather=none` so immich-kiosk does not auto-select its default location. The weather detail selects (`Use Kiosk Config` / `Show` / `Hide`) inherit or override per frame.

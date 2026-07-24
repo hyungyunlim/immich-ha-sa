@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.85
+
+- Stop Immich/NAS image traffic while a frame is off by unmounting the immich-kiosk iframe before FreeKiosk screen-off, then recreate it after screen-on.
+- Add acknowledged frame commands so Home Assistant reports a failure when a connected browser did not actually apply next, previous, play, pause, reload, or mute.
+- Add explicit **Play** and **Pause** buttons and stateful media-player controls while retaining **Play/Pause** for existing dashboards and automations.
+- Report slideshow `playing`, `paused`, `idle`, and `off` states from confirmed renderer state; Previous now reports failure when no earlier asset exists.
+- After upgrading, refresh the FreeKiosk frame page once (or restart the app) so an already-open WebView loads the acknowledged command bridge.
+
 ## 0.1.84
 
 - Explicitly support whitespace-separated values in **Custom CSS Class**, normalizing tabs, line breaks, and repeated spaces before sending multiple classes to immich-kiosk.

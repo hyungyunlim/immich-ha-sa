@@ -18,6 +18,12 @@
 
 프레임의 `disableNavigation` 렌더러 옵션을 **꺼두세요**. immich-kiosk의 `disable_navigation`은 터치, 키보드, 메뉴 내비게이션을 차단하므로, 켜져 있는 동안 브리지된 명령과 물리 키 이벤트가 무시됩니다.
 
+Previous는 이전 사진 히스토리가 있어야 동작합니다. 프레임을 막 열었거나 슬라이드쇼의 첫 사진이면 실패 응답이 정상입니다. 연결된 프레임이 명령을 적용하지 못하면 컨트롤러도 성공으로 표시하지 않으므로, Home Assistant 오류와 컨트롤러 로그에서 원인을 확인할 수 있습니다.
+
+## 화면을 껐는데 NAS 디스크가 계속 동작해요
+
+컨트롤러와 Home Assistant 통합을 **0.1.85 이상**으로 함께 업데이트하세요. 이 버전부터 Screen Off가 물리 화면을 끄기 전에 immich-kiosk iframe을 완전히 분리해 이미지 요청과 슬라이드쇼 타이머를 멈춥니다. FreeKiosk 자체의 Screen Off나 절전 기능만 단독으로 사용하면 WebView의 자바스크립트는 계속 실행될 수 있으므로, 자동화에서도 이 통합의 **Screen** 스위치나 **Screen Off** 버튼을 사용하세요.
+
 ## 날씨 위치가 이상하거나 원치 않게 표시돼요
 
 날씨 API 키와 위치는 컨트롤러가 아니라 immich-kiosk의 `config.yaml`에 있습니다. 프레임의 **Weather Location** text 엔티티에 설정된 위치 이름을 넣거나, 비워서 kiosk 기본값을 쓰거나, `rotate`로 설정된 위치들을 순환하세요. **Show Weather**를 끄면 `weather=none`이 전송되어 immich-kiosk가 기본 위치를 자동 선택하지 않습니다. 날씨 상세 select(`Use Kiosk Config` / `Show` / `Hide`)로 프레임별 상속/오버라이드를 정합니다.

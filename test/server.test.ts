@@ -5,10 +5,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createServer } from '../src/server.js';
+import { FrameEventHub } from '../src/events.js';
 import { JsonStore } from '../src/store.js';
 import type { AppConfig } from '../src/config.js';
 import type { ImmichClient } from '../src/immichClient.js';
-import type { AlbumCacheEntry, FrameDevice, PersonCacheEntry } from '../src/types.js';
+import type { AlbumCacheEntry, FrameCommand, FrameDevice, PersonCacheEntry } from '../src/types.js';
 
 const tempDirs: string[] = [];
 
@@ -55,6 +56,37 @@ async function waitForDeviceIp(store: JsonStore, deviceId: string, ip: string): 
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
   expect(store.getDevice(deviceId)?.lastSeenIp).toBe(ip);
+}
+
+function mockAcknowledgedFrame(events: FrameEventHub, issued: FrameCommand[]): void {
+  const commandsById = new Map<string, FrameCommand>();
+  let sequence = 0;
+  vi.spyOn(events, 'issueCommand').mockImplementation((_deviceId, command) => {
+    sequence += 1;
+    const commandId = `00000000-0000-4000-8000-${String(sequence).padStart(12, '0')}`;
+    issued.push(command);
+    commandsById.set(commandId, command);
+    return {
+      event: {
+        command,
+        commandId,
+        ackToken: `ack-token-${sequence}-valid-for-tests`,
+        issuedAt: '2026-07-24T00:00:00.000Z',
+      },
+      connectedClients: 1,
+      delivered: 1,
+    };
+  });
+  vi.spyOn(events, 'waitForCommandAck').mockImplementation(async (commandId) => {
+    const command = commandsById.get(commandId);
+    return {
+      commandId,
+      success: true,
+      acknowledgedAt: '2026-07-24T00:00:00.100Z',
+      playbackState: command === 'pause' ? 'paused' : 'playing',
+      rendererSuspended: command === 'renderer-suspend',
+    };
+  });
 }
 
 describe('controller API', () => {
@@ -1213,6 +1245,86 @@ describe('controller API', () => {
     await new Promise<void>((resolve) => remote.close(() => resolve()));
   });
 
+  it('records explicit playback state only after the frame acknowledges it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    const events = new FrameEventHub();
+    const issued: FrameCommand[] = [];
+    mockAcknowledgedFrame(events, issued);
+    const server = createTestServer({ config, store, events });
+
+    const pause = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'pause' },
+    });
+
+    expect(pause.statusCode).toBe(200);
+    expect(pause.json().data.frameEvent).toMatchObject({
+      delivered: 1,
+      acknowledged: true,
+      acknowledgement: { success: true, playbackState: 'paused' },
+    });
+    expect(store.getFrameState('lenovo')?.playbackState).toBe('paused');
+
+    const play = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'play' },
+    });
+
+    expect(play.statusCode).toBe(200);
+    expect(store.getFrameState('lenovo')?.playbackState).toBe('playing');
+    expect(issued).toEqual(['pause', 'play']);
+    await server.close();
+  });
+
+  it('rejects a renderer suspension that the connected frame cannot apply', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    store.updateDevice('lenovo', {
+      remoteControlType: 'freekiosk',
+      remoteApiUrl: 'http://127.0.0.1:1',
+    });
+    const events = new FrameEventHub();
+    vi.spyOn(events, 'issueCommand').mockReturnValue({
+      event: {
+        command: 'renderer-suspend',
+        commandId: '00000000-0000-4000-8000-000000000001',
+        ackToken: 'ack-token-valid-for-tests',
+        issuedAt: '2026-07-24T00:00:00.000Z',
+      },
+      connectedClients: 1,
+      delivered: 1,
+    });
+    vi.spyOn(events, 'waitForCommandAck').mockResolvedValue({
+      commandId: '00000000-0000-4000-8000-000000000001',
+      success: false,
+      acknowledgedAt: '2026-07-24T00:00:00.100Z',
+      rendererSuspended: false,
+      error: 'Renderer could not be suspended.',
+    });
+    const server = createTestServer({ config, store, events });
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/command',
+      payload: { command: 'screen-off' },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error).toMatchObject({
+      code: 'FRAME_COMMAND_REJECTED',
+      message: 'Renderer could not be suspended.',
+    });
+    expect(store.getFrameState('lenovo')?.rendererSuspended).toBe(false);
+    await server.close();
+  });
+
   it('captures and restores FreeKiosk brightness across screen power cycles', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
@@ -1266,7 +1378,10 @@ describe('controller API', () => {
       remoteApiUrl: `http://127.0.0.1:${remotePort}`,
       remoteApiKey: 'test-key',
     });
-    const server = createTestServer({ config, store });
+    const events = new FrameEventHub();
+    const issued: FrameCommand[] = [];
+    mockAcknowledgedFrame(events, issued);
+    const server = createTestServer({ config, store, events });
 
     const off = await server.inject({
       method: 'POST',
@@ -1287,6 +1402,12 @@ describe('controller API', () => {
       changed: true,
       endpoint: '/api/volume',
     });
+    expect(off.json().data.rendererSuspend).toMatchObject({
+      previous: 'active',
+      current: 'suspended',
+      frameEvent: { delivered: 1, acknowledged: true },
+    });
+    expect(store.getFrameState('lenovo')?.rendererSuspended).toBe(true);
     expect(store.getDevice('lenovo')?.remoteBrightnessRestoreValue).toBe(37);
 
     const on = await server.inject({
@@ -1303,6 +1424,13 @@ describe('controller API', () => {
       value: 37,
       endpoint: '/api/brightness',
     });
+    expect(on.json().data.rendererResume).toMatchObject({
+      previous: 'suspended',
+      current: 'active',
+      frameEvent: { delivered: 1, acknowledged: true },
+    });
+    expect(store.getFrameState('lenovo')?.rendererSuspended).toBe(false);
+    expect(issued).toEqual(['renderer-suspend', 'renderer-resume']);
 
     expect(requests).toEqual([
       { method: 'GET', url: '/api/status', body: undefined, apiKey: 'test-key' },
@@ -1385,7 +1513,7 @@ describe('controller API', () => {
     await new Promise<void>((resolve) => remote.close(() => resolve()));
   });
 
-  it('emits frame commands without requiring a remote backend', async () => {
+  it('rejects renderer commands when no browser or remote backend can execute them', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
@@ -1397,10 +1525,8 @@ describe('controller API', () => {
       payload: { command: 'mute-toggle' },
     });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json().data.command).toBe('mute-toggle');
-    expect(response.json().data.frameEvent).toMatchObject({ connectedClients: 0, delivered: 0 });
-    expect(response.json().data.remoteFallback).toBeNull();
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('FRAME_COMMAND_UNDELIVERED');
     await server.close();
   });
 
@@ -1418,6 +1544,8 @@ describe('controller API', () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json().error.code).toBe('REMOTE_NOT_CONFIGURED');
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    expect(store.getFrameState('lenovo')?.rendererSuspended).toBe(false);
     await server.close();
   });
 

@@ -7,7 +7,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DATA_COORDINATOR, DOMAIN
 from .coordinator import ImmichFrameCoordinator
 from .entity_helpers import frame_device_info, frame_label, frame_unique_id
-from .remote_status import remote_effective_muted, remote_effective_muted_source, remote_status_bool
+from .remote_status import frame_screen_on, remote_effective_muted, remote_effective_muted_source
 
 
 async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
@@ -239,7 +239,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 "screen-on",
                 "screen-off",
                 "mdi:monitor",
-                lambda data: remote_status_bool(data, ["screen", "on"]),
+                frame_screen_on,
             ),
             ImmichFrameRemoteCommandSwitch(
                 coordinator,

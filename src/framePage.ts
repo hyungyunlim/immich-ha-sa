@@ -45,6 +45,9 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
     body.empty #fallback {
       display: flex;
     }
+    body.suspended #fallback {
+      display: none;
+    }
   </style>
 </head>
 <body class="empty">
@@ -55,36 +58,99 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       var deviceId = ${JSON.stringify(escapedDeviceId)};
       var stateUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/state';
       var eventsUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/events';
+      var ackUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/commands/ack';
       var iframe = document.getElementById('renderer');
       var previewMode = ${JSON.stringify(previewMode)};
       var lastVersion = 0;
       var lastRendererUrl = '';
+      var playbackState = 'playing';
+      var rendererSuspended = false;
       var pollTimer = null;
       var pollIntervalMs = ${Math.max(previewMode ? 60 : 5, device.pollIntervalSeconds) * 1000};
       var frameVideoMuted = true;
       var keyMap = {
         next: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
         previous: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
+        play: { key: 'P', code: 'KeyP', keyCode: 80, shiftKey: true },
+        pause: { key: 'p', code: 'KeyP', keyCode: 80, shiftKey: false },
         'play-pause': { key: ' ', code: 'Space', keyCode: 32 },
         'mute-toggle': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 }
       };
 
-      function applyState(state) {
-        if (!state || !state.rendererUrl) return;
-        if (state.version && state.version < lastVersion) return;
-        if (state.version) lastVersion = state.version;
-        if (state.rendererUrl === lastRendererUrl) {
+      function bindRendererLoad(target) {
+        target.addEventListener('load', function () {
+          if (previewMode) return;
+          try { target.contentWindow && target.contentWindow.focus(); } catch (error) {}
+          if (playbackState === 'paused') {
+            setTimeout(function () { applyPlaybackState('paused'); }, 0);
+          }
+        });
+      }
+
+      function createRenderer() {
+        if (iframe && iframe.isConnected) return iframe;
+        iframe = document.createElement('iframe');
+        iframe.id = 'renderer';
+        iframe.title = 'Immich frame renderer';
+        iframe.referrerPolicy = 'no-referrer';
+        bindRendererLoad(iframe);
+        document.body.insertBefore(iframe, document.getElementById('fallback'));
+        return iframe;
+      }
+
+      function suspendRenderer() {
+        rendererSuspended = true;
+        if (iframe) {
+          iframe.remove();
+          iframe = null;
+        }
+        document.body.className = 'suspended';
+        return true;
+      }
+
+      function resumeRenderer() {
+        rendererSuspended = false;
+        var target = createRenderer();
+        if (lastRendererUrl && target.getAttribute('src') !== lastRendererUrl) {
+          target.src = lastRendererUrl;
           document.body.className = '';
+        } else if (!lastRendererUrl) {
+          document.body.className = 'empty';
+        }
+        return Boolean(target);
+      }
+
+      function applyState(state) {
+        if (!state) return;
+        if (state.version && state.version < lastVersion) return;
+        var stateChanged = Boolean(state.version && state.version > lastVersion);
+        if (state.version) lastVersion = state.version;
+        if (state.rendererUrl) lastRendererUrl = state.rendererUrl;
+        if (state.playbackState === 'playing' || state.playbackState === 'paused') {
+          playbackState = state.playbackState;
+        }
+        if (state.rendererSuspended) {
+          suspendRenderer();
           return;
         }
-        lastRendererUrl = state.rendererUrl;
-        iframe.src = state.rendererUrl;
+        var target = createRenderer();
+        rendererSuspended = false;
+        if (!lastRendererUrl) {
+          document.body.className = 'empty';
+          return;
+        }
+        if (target.getAttribute('src') === lastRendererUrl) {
+          document.body.className = '';
+          if (stateChanged) applyPlaybackState(playbackState);
+          return;
+        }
+        target.src = lastRendererUrl;
         document.body.className = '';
       }
 
       function iframeDocument() {
         try {
-          return iframe.contentWindow && iframe.contentWindow.document;
+          return iframe && iframe.contentWindow && iframe.contentWindow.document;
         } catch (error) {
           return null;
         }
@@ -92,7 +158,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
 
       function iframeWindow() {
         try {
-          return iframe.contentWindow;
+          return iframe && iframe.contentWindow;
         } catch (error) {
           return null;
         }
@@ -125,6 +191,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         var selector = null;
         if (command === 'next') selector = '.navigation--next-asset, [aria-label="Next"], [title="Next"]';
         if (command === 'previous') selector = '.navigation--prev-asset, [aria-label="Previous"], [title="Previous"]';
+        if (command === 'play-pause') selector = '.navigation--play-pause, [aria-label="Play"], [aria-label="Pause"], [title="Play/Pause"]';
         if (command === 'mute-toggle') selector = '.navigation--mute, [aria-label="Mute"], [aria-label="Unmute"], [title="Mute"], [title="Unmute"], .mute, .unmute';
         if (!selector) return false;
         var control = doc.querySelector(selector);
@@ -218,16 +285,18 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       function dispatchKioskKey(command) {
         var target = keyMap[command];
         var doc = iframeDocument();
-        if (!target || !doc || !iframe.contentWindow) return false;
+        var win = iframeWindow();
+        if (!target || !doc || !win) return false;
         var eventInit = {
           key: target.key,
           code: target.code,
           keyCode: target.keyCode,
           which: target.keyCode,
+          shiftKey: Boolean(target.shiftKey),
           bubbles: true,
           cancelable: true
         };
-        var nodes = [doc.body, doc.documentElement, doc, iframe.contentWindow].filter(Boolean);
+        var nodes = [doc.body, doc.documentElement, doc, win].filter(Boolean);
         nodes.forEach(function (node) {
           node.dispatchEvent(new KeyboardEvent('keydown', eventInit));
           node.dispatchEvent(new KeyboardEvent('keyup', eventInit));
@@ -235,16 +304,59 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         return true;
       }
 
+      function readPlaybackState() {
+        var doc = iframeDocument();
+        if (!doc || !doc.body) return 'unknown';
+        return doc.body.classList.contains('polling-paused') ? 'paused' : 'playing';
+      }
+
+      function applyPlaybackState(targetState) {
+        var current = readPlaybackState();
+        if (current === targetState) {
+          playbackState = targetState;
+          return true;
+        }
+        if (current === 'unknown') return false;
+        var command = targetState === 'paused' ? 'pause' : 'play';
+        clickKioskControl('play-pause');
+        if (readPlaybackState() !== targetState) dispatchKioskKey(command);
+        var applied = readPlaybackState();
+        if (applied !== targetState) return false;
+        playbackState = applied;
+        return true;
+      }
+
+      function togglePlaybackState() {
+        var current = readPlaybackState();
+        if (current === 'unknown') return false;
+        return applyPlaybackState(current === 'paused' ? 'playing' : 'paused');
+      }
+
+      function previousAssetAvailable() {
+        var doc = iframeDocument();
+        if (!doc) return false;
+        var history = doc.querySelectorAll('.kiosk-history--entry');
+        if (history.length < 2) return false;
+        return !history[0].value || history[0].value.charAt(0) !== '*';
+      }
+
       function triggerKioskCommand(command) {
+        if (command === 'renderer-suspend') return suspendRenderer();
+        if (command === 'renderer-resume') return resumeRenderer();
+        if (rendererSuspended) return false;
         if (command === 'reload') {
           try {
-            if (iframe.contentWindow) iframe.contentWindow.location.reload();
+            if (iframe && iframe.contentWindow) iframe.contentWindow.location.reload();
             return true;
           } catch (error) {
-            if (lastRendererUrl) iframe.src = lastRendererUrl;
+            if (lastRendererUrl) createRenderer().src = lastRendererUrl;
             return false;
           }
         }
+        if (command === 'play') return applyPlaybackState('playing');
+        if (command === 'pause') return applyPlaybackState('paused');
+        if (command === 'play-pause') return togglePlaybackState();
+        if (command === 'previous' && !previousAssetAvailable()) return false;
         if (command === 'mute-on') {
           return applyVideoMutedState(true);
         }
@@ -257,12 +369,37 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         return triggerKioskApi(command) || clickKioskControl(command) || dispatchKioskKey(command);
       }
 
-      window.__immichFrameCommand = triggerKioskCommand;
+      function acknowledgeCommand(payload, success, error) {
+        if (!payload || !payload.commandId || !payload.ackToken) return;
+        var body = {
+          commandId: payload.commandId,
+          ackToken: payload.ackToken,
+          success: Boolean(success),
+          playbackState: readPlaybackState(),
+          rendererSuspended: rendererSuspended
+        };
+        if (error) body.error = String(error);
+        fetch(ackUrl, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+          cache: 'no-store',
+          keepalive: true
+        }).catch(function () {});
+      }
 
-      iframe.addEventListener('load', function () {
-        if (previewMode) return;
-        try { iframe.contentWindow && iframe.contentWindow.focus(); } catch (error) {}
-      });
+      window.__immichFrameCommand = function (command, payload) {
+        try {
+          var result = triggerKioskCommand(command);
+          acknowledgeCommand(payload, result, result ? undefined : 'Command was not supported by the current renderer state.');
+          return result;
+        } catch (error) {
+          acknowledgeCommand(payload, false, error);
+          return false;
+        }
+      };
+
+      if (iframe) bindRendererLoad(iframe);
 
       document.addEventListener('keyup', function (event) {
         if (previewMode) return;
@@ -306,7 +443,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
           source.addEventListener('command', function (event) {
             try {
               var payload = JSON.parse(event.data);
-              if (payload && payload.command) triggerKioskCommand(payload.command);
+              if (payload && payload.command) window.__immichFrameCommand(payload.command, payload);
             } catch (error) {}
           });
           source.onerror = function () {

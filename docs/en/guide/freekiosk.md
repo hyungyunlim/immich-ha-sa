@@ -80,13 +80,15 @@ Without MQTT (REST-only frames), the integration keeps polling every 30 seconds 
 
 Buttons:
 
-- **Next**, **Previous**, **Play/Pause**, **Reload**
+- **Next**, **Previous**, **Play**, **Pause**, **Play/Pause**, **Reload**
 - **Screen On**, **Screen Off**
 - **Volume Up**, **Volume Down**, **Device Mute Toggle**
 
 ## How commands are delivered
 
-Next, previous, play/pause, and reload are sent to the fixed frame page over the controller event stream, then bridged into the same-origin immich-kiosk iframe. If no frame browser is connected, these commands fall back to the FreeKiosk device path.
+Next, previous, play, pause, play/pause, and reload are sent to the fixed frame page over the controller event stream, then bridged into the same-origin immich-kiosk iframe. The frame page acknowledges whether it actually applied the command and reports its playback state. A connected browser that does not acknowledge or cannot apply the command is no longer reported as a success. If no frame browser is connected, these commands fall back to the FreeKiosk device path.
+
+**Screen Off** does more than turn off the FreeKiosk display. The frame page first unmounts the entire immich-kiosk iframe to stop image fetching and slideshow timers, then the controller prepares brightness/mute state and turns off the physical display. **Screen On** turns on the display, mounts a fresh iframe, and starts the slideshow in the playing state. This prevents the frame from continuing to request the next images from Immich or a NAS while its display is off.
 
 Screen, brightness, and volume controls go to the FreeKiosk device directly. **The controller prefers the REST API whenever it can reach the device** (a manual Remote API URL, or a FreeKiosk IP verified from the frame's own telemetry): REST confirms the command actually executed and avoids device-side MQTT command quirks. MQTT carries these commands only when the controller has no reachable REST endpoint — a remote frame reached through the broker — or as a fallback when a REST attempt fails in a way that is safe to retry (screen on/off and reload are retried over MQTT; relative volume steps and mute toggles are not, to avoid double-applying). Auto-brightness control is REST-only.
 
@@ -95,6 +97,12 @@ Screen, brightness, and volume controls go to the FreeKiosk device directly. **T
 
 ::: warning Keep navigation enabled
 Keep the frame's `disableNavigation` renderer option **off** when using the next/previous buttons. immich-kiosk's `disable_navigation` blocks touch, keyboard, and menu navigation, so bridged commands are ignored when it is enabled.
+:::
+
+**Previous** succeeds only when immich-kiosk has an earlier asset in its history; immediately after the first slide there may be nothing to return to. **Play** and **Pause** inspect the current `polling-paused` state and apply only the needed transition instead of guessing a toggle state. The **Play/Pause** toggle remains available for backward compatibility with existing automations.
+
+::: tip Immediately after updating to 0.1.85
+An already-open frame page may still have the previous command bridge in memory. After updating the controller and integration, refresh the FreeKiosk page once or restart the app. You do not need to repeat this unless another release explicitly asks for it.
 :::
 
 ## Audio: device mute vs. video mute

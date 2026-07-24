@@ -44,9 +44,17 @@ class ImmichFrameSlideshowMediaPlayer(
 
     @property
     def state(self) -> MediaPlayerState:
+        frame_state = self.coordinator.data.get("state", {})
+        if frame_state.get("rendererSuspended") is True:
+            return MediaPlayerState.OFF
         screen_on = remote_status_bool(self.coordinator.data, ["screen", "on"])
         if screen_on is False:
             return MediaPlayerState.OFF
+        playback_state = frame_state.get("playbackState")
+        if playback_state == "paused":
+            return MediaPlayerState.PAUSED
+        if playback_state == "unknown":
+            return MediaPlayerState.IDLE
         return MediaPlayerState.PLAYING
 
     @property
@@ -67,13 +75,15 @@ class ImmichFrameSlideshowMediaPlayer(
         await self._send_command("previous")
 
     async def async_media_play(self) -> None:
-        await self._send_command("play-pause")
+        await self._send_command("play")
 
     async def async_media_pause(self) -> None:
-        await self._send_command("play-pause")
+        await self._send_command("pause")
 
     async def async_media_play_pause(self) -> None:
-        await self._send_command("play-pause")
+        await self._send_command(
+            "pause" if self.state == MediaPlayerState.PLAYING else "play"
+        )
 
     async def async_set_volume_level(self, volume: float) -> None:
         percent = round(max(0, min(1, volume)) * 100)

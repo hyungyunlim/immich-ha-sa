@@ -86,6 +86,7 @@ describe('Home Assistant integration files', () => {
     const binarySensorSource = readFileSync(join(root, 'custom_components/immich_frame/binary_sensor.py'), 'utf8');
     const lightSource = readFileSync(join(root, 'custom_components/immich_frame/light.py'), 'utf8');
     const mediaPlayerSource = readFileSync(join(root, 'custom_components/immich_frame/media_player.py'), 'utf8');
+    const buttonSource = readFileSync(join(root, 'custom_components/immich_frame/button.py'), 'utf8');
     const switchSource = readFileSync(join(root, 'custom_components/immich_frame/switch.py'), 'utf8');
     const remoteStatusSource = readFileSync(join(root, 'custom_components/immich_frame/remote_status.py'), 'utf8');
     const numberSource = readFileSync(join(root, 'custom_components/immich_frame/number.py'), 'utf8');
@@ -106,6 +107,10 @@ describe('Home Assistant integration files', () => {
     expect(mediaPlayerSource).toContain('MediaPlayerEntityFeature.VOLUME_MUTE');
     expect(mediaPlayerSource).toContain('MediaPlayerEntityFeature.VOLUME_SET');
     expect(mediaPlayerSource).toContain('async_media_play_pause');
+    expect(mediaPlayerSource).toContain('_send_command("play")');
+    expect(mediaPlayerSource).toContain('_send_command("pause")');
+    expect(mediaPlayerSource).toContain('playbackState');
+    expect(mediaPlayerSource).toContain('rendererSuspended');
     expect(mediaPlayerSource).toContain('async_mute_volume');
     expect(mediaPlayerSource).toContain('async_set_volume_level');
     expect(mediaPlayerSource).not.toContain('"mute-on" if mute else "mute-off"');
@@ -114,6 +119,10 @@ describe('Home Assistant integration files', () => {
     expect(switchSource).toContain('"remote_screen"');
     expect(switchSource).toContain('"screen-on"');
     expect(switchSource).toContain('"screen-off"');
+    expect(switchSource).toContain('frame_screen_on');
+    expect(buttonSource).toContain('"play", "Play", "play"');
+    expect(buttonSource).toContain('"pause", "Pause", "pause"');
+    expect(buttonSource).toContain('"play_pause", "Play/Pause", "play-pause"');
     expect(switchSource).toContain('"remote_device_mute"');
     expect(switchSource).toContain('"device-mute-toggle"');
     expect(remoteStatusSource).toContain('audio.volume_zero');

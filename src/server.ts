@@ -24,6 +24,7 @@ const REMOTE_BRIGHTNESS_RESTORE_DELAY_MS = 500;
 const REMOTE_REQUEST_TIMEOUT_MS = 7_000;
 const REMOTE_REQUEST_OFFLINE_TIMEOUT_MS = 2_000;
 const REMOTE_VOLUME_STEP = 10;
+const FRAME_COMMAND_ACK_TIMEOUT_MS = 3_000;
 
 export type RemoteAvailability = 'online' | 'offline' | 'unknown';
 
@@ -293,7 +294,16 @@ const DevicePatchSchema = z.object({
 });
 
 const FrameCommandSchema = z.object({
-  command: z.enum(['next', 'previous', 'play-pause', 'reload', 'mute-toggle', 'mute-on', 'mute-off', 'screen-on', 'screen-off', 'volume-up', 'volume-down', 'device-mute-toggle', 'dpad-up']),
+  command: z.enum(['next', 'previous', 'play', 'pause', 'play-pause', 'reload', 'mute-toggle', 'mute-on', 'mute-off', 'screen-on', 'screen-off', 'volume-up', 'volume-down', 'device-mute-toggle', 'dpad-up']),
+});
+
+const FrameCommandAckSchema = z.object({
+  commandId: z.string().uuid(),
+  ackToken: z.string().min(16).max(128),
+  success: z.boolean(),
+  playbackState: z.enum(['playing', 'paused', 'unknown']).optional(),
+  rendererSuspended: z.boolean().optional(),
+  error: z.string().max(500).optional(),
 });
 
 const RemoteLevelSchema = z.object({
@@ -413,6 +423,87 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       ...state,
       kioskVideoMuted: muted,
     }));
+  }
+
+  function updateFrameRuntimeState(
+    deviceId: string,
+    patch: Pick<Partial<FrameState>, 'playbackState' | 'rendererSuspended'>,
+  ): FrameState {
+    const current = store.getFrameState(deviceId);
+    if (!current) {
+      throw new RemoteCommandError('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`, 404);
+    }
+    const changed = Object.entries(patch).some(([key, value]) => current[key as keyof FrameState] !== value);
+    if (!changed) return current;
+    const updated = store.updateFrameState(deviceId, (state) => bumpState({ ...state, ...patch }));
+    events.emitState(deviceId, updated, store.getDevice(deviceId));
+    return updated;
+  }
+
+  function rememberFrameCommandAck(deviceId: string, ack: Awaited<ReturnType<typeof events.waitForCommandAck>>): void {
+    if (!ack?.success) return;
+    if (ack.playbackState === 'playing' || ack.playbackState === 'paused') {
+      updateFrameRuntimeState(deviceId, { playbackState: ack.playbackState });
+    }
+  }
+
+  async function issueFrameCommand(deviceId: string, command: FrameCommand) {
+    const delivery = events.issueCommand(deviceId, command);
+    const ack = delivery.delivered > 0
+      ? await events.waitForCommandAck(delivery.event.commandId, FRAME_COMMAND_ACK_TIMEOUT_MS)
+      : undefined;
+    rememberFrameCommandAck(deviceId, ack);
+    return {
+      connectedClients: delivery.connectedClients,
+      delivered: delivery.delivered,
+      commandId: delivery.event.commandId,
+      acknowledged: Boolean(ack?.success),
+      acknowledgement: ack ?? null,
+    };
+  }
+
+  async function setRendererSuspended(
+    deviceId: string,
+    suspended: boolean,
+  ): Promise<{
+    previous: boolean;
+    state: FrameState;
+    frameEvent: Awaited<ReturnType<typeof issueFrameCommand>>;
+  }> {
+    const current = store.getFrameState(deviceId);
+    if (!current) {
+      throw new RemoteCommandError('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`, 404);
+    }
+    const state = updateFrameRuntimeState(deviceId, { rendererSuspended: suspended });
+    const frameEvent = await issueFrameCommand(
+      deviceId,
+      suspended ? 'renderer-suspend' : 'renderer-resume',
+    );
+    return { previous: current.rendererSuspended, state, frameEvent };
+  }
+
+  function rendererTransitionResult(transition: Awaited<ReturnType<typeof setRendererSuspended>>) {
+    return {
+      previous: transition.previous ? 'suspended' : 'active',
+      current: transition.state.rendererSuspended ? 'suspended' : 'active',
+      frameEvent: transition.frameEvent,
+    };
+  }
+
+  function requireSuccessfulFrameAck(
+    command: FrameCommand,
+    frameEvent: Awaited<ReturnType<typeof issueFrameCommand>>,
+  ): void {
+    if (frameEvent.delivered === 0) return;
+    if (frameEvent.acknowledgement?.success) return;
+    const timedOut = frameEvent.acknowledgement === null;
+    throw new RemoteCommandError(
+      timedOut ? 'FRAME_COMMAND_ACK_TIMEOUT' : 'FRAME_COMMAND_REJECTED',
+      timedOut
+        ? `The connected frame did not acknowledge ${command} within ${FRAME_COMMAND_ACK_TIMEOUT_MS} ms.`
+        : frameEvent.acknowledgement?.error ?? `The connected frame rejected ${command}.`,
+      timedOut ? 504 : 409,
+    );
   }
 
   function writeTelemetryEvent(reply: FastifyReply, event: string, data: unknown): boolean {
@@ -960,6 +1051,8 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           showProgressBar: frameState?.showProgressBar,
           showVideos: frameState?.showVideos,
           kioskVideoMuted: frameState?.kioskVideoMuted,
+          playbackState: frameState?.playbackState,
+          rendererSuspended: frameState?.rendererSuspended,
           excludeVideosOver: frameState?.excludeVideosOver,
           showArchived: frameState?.showArchived,
           showImageRating: frameState?.showImageRating,
@@ -1342,6 +1435,25 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return ok(resolved, { version: resolved.version, updatedAt: resolved.updatedAt });
   });
 
+  app.post('/api/frame/:deviceId/commands/ack', async (request, reply) => {
+    const { deviceId } = request.params as { deviceId: string };
+    if (!store.getDevice(deviceId)) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
+    const parsed = FrameCommandAckSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid frame command acknowledgement.'));
+      return;
+    }
+    const ack = events.acknowledgeCommand(deviceId, parsed.data);
+    if (!ack) {
+      reply.status(404).send(fail('FRAME_COMMAND_NOT_PENDING', 'The command is no longer pending or the acknowledgement token is invalid.'));
+      return;
+    }
+    return ok(ack);
+  });
+
   app.post('/api/frames/:deviceId/command', async (request, reply) => {
     if (!auth.requireMutationAuth(request, reply)) return;
     const { deviceId } = request.params as { deviceId: string };
@@ -1376,18 +1488,31 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     }
 
     if (commandUsesFrameEvents(parsed.data.command)) {
-      const delivered = events.emitCommand(deviceId, {
-        command: parsed.data.command,
-        issuedAt: new Date().toISOString(),
-      });
-      const frameEvent = {
-        connectedClients: events.connectedClientCount(deviceId),
-        delivered,
-      };
-      if (delivered === 0 && remoteCommandPathAvailable(device, parsed.data.command)) {
+      const frameEvent = await issueFrameCommand(deviceId, parsed.data.command);
+      if (frameEvent.delivered > 0) {
+        try {
+          requireSuccessfulFrameAck(parsed.data.command, frameEvent);
+        } catch (error) {
+          const remoteError = error instanceof RemoteCommandError
+            ? error
+            : new RemoteCommandError('FRAME_COMMAND_FAILED', error instanceof Error ? error.message : String(error));
+          reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
+          return;
+        }
+        rememberKioskVideoMuteCommand(deviceId, parsed.data.command);
+        return ok({
+          command: parsed.data.command,
+          frameEvent,
+          remoteFallback: null,
+        });
+      }
+      if (remoteCommandPathAvailable(device, parsed.data.command)) {
         try {
           const remoteFallback = await dispatchRemoteCommand(device, parsed.data.command);
           rememberKioskVideoMuteCommand(deviceId, parsed.data.command);
+          if (parsed.data.command === 'play' || parsed.data.command === 'pause' || parsed.data.command === 'play-pause') {
+            updateFrameRuntimeState(deviceId, { playbackState: 'unknown' });
+          }
           return ok({
             command: parsed.data.command,
             frameEvent,
@@ -1401,24 +1526,23 @@ export function createServer(deps: ServerDeps): FastifyInstance {
           return;
         }
       }
-      if (delivered === 0 && kioskVideoMutedForCommand(parsed.data.command) !== undefined) {
-        reply.status(409).send(fail(
-          'FRAME_COMMAND_UNDELIVERED',
-          'No connected frame browser or FreeKiosk remote path is available to set kiosk video mute state.',
-        ));
-        return;
-      }
-      rememberKioskVideoMuteCommand(deviceId, parsed.data.command);
-      return ok({
-        command: parsed.data.command,
-        frameEvent,
-        remoteFallback: null,
-      });
+      reply.status(409).send(fail(
+        'FRAME_COMMAND_UNDELIVERED',
+        `No connected frame browser or FreeKiosk remote path is available to execute ${parsed.data.command}.`,
+      ));
+      return;
     }
+    let rendererSuspend: Awaited<ReturnType<typeof setRendererSuspended>> | undefined;
+    let screenOffDispatchStarted = false;
     try {
+      if (parsed.data.command === 'screen-off') {
+        rendererSuspend = await setRendererSuspended(deviceId, true);
+        requireSuccessfulFrameAck('renderer-suspend', rendererSuspend.frameEvent);
+      }
       const screenOffPreparation = parsed.data.command === 'screen-off'
         ? await prepareScreenOff(device)
         : undefined;
+      screenOffDispatchStarted = parsed.data.command === 'screen-off';
       const result = await dispatchRemoteCommand(device, parsed.data.command);
       app.log.info({
         deviceId,
@@ -1428,16 +1552,36 @@ export function createServer(deps: ServerDeps): FastifyInstance {
         screenOffPreparation,
       }, 'FreeKiosk command completed');
       if (parsed.data.command === 'screen-on') {
+        updateFrameRuntimeState(deviceId, { playbackState: 'playing' });
+        const rendererResume = await setRendererSuspended(deviceId, false);
+        requireSuccessfulFrameAck('renderer-resume', rendererResume.frameEvent);
         return ok({
           ...result,
+          rendererResume: rendererTransitionResult(rendererResume),
           brightnessRestore: await restoreBrightnessAfterScreenOn(deviceId),
         });
       }
-      return ok(screenOffPreparation ? { ...result, ...screenOffPreparation } : result);
+      return ok(screenOffPreparation
+        ? {
+            ...result,
+            ...screenOffPreparation,
+            rendererSuspend: rendererSuspend ? rendererTransitionResult(rendererSuspend) : undefined,
+          }
+        : result);
     } catch (error) {
       const remoteError = error instanceof RemoteCommandError
         ? error
         : new RemoteCommandError('REMOTE_COMMAND_FAILED', error instanceof Error ? error.message : String(error));
+      const shouldRollbackSuspend = rendererSuspend
+        && !rendererSuspend.previous
+        && (
+          !screenOffDispatchStarted
+          || remoteError.code === 'REMOTE_NOT_CONFIGURED'
+          || remoteError.responseReceived
+        );
+      if (shouldRollbackSuspend) {
+        updateFrameRuntimeState(deviceId, { rendererSuspended: false });
+      }
       reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
     }
   });
@@ -2107,6 +2251,8 @@ function commandIsIdempotent(command: FrameCommand): boolean {
   return command === 'screen-on'
     || command === 'screen-off'
     || command === 'reload'
+    || command === 'play'
+    || command === 'pause'
     || command === 'mute-on'
     || command === 'mute-off';
 }
@@ -2128,6 +2274,8 @@ function freeKioskMqttCommandPublication(
   switch (command) {
     case 'next':
     case 'previous':
+    case 'play':
+    case 'pause':
     case 'play-pause':
     case 'mute-toggle':
     case 'mute-on':
@@ -2143,6 +2291,9 @@ function freeKioskMqttCommandPublication(
       return { suffix: 'screen', payload: 'ON' };
     case 'screen-off':
       return { suffix: 'screen', payload: 'OFF' };
+    case 'renderer-suspend':
+    case 'renderer-resume':
+      return undefined;
     case 'volume-up':
     case 'volume-down': {
       const volume = remoteVolumeValue(cachedState);
@@ -2216,9 +2367,12 @@ async function sendRemoteCommand(
 
   const endpoint = freeKioskEndpoint(command);
   if (!endpoint) {
+    const playbackCommand = command === 'play' || command === 'pause';
     throw new RemoteCommandError(
-      'REMOTE_EXPLICIT_MUTE_UNAVAILABLE',
-      'FreeKiosk JavaScript execution is required to set immich-kiosk video mute state.',
+      playbackCommand ? 'REMOTE_EXPLICIT_PLAYBACK_UNAVAILABLE' : 'REMOTE_EXPLICIT_MUTE_UNAVAILABLE',
+      playbackCommand
+        ? 'FreeKiosk JavaScript execution is required to set an explicit immich-kiosk playback state.'
+        : 'FreeKiosk JavaScript execution is required to set immich-kiosk video mute state.',
     );
   }
   const remote = await sendRemoteRequest(device, endpoint, { method: 'POST', timeoutMs });
@@ -2407,6 +2561,8 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
   if (
     command !== 'next'
     && command !== 'previous'
+    && command !== 'play'
+    && command !== 'pause'
     && command !== 'play-pause'
     && command !== 'mute-toggle'
     && command !== 'mute-on'
@@ -2502,6 +2658,21 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     if (command === 'mute-off') return applyMutedState(false);
     return false;
   }
+  function readPlaybackState() {
+    var doc = targetDocument();
+    if (!doc || !doc.body) return 'unknown';
+    return doc.body.classList.contains('polling-paused') ? 'paused' : 'playing';
+  }
+  function setPlaybackState(target) {
+    var current = readPlaybackState();
+    if (current === target) return true;
+    if (current === 'unknown') return false;
+    var doc = targetDocument();
+    var control = doc && doc.querySelector('.navigation--play-pause');
+    if (control && typeof control.click === 'function') control.click();
+    if (readPlaybackState() === target) return true;
+    return dispatchKey(target === 'paused' ? 'pause' : 'play') && readPlaybackState() === target;
+  }
   function triggerKioskApi() {
     var win = iframeWindow();
     try {
@@ -2528,6 +2699,7 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     var selector = null;
     if (command === 'next') selector = '.navigation--next-asset, [aria-label="Next"], [title="Next"]';
     if (command === 'previous') selector = '.navigation--prev-asset, [aria-label="Previous"], [title="Previous"]';
+    if (command === 'play-pause') selector = '.navigation--play-pause, [aria-label="Play"], [aria-label="Pause"], [title="Play/Pause"]';
     if (command === 'mute-toggle') selector = '.navigation--mute, [aria-label="Mute"], [aria-label="Unmute"], [title="Mute"], [title="Unmute"], .mute, .unmute';
     if (!selector) return false;
     var control = doc.querySelector(selector);
@@ -2542,6 +2714,8 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     var map = {
       next: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
       previous: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
+      play: { key: 'P', code: 'KeyP', keyCode: 80, shiftKey: true },
+      pause: { key: 'p', code: 'KeyP', keyCode: 80, shiftKey: false },
       'play-pause': { key: ' ', code: 'Space', keyCode: 32 },
       'mute-toggle': { key: 'ArrowUp', code: 'ArrowUp', keyCode: 38 }
     };
@@ -2554,6 +2728,7 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
       code: target.code,
       keyCode: target.keyCode,
       which: target.keyCode,
+      shiftKey: Boolean(target.shiftKey),
       bubbles: true,
       cancelable: true
     };
@@ -2566,6 +2741,8 @@ function freeKioskJavaScriptCommand(command: FrameCommand): string | null {
     });
     return true;
   }
+  if (command === 'play') return callController() || setPlaybackState('playing');
+  if (command === 'pause') return callController() || setPlaybackState('paused');
   if (command === 'mute-on' || command === 'mute-off') return callController() || setExplicitMute();
   if (command === 'mute-toggle') return toggleMutedWithApi() || clickControl() || toggleMutedDirectly() || dispatchKey();
   return callController() || triggerKioskApi() || clickControl() || dispatchKey();
@@ -2783,6 +2960,9 @@ function freeKioskEndpoint(command: FrameCommand): string | null {
       return '/api/remote/right';
     case 'previous':
       return '/api/remote/left';
+    case 'play':
+    case 'pause':
+      return null;
     case 'play-pause':
       return '/api/remote/playpause';
     case 'reload':
@@ -2791,6 +2971,8 @@ function freeKioskEndpoint(command: FrameCommand): string | null {
       return '/api/remote/up';
     case 'mute-on':
     case 'mute-off':
+    case 'renderer-suspend':
+    case 'renderer-resume':
       return null;
     case 'screen-on':
       return '/api/screen/on';
@@ -2810,6 +2992,8 @@ function freeKioskEndpoint(command: FrameCommand): string | null {
 function commandUsesFrameEvents(command: FrameCommand): boolean {
   return command === 'next'
     || command === 'previous'
+    || command === 'play'
+    || command === 'pause'
     || command === 'play-pause'
     || command === 'reload'
     || command === 'mute-toggle'

@@ -80,13 +80,15 @@ MQTT 없이(REST 전용 프레임)는 통합이 계속 30초 폴링합니다 —
 
 버튼:
 
-- **Next**, **Previous**, **Play/Pause**, **Reload**
+- **Next**, **Previous**, **Play**, **Pause**, **Play/Pause**, **Reload**
 - **Screen On**, **Screen Off**
 - **Volume Up**, **Volume Down**, **Device Mute Toggle**
 
 ## 명령 전달 방식
 
-Next, Previous, Play/Pause, Reload는 컨트롤러 이벤트 스트림으로 고정 프레임 페이지에 전달된 뒤 same-origin immich-kiosk iframe으로 브리지됩니다. 프레임 브라우저가 연결되어 있지 않으면 FreeKiosk 디바이스 경로로 폴백합니다.
+Next, Previous, Play, Pause, Play/Pause, Reload는 컨트롤러 이벤트 스트림으로 고정 프레임 페이지에 전달된 뒤 same-origin immich-kiosk iframe으로 브리지됩니다. 프레임 페이지는 명령을 실제로 적용한 뒤 성공/실패와 재생 상태를 컨트롤러에 응답합니다. 연결된 브라우저가 응답하지 않거나 명령을 적용하지 못하면 성공으로 처리하지 않습니다. 프레임 브라우저가 연결되어 있지 않으면 FreeKiosk 디바이스 경로로 폴백합니다.
+
+**Screen Off**는 FreeKiosk의 물리 화면만 끄지 않습니다. 먼저 프레임 페이지에서 immich-kiosk iframe을 완전히 분리해 이미지 가져오기와 슬라이드쇼 타이머를 중단하고, 그다음 밝기·음소거 준비와 물리 화면 끄기를 실행합니다. **Screen On**은 물리 화면을 켠 뒤 iframe을 새로 만들고 슬라이드쇼를 재생 상태로 시작합니다. 따라서 화면이 꺼진 동안 NAS와 Immich 서버에 다음 이미지를 계속 요청하지 않습니다.
 
 화면, 밝기, 볼륨 제어는 FreeKiosk 디바이스로 직접 갑니다. **컨트롤러는 디바이스에 도달 가능하면 항상 REST API를 우선합니다** (수동 Remote API URL, 또는 프레임 텔레메트리에서 검증된 FreeKiosk IP). REST는 명령이 실제로 실행됐음을 확인해 주고, 디바이스 측 MQTT 명령 결함을 피할 수 있기 때문입니다. MQTT로 명령을 보내는 경우는 컨트롤러가 도달 가능한 REST 엔드포인트가 없을 때 — broker를 통해서만 닿는 원격 프레임 — 또는 REST 시도가 재시도해도 안전한 방식으로 실패했을 때(화면 on/off와 reload는 MQTT로 재시도, 상대 볼륨 스텝과 음소거 토글은 이중 적용 방지를 위해 재시도 안 함)뿐입니다. 자동 밝기 제어는 REST 전용입니다.
 
@@ -95,6 +97,12 @@ Next, Previous, Play/Pause, Reload는 컨트롤러 이벤트 스트림으로 고
 
 ::: warning 내비게이션을 켜두세요
 Next/Previous 버튼을 쓰려면 프레임의 `disableNavigation` 렌더러 옵션을 **꺼두세요**. immich-kiosk의 `disable_navigation`은 터치, 키보드, 메뉴 내비게이션을 모두 차단하므로, 켜져 있으면 브리지된 명령이 무시됩니다.
+:::
+
+**Previous**는 immich-kiosk 히스토리에 이전 자산이 있을 때만 성공합니다. 첫 사진 직후처럼 돌아갈 기록이 없으면 컨트롤러가 실패를 반환합니다. **Play**와 **Pause**는 토글을 추측하지 않고 현재 `polling-paused` 상태를 확인한 뒤 필요한 동작만 적용합니다. 기존 자동화 호환성을 위해 **Play/Pause** 토글 버튼도 유지됩니다.
+
+::: tip 0.1.85로 업데이트한 직후
+이미 열려 있던 프레임 페이지에는 이전 명령 브리지가 남아 있을 수 있습니다. 컨트롤러와 통합을 업데이트한 뒤 FreeKiosk 페이지를 한 번 새로고침하거나 앱을 재시작하세요. 이후 업데이트 없이 반복할 필요는 없습니다.
 :::
 
 ## 오디오: 기기 음소거 vs 비디오 음소거

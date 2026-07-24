@@ -23,6 +23,16 @@ def remote_status_bool(data: dict[str, Any], path: list[str]) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+def frame_screen_on(data: dict[str, Any]) -> bool | None:
+    suspended = (data.get("state") or {}).get("rendererSuspended")
+    if suspended is True:
+        return False
+    remote = remote_status_bool(data, ["screen", "on"])
+    if remote is not None:
+        return remote
+    return not suspended if isinstance(suspended, bool) else None
+
+
 def remote_status_number(data: dict[str, Any], path: list[str]) -> float | None:
     value = remote_status_value(data, path)
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None

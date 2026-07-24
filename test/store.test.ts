@@ -30,14 +30,20 @@ describe('JsonStore', () => {
 
     const first = new JsonStore(path, device);
     expect(first.getFrameState('lenovo')?.disableNavigation).toBe(false);
+    expect(first.getFrameState('lenovo')?.rendererSuspended).toBe(false);
+    expect(first.getFrameState('lenovo')?.playbackState).toBe('playing');
     first.updateFrameState('lenovo', (state) => ({
       ...state,
       activeAlbumIds: ['album-1'],
+      rendererSuspended: true,
+      playbackState: 'paused',
       version: state.version + 1,
     }));
 
     const second = new JsonStore(path, device);
     expect(second.getFrameState('lenovo')?.activeAlbumIds).toEqual(['album-1']);
+    expect(second.getFrameState('lenovo')?.rendererSuspended).toBe(true);
+    expect(second.getFrameState('lenovo')?.playbackState).toBe('paused');
   });
 
   it('backfills required device URLs from defaults for old store data', () => {
@@ -77,6 +83,8 @@ describe('JsonStore', () => {
     expect(store.getDevice('lenovo')?.localKioskBaseUrl).toBe('http://10.0.0.10:3000');
     expect(store.getFrameState('lenovo')?.deviceId).toBe('lenovo');
     expect(store.getFrameState('lenovo')?.customCssClass).toBe('');
+    expect(store.getFrameState('lenovo')?.rendererSuspended).toBe(false);
+    expect(store.getFrameState('lenovo')?.playbackState).toBe('playing');
     expect(store.getProfile('gallery')?.customCssClass).toBe('');
     expect(store.getPersonCache()).toEqual({ items: [], stale: true });
   });

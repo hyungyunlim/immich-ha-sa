@@ -1,5 +1,13 @@
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { FastifyReply } from 'fastify';
-import type { FrameCommandEvent, FrameDevice, FrameState, ResolvedFrameState } from './types.js';
+import type {
+  FrameCommand,
+  FrameCommandAck,
+  FrameCommandEvent,
+  FrameDevice,
+  FrameState,
+  ResolvedFrameState,
+} from './types.js';
 import { buildProxiedRendererUrl, controllerBaseUrlForContext, type RequestContext } from './rendererUrl.js';
 
 interface SseClient {
@@ -9,8 +17,32 @@ interface SseClient {
   globalKioskPassword?: string;
 }
 
+interface PendingFrameCommand {
+  deviceId: string;
+  ackToken: string;
+  ack?: FrameCommandAck;
+  waiters: Set<(ack: FrameCommandAck | undefined) => void>;
+  expiresAt: NodeJS.Timeout;
+}
+
+export interface FrameCommandDelivery {
+  event: FrameCommandEvent;
+  connectedClients: number;
+  delivered: number;
+}
+
+export interface FrameCommandAckInput {
+  commandId: string;
+  ackToken: string;
+  success: boolean;
+  playbackState?: FrameCommandAck['playbackState'];
+  rendererSuspended?: boolean;
+  error?: string;
+}
+
 export class FrameEventHub {
   private readonly clients = new Map<string, Set<SseClient>>();
+  private readonly pendingCommands = new Map<string, PendingFrameCommand>();
 
   connectedClientCount(deviceId: string): number {
     return this.clients.get(deviceId)?.size ?? 0;
@@ -59,19 +91,79 @@ export class FrameEventHub {
     }
   }
 
-  emitCommand(deviceId: string, event: FrameCommandEvent): number {
+  issueCommand(deviceId: string, command: FrameCommand): FrameCommandDelivery {
+    const event: FrameCommandEvent = {
+      command,
+      commandId: randomUUID(),
+      ackToken: randomBytes(24).toString('base64url'),
+      issuedAt: new Date().toISOString(),
+    };
     const clients = this.clients.get(deviceId);
-    if (!clients) return 0;
+    const connectedClients = clients?.size ?? 0;
     let delivered = 0;
-    for (const client of clients) {
-      try {
-        this.send(client, 'command', event);
-        delivered += 1;
-      } catch {
-        clients.delete(client);
+    if (clients) {
+      for (const client of clients) {
+        try {
+          this.send(client, 'command', event);
+          delivered += 1;
+        } catch {
+          clients.delete(client);
+        }
       }
     }
-    return delivered;
+    if (delivered > 0) {
+      const expiresAt = setTimeout(() => {
+        const pending = this.pendingCommands.get(event.commandId);
+        if (!pending) return;
+        this.pendingCommands.delete(event.commandId);
+        for (const waiter of pending.waiters) waiter(undefined);
+      }, 30_000);
+      expiresAt.unref();
+      this.pendingCommands.set(event.commandId, {
+        deviceId,
+        ackToken: event.ackToken,
+        waiters: new Set(),
+        expiresAt,
+      });
+    }
+    return { event, connectedClients, delivered };
+  }
+
+  acknowledgeCommand(deviceId: string, input: FrameCommandAckInput): FrameCommandAck | undefined {
+    const pending = this.pendingCommands.get(input.commandId);
+    if (!pending || pending.deviceId !== deviceId || pending.ackToken !== input.ackToken) return undefined;
+    const ack: FrameCommandAck = {
+      commandId: input.commandId,
+      success: input.success,
+      acknowledgedAt: new Date().toISOString(),
+      playbackState: input.playbackState,
+      rendererSuspended: input.rendererSuspended,
+      error: input.error,
+    };
+    pending.ack = ack;
+    for (const waiter of pending.waiters) waiter(ack);
+    return ack;
+  }
+
+  waitForCommandAck(commandId: string, timeoutMs: number): Promise<FrameCommandAck | undefined> {
+    const pending = this.pendingCommands.get(commandId);
+    if (!pending) return Promise.resolve(undefined);
+    if (pending.ack) {
+      this.finishPendingCommand(commandId, pending);
+      return Promise.resolve(pending.ack);
+    }
+    return new Promise((resolve) => {
+      let timeout: NodeJS.Timeout;
+      const finish = (ack: FrameCommandAck | undefined): void => {
+        clearTimeout(timeout);
+        pending.waiters.delete(finish);
+        this.finishPendingCommand(commandId, pending);
+        resolve(ack);
+      };
+      pending.waiters.add(finish);
+      timeout = setTimeout(() => finish(undefined), timeoutMs);
+      timeout.unref();
+    });
   }
 
   heartbeat(): void {
@@ -85,6 +177,12 @@ export class FrameEventHub {
   private send(client: SseClient, event: string, data: ResolvedFrameState | { at: string } | FrameCommandEvent): void {
     client.reply.raw.write(`event: ${event}\n`);
     client.reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+  }
+
+  private finishPendingCommand(commandId: string, pending: PendingFrameCommand): void {
+    if (this.pendingCommands.get(commandId) !== pending) return;
+    clearTimeout(pending.expiresAt);
+    this.pendingCommands.delete(commandId);
   }
 }
 
