@@ -101,7 +101,7 @@ Keep the frame's `disableNavigation` renderer option **off** when using the next
 
 **Previous** succeeds only when immich-kiosk has an earlier asset in its history; immediately after the first slide there may be nothing to return to. **Play** and **Pause** inspect the current `polling-paused` state and apply only the needed transition instead of guessing a toggle state. The **Play/Pause** toggle remains available for backward compatibility with existing automations.
 
-::: tip Immediately after updating to 0.1.85
+::: tip Immediately after updating to 0.1.86
 An already-open frame page may still have the previous command bridge in memory. After updating the controller and integration, refresh the FreeKiosk page once or restart the app. You do not need to repeat this unless another release explicitly asks for it.
 :::
 

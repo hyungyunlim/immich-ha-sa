@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.86
+
+- Send frame command acknowledgements with `XMLHttpRequest`, with a plain Fetch fallback, so older Android WebViews can confirm Play, Pause, Previous, and renderer suspend/resume commands.
+
 ## 0.1.85
 
 - Stop Immich/NAS image traffic while a frame is off by unmounting the immich-kiosk iframe before FreeKiosk screen-off, then recreate it after screen-on.

@@ -22,7 +22,7 @@ Previous also needs an earlier asset in immich-kiosk's history. A failure is exp
 
 ## The NAS is still active after turning off the screen
 
-Update both the controller and Home Assistant integration to **0.1.85 or newer**. Starting with this version, Screen Off unmounts the entire immich-kiosk iframe before turning off the physical display, stopping image requests and slideshow timers. FreeKiosk's own Screen Off or sleep feature alone may leave WebView JavaScript running, so use this integration's **Screen** switch or **Screen Off** button in automations.
+Update both the controller and Home Assistant integration to **0.1.86 or newer**. Starting with this version, Screen Off unmounts the entire immich-kiosk iframe before turning off the physical display, stopping image requests and slideshow timers. FreeKiosk's own Screen Off or sleep feature alone may leave WebView JavaScript running, so use this integration's **Screen** switch or **Screen Off** button in automations.
 
 ## Wrong or unwanted weather location
 

@@ -22,7 +22,7 @@ Previous는 이전 사진 히스토리가 있어야 동작합니다. 프레임�
 
 ## 화면을 껐는데 NAS 디스크가 계속 동작해요
 
-컨트롤러와 Home Assistant 통합을 **0.1.85 이상**으로 함께 업데이트하세요. 이 버전부터 Screen Off가 물리 화면을 끄기 전에 immich-kiosk iframe을 완전히 분리해 이미지 요청과 슬라이드쇼 타이머를 멈춥니다. FreeKiosk 자체의 Screen Off나 절전 기능만 단독으로 사용하면 WebView의 자바스크립트는 계속 실행될 수 있으므로, 자동화에서도 이 통합의 **Screen** 스위치나 **Screen Off** 버튼을 사용하세요.
+컨트롤러와 Home Assistant 통합을 **0.1.86 이상**으로 함께 업데이트하세요. 이 버전부터 Screen Off가 물리 화면을 끄기 전에 immich-kiosk iframe을 완전히 분리해 이미지 요청과 슬라이드쇼 타이머를 멈춥니다. FreeKiosk 자체의 Screen Off나 절전 기능만 단독으로 사용하면 WebView의 자바스크립트는 계속 실행될 수 있으므로, 자동화에서도 이 통합의 **Screen** 스위치나 **Screen Off** 버튼을 사용하세요.
 
 ## 날씨 위치가 이상하거나 원치 않게 표시돼요
 

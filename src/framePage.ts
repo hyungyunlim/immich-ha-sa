@@ -379,13 +379,22 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
           rendererSuspended: rendererSuspended
         };
         if (error) body.error = String(error);
-        fetch(ackUrl, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(body),
-          cache: 'no-store',
-          keepalive: true
-        }).catch(function () {});
+        var serialized = JSON.stringify(body);
+        try {
+          var request = new XMLHttpRequest();
+          request.open('POST', ackUrl, true);
+          request.setRequestHeader('content-type', 'application/json');
+          request.send(serialized);
+          return;
+        } catch (xhrError) {}
+        try {
+          fetch(ackUrl, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: serialized,
+            cache: 'no-store'
+          }).catch(function () {});
+        } catch (fetchError) {}
       }
 
       window.__immichFrameCommand = function (command, payload) {

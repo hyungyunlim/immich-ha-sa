@@ -34,6 +34,8 @@ describe('frame page', () => {
     expect(html).toContain('/commands/ack');
     expect(html).toContain('ackToken: payload.ackToken');
     expect(html).toContain('rendererSuspended: rendererSuspended');
+    expect(html).toContain("request.open('POST', ackUrl, true)");
+    expect(html).not.toContain('keepalive: true');
   });
 
   it('supports explicit play and pause commands with state verification', () => {
