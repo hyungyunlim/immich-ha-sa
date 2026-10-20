@@ -622,12 +622,18 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         });
       }
 
-      function displayItems() {
+      function noticeItems() {
+        var now = Date.now();
+        return notices
+          .filter(function (notice) { return !notice.until || Date.parse(notice.until) > now; })
+          .map(function (notice) { return { key: 'n' + notice.id + notice.text, text: notice.text }; });
+      }
+
+      // The next few events that have not ended, with a day chip and a time
+      function eventItems() {
         var now = new Date();
         var words = agendaWordsFor();
-        var list = notices
-          .filter(function (notice) { return !notice.until || Date.parse(notice.until) > now.getTime(); })
-          .map(function (notice) { return { key: 'n' + notice.id + notice.text, text: notice.text }; });
+        var list = [];
         agenda.items
           .filter(function (item) { return eventEnd(item).getTime() > now.getTime(); })
           .slice(0, 5)
@@ -689,7 +695,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
             + (weekday === 0 ? ' sun' : weekday === 6 ? ' sat' : '') + '"><b>' + d + '</b></span>');
         }
         // Under "Today's events" today's items need only their time; later days keep their day chip
-        var rows = displayItems().slice(0, 5).map(function (item) {
+        var rows = eventItems().map(function (item) {
           return '<div class="row">'
             + (item.chip && !item.today ? '<span class="chip">' + escapeText(item.chip) + '</span>' : '')
             + (item.chip ? '<span class="time">' + escapeText(item.time) + '</span>' : '')
@@ -706,17 +712,18 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         widgetEl.className = 'show';
       }
 
-      // Rotates through the items in the pill (fading out before swapping), or keeps the widget current.
+      // Keeps the widget current and rotates the pill (fading out before swapping). With the widget on, the
+      // pill carries only notices and sits just above the widget; without it, events take turns too.
       function showNextNotice() {
         if (!agendaLoaded) return;
         if (agenda.widget) {
-          noticeEl.className = ''; // notices are listed in the widget instead
-          noticeKey = '';
           renderWidget();
-          return;
+          noticeEl.style.bottom = 'calc(12.5vmin + ' + widgetEl.offsetHeight + 'px)';
+        } else {
+          widgetEl.className = '';
+          noticeEl.style.bottom = '';
         }
-        widgetEl.className = '';
-        var items = displayItems();
+        var items = noticeItems().concat(agenda.widget ? [] : eventItems());
         if (!items.length) {
           noticeEl.className = '';
           noticeKey = '';

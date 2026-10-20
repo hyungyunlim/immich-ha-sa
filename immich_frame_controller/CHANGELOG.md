@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.99
+
+- With the calendar widget on, notices keep their own pill again, placed just above the widget so the two never overlap; the widget lists only calendar events.
+- Includes 0.1.98: a lighter, slightly less transparent widget card.
+- Reload the frames so they pick up the new frame page; update the integration for the new hint text in the Calendar tab.
+
 ## 0.1.98
 
 - The calendar widget card is a lighter charcoal and slightly less transparent.

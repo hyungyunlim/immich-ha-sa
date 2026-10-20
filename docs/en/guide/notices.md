@@ -24,7 +24,7 @@ The **Calendar** tab of the **Frames** panel shows upcoming events from Home Ass
 
 ### Calendar widget
 
-Turn on **Show as a calendar widget** to replace the pill with a small, quiet card near the bottom of the frame: this month's calendar with today circled and a dot on days with events, next to a *Today's events* list of the notices and next events (today's events show their time; later ones also show their day). It works without any calendar ticked too, as a month calendar with the notices. Turn it off to go back to the pill.
+Turn on **Show as a calendar widget** to replace the pill with a small, quiet card near the bottom of the frame: this month's calendar with today circled and a dot on days with events, next to a *Today's events* list of the next events (today's events show their time; later ones also show their day). Notices keep their own pill, just above the card. It works without any calendar ticked too, as a month calendar. Turn it off and events take turns with the notices in the pill again.
 
 The integration rereads the calendars every 15 minutes and right after you save. Frames show the next five events that have not ended, after the notices, with today's events marked in amber. Events in two subscribed copies of the same calendar show once.
 
