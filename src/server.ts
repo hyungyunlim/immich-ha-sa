@@ -16,7 +16,7 @@ import { FreeKioskMqttBridge, type FreeKioskMqttSnapshot } from './mqttClient.js
 import { buildProxiedRendererUrl, buildRendererUrl, controllerBaseUrlForContext } from './rendererUrl.js';
 import { renderSetupBlockedPage, renderSetupPage } from './setupPage.js';
 import { JsonStore } from './store.js';
-import type { AlbumCache, FrameClaim, FrameCommand, FrameDevice, FrameNotice, FrameState, PersonCache } from './types.js';
+import type { AgendaItem, AlbumCache, FrameClaim, FrameCommand, FrameDevice, FrameNotice, FrameState, PersonCache } from './types.js';
 
 const REMOTE_DISCOVERY_RETRY_MS = 30_000;
 const REMOTE_DISCOVERY_TIMEOUT_MS = 1_500;
@@ -302,11 +302,27 @@ const MicStreamToggleSchema = z.object({
   notify: z.boolean().optional(),
 }).refine((value) => value.enabled !== undefined || value.notify !== undefined, 'Set enabled or notify.');
 
+const AgendaSchema = z.object({
+  items: z.array(z.object({
+    title: z.string().trim().min(1).max(140),
+    start: z.string().min(10).max(40),
+    end: z.string().min(10).max(40).optional(),
+    allDay: z.boolean(),
+  })).max(100),
+  deviceIds: z.array(z.string().min(1)).max(50),
+  locale: z.string().min(2).max(10).default('en'),
+});
 const NoticeCreateSchema = z.object({
   text: z.string().trim().min(1).max(140),
   deviceIds: z.array(z.string().min(1)).max(50).optional(),
   until: z.string().datetime({ offset: true }).optional(),
 });
+type IceServer = { urls: string | string[]; username?: string; credential?: string };
+// Public STUN lets many calls from outside connect directly even without a TURN key
+const DEFAULT_ICE_SERVERS: IceServer[] = [{ urls: 'stun:stun.cloudflare.com:3478' }];
+const TURN_TTL_SECONDS = 12 * 3600;
+const TURN_MIN_REMAINING_MS = 4 * 3600 * 1000; // hand out credentials that outlast any call
+
 const CallOfferSchema = z.object({ sdp: z.string().startsWith('v=0').max(20000) });
 const FrameAudioPlaySchema = z.object({
   url: z.string().url().refine((value) => /^https?:\/\//i.test(value), 'Use an http(s) URL the frame can reach.'),
@@ -1818,6 +1834,40 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return ok({ items: noticesForFrame(deviceId) });
   });
 
+  // Calendar agenda: Home Assistant pushes upcoming events and the frames that should show them.
+  app.get('/api/agenda', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    return ok(store.getAgenda());
+  });
+
+  app.put('/api/agenda', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const parsed = AgendaSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid agenda.'));
+      return;
+    }
+    const agenda = store.setAgenda({ ...parsed.data, updatedAt: new Date().toISOString() });
+    for (const deviceId of Object.keys(store.getData().devices)) {
+      events.emitAgenda(deviceId, agendaForFrame(deviceId));
+    }
+    return ok(agenda);
+  });
+
+  app.get('/api/frame/:deviceId/agenda', async (request, reply) => {
+    const { deviceId } = request.params as { deviceId: string };
+    if (!store.getDevice(deviceId)) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
+    return ok(agendaForFrame(deviceId));
+  });
+
+  function agendaForFrame(deviceId: string): { items: AgendaItem[]; locale: string } {
+    const agenda = store.getAgenda();
+    return { items: agenda.deviceIds.includes(deviceId) ? agenda.items : [], locale: agenda.locale };
+  }
+
   function noticesForFrame(deviceId: string): Array<Pick<FrameNotice, 'id' | 'text' | 'until'>> {
     return store.getNotices()
       .filter((notice) => notice.deviceIds.length === 0 || notice.deviceIds.includes(deviceId))
@@ -1830,6 +1880,42 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     }
   }
 
+  // ICE servers for a call: Cloudflare STUN, plus short-lived Cloudflare TURN credentials when a key is set.
+  let turnCache: { servers: IceServer[]; expiresAt: number } | undefined;
+  async function callIceServers(): Promise<IceServer[]> {
+    const turn = deps.config.turn;
+    if (!turn) return DEFAULT_ICE_SERVERS;
+    if (turnCache && turnCache.expiresAt - Date.now() > TURN_MIN_REMAINING_MS) return turnCache.servers;
+    try {
+      const response = await fetch(
+        `${turn.apiBaseUrl}/v1/turn/keys/${encodeURIComponent(turn.keyId)}/credentials/generate-ice-servers`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${turn.apiToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ttl: TURN_TTL_SECONDS }),
+          signal: AbortSignal.timeout(5000),
+        },
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const body = await response.json() as { iceServers?: IceServer[] };
+      // Without trickle ICE, a browser would wait out port 53, which it blocks
+      const servers = (body.iceServers ?? [])
+        .map((server) => ({ ...server, urls: [server.urls].flat().filter((url) => !/:53(\?|$)/.test(url)) }))
+        .filter((server) => server.urls.length > 0);
+      if (servers.length === 0) throw new Error('no ICE servers in the response');
+      turnCache = { servers, expiresAt: Date.now() + TURN_TTL_SECONDS * 1000 };
+      return servers;
+    } catch (error) {
+      app.log.warn({ err: error }, 'Cloudflare TURN credentials failed; calls fall back to STUN');
+      return DEFAULT_ICE_SERVERS;
+    }
+  }
+
+  app.get('/api/calls/ice-servers', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    return ok({ iceServers: await callIceServers(), turn: Boolean(deps.config.turn) });
+  });
+
   // Two-way audio with the Frame Mic app (0.6+): relays the caller's SDP offer and returns the frame's answer.
   app.post('/api/frames/:deviceId/call', async (request, reply) => {
     if (!auth.requireMutationAuth(request, reply)) return;
@@ -1841,7 +1927,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     const device = deviceOrReply(request, reply);
     if (!device) return;
     try {
-      return ok({ sdp: await micStreamCall(device, parsed.data.sdp) });
+      return ok({ sdp: await micStreamCall(device, parsed.data.sdp, await callIceServers()) });
     } catch (error) {
       sendRemoteFailure(reply, error);
     }
@@ -3049,13 +3135,17 @@ function micStreamTarget(device: FrameDevice): { baseUrl: string; key: string } 
   return { baseUrl, key: encodeURIComponent(device.micStreamKey) };
 }
 
-async function micStreamCall(device: FrameDevice, offer: string): Promise<string> {
+async function micStreamCall(device: FrameDevice, offer: string, iceServers: IceServer[]): Promise<string> {
   const { baseUrl, key } = micStreamTarget(device);
   let response: Response;
   try {
     response = await fetch(`${baseUrl}/call?k=${key}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/sdp' },
+      // Frame Mic 0.7+ uses these too; older versions ignore the header and stay on direct connections
+      headers: {
+        'Content-Type': 'application/sdp',
+        'X-Ice-Servers': Buffer.from(JSON.stringify(iceServers)).toString('base64'),
+      },
       body: offer,
       signal: AbortSignal.timeout(20_000),
     });

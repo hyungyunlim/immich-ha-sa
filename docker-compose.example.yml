@@ -29,6 +29,8 @@ services:
       MQTT_USERNAME: "${MQTT_USERNAME:-}"
       MQTT_PASSWORD: "${MQTT_PASSWORD:-}"
       MQTT_BASE_TOPIC: "${MQTT_BASE_TOPIC:-freekiosk}"
+      TURN_KEY_ID: "${TURN_KEY_ID:-}"
+      TURN_KEY_API_TOKEN: "${TURN_KEY_API_TOKEN:-}"
     volumes:
       - ./data:/data
     networks:

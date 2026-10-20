@@ -2,12 +2,28 @@
 //   Calls   - two-way WebRTC audio with frames running Frame Mic 0.6+. The offer goes through
 //             Home Assistant (/api/immich_frame/call); audio flows straight to the frame.
 //   Notices - short family notices the frames show as a pill over the slideshow.
+//   Agenda  - upcoming events from chosen Home Assistant calendars, shown between the notices.
 
 const STRINGS = {
   en: {
     title: "Frames",
     tabCalls: "Calls",
     tabNotices: "Notices",
+    tabAgenda: "Calendar",
+    calendars: "Calendars",
+    showOn: "Show on",
+    days1: "Today only",
+    days3: "Next 3 days",
+    days7: "Next week",
+    save: "Save",
+    saved: "Saved",
+    upcoming: "Coming up on the frames",
+    noEvents: "No upcoming events.",
+    noCalendars: "Home Assistant has no calendars yet.",
+    dayToday: "Today",
+    dayTomorrow: "Tomorrow",
+    allDay: "All day",
+    weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
     call: "Call",
     hangup: "Hang up",
     mute: "Mute",
@@ -39,6 +55,21 @@ const STRINGS = {
     title: "액자",
     tabCalls: "통화",
     tabNotices: "공지",
+    tabAgenda: "일정",
+    calendars: "캘린더",
+    showOn: "표시할 액자",
+    days1: "오늘만",
+    days3: "3일",
+    days7: "1주일",
+    save: "저장",
+    saved: "저장했어요",
+    upcoming: "액자에 표시될 일정",
+    noEvents: "다가오는 일정이 없어요.",
+    noCalendars: "Home Assistant에 캘린더가 없어요.",
+    dayToday: "오늘",
+    dayTomorrow: "내일",
+    allDay: "종일",
+    weekdays: ["일", "월", "화", "수", "목", "금", "토"],
     call: "통화",
     hangup: "끊기",
     mute: "음소거",
@@ -88,6 +119,12 @@ const endOfDay = (days) => {
   date.setHours(23, 59, 0, 0);
   return date;
 };
+
+// All-day events come as YYYY-MM-DD and mean local midnight
+const eventDate = (value, allDay) => (allDay ? new Date(`${value}T00:00:00`) : new Date(value));
+const midnight = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+const eventEnd = (item) =>
+  item.end ? eventDate(item.end, item.allDay) : new Date(eventDate(item.start, item.allDay).getTime() + 3600_000);
 
 const DURATIONS = {
   forever: () => null,
@@ -159,6 +196,10 @@ class ImmichFramePanel extends HTMLElement {
     }
     this._renderCalls();
     this._renderNotices();
+    if (!this._agendaLoaded && !this._loadError) {
+      this._agendaLoaded = true;
+      this._loadAgenda();
+    }
   }
 
   _selectTab(tab) {
@@ -171,6 +212,7 @@ class ImmichFramePanel extends HTMLElement {
     this.shadowRoot.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
     this._callsEl.hidden = tab !== "calls";
     this._noticesEl.hidden = tab !== "notices";
+    this._agendaEl.hidden = tab !== "agenda";
   }
 
   // ---- Calls ---------------------------------------------------------------------------------------
@@ -191,7 +233,12 @@ class ImmichFramePanel extends HTMLElement {
       call.stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
-      const pc = (call.pc = new RTCPeerConnection());
+      // STUN, plus Cloudflare TURN when the controller has a key, so calls also work from outside
+      const { iceServers } = await this._hass
+        .callApi("GET", `immich_frame/call/${frame.entry_id}`)
+        .catch(() => ({ iceServers: [] }));
+      if (this._call !== call) return;
+      const pc = (call.pc = new RTCPeerConnection({ iceServers }));
       call.stream.getTracks().forEach((track) => pc.addTrack(track, call.stream));
       pc.ontrack = (event) => {
         this._audio.srcObject = event.streams[0] || new MediaStream([event.track]);
@@ -209,7 +256,7 @@ class ImmichFramePanel extends HTMLElement {
         }
       };
       await pc.setLocalDescription(await pc.createOffer());
-      await gatheringDone(pc, 2000);
+      await gatheringDone(pc, 3000);
       if (this._call !== call) return;
       const { sdp } = await this._hass.callApi("POST", `immich_frame/call/${frame.entry_id}`, {
         sdp: pc.localDescription.sdp,
@@ -373,6 +420,93 @@ class ImmichFramePanel extends HTMLElement {
       .join("");
   }
 
+  // ---- Agenda --------------------------------------------------------------------------------------
+
+  async _loadAgenda() {
+    try {
+      this._agenda = await this._hass.callApi("GET", "immich_frame/agenda");
+      this._agendaError = null;
+    } catch (err) {
+      this._agendaError = errorMessage(err);
+    }
+    this._renderAgenda();
+  }
+
+  async _saveAgenda(event) {
+    event.preventDefault();
+    const form = event.target;
+    const checked = (name) => [...form.querySelectorAll(`input[name="${name}"]:checked`)].map((input) => input.value);
+    form.save.disabled = true;
+    try {
+      this._agenda = await this._hass.callApi("POST", "immich_frame/agenda", {
+        calendars: checked("calendar"),
+        device_ids: checked("frame"),
+        days: Number(form.days.value),
+      });
+      this._agendaError = null;
+      this._renderAgenda(true);
+    } catch (err) {
+      this._agendaError = errorMessage(err);
+      this._renderAgenda();
+    }
+  }
+
+  _eventParts(item) {
+    const t = this._t;
+    const start = eventDate(item.start, item.allDay);
+    const days = Math.round((midnight(start) - midnight(new Date())) / 86400_000);
+    const day = days <= 0 ? t.dayToday : days === 1 ? t.dayTomorrow : `${start.getMonth() + 1}/${start.getDate()} ${t.weekdays[start.getDay()]}`;
+    const time = item.allDay ? t.allDay : start.toTimeString().slice(0, 5);
+    return { day, today: days <= 0, time };
+  }
+
+  _renderAgenda(saved = false) {
+    if (!this._agendaEl) return;
+    const t = this._t;
+    const agenda = this._agenda || { settings: { calendars: [], device_ids: [], days: 3 }, items: [] };
+    const calendars = Object.values(this._hass.states)
+      .filter((state) => state.entity_id.startsWith("calendar."))
+      .map((state) => ({ id: state.entity_id, name: state.attributes.friendly_name || state.entity_id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const chosen = new Set(agenda.settings.calendars);
+    const shownOn = new Set(agenda.settings.device_ids);
+    const now = Date.now();
+    const upcoming = (agenda.items || []).filter((item) => eventEnd(item).getTime() > now).slice(0, 20);
+    this._agendaEl.innerHTML = `
+      <ha-card>
+        <form class="compose">
+          <div class="label">${escapeHtml(t.calendars)}</div>
+          <div class="checks scroll">
+            ${calendars.length
+              ? calendars.map((c) => `<label><input type="checkbox" name="calendar" value="${escapeHtml(c.id)}"
+                  ${chosen.has(c.id) ? "checked" : ""}>${escapeHtml(c.name)}
+                  <span class="hint">${escapeHtml(c.id.slice("calendar.".length))}</span></label>`).join("")
+              : `<div class="status">${escapeHtml(t.noCalendars)}</div>`}
+          </div>
+          <div class="label">${escapeHtml(t.showOn)}</div>
+          <div class="checks">
+            ${this._frames.map((f) => `<label><input type="checkbox" name="frame" value="${escapeHtml(f.device_id)}"
+                ${shownOn.has(f.device_id) ? "checked" : ""}>${escapeHtml(f.name)}</label>`).join("")}
+          </div>
+          <select name="days">
+            ${[1, 3, 7].map((d) => `<option value="${d}" ${agenda.settings.days === d ? "selected" : ""}>${escapeHtml(t[`days${d}`])}</option>`).join("")}
+          </select>
+          <div class="error">${escapeHtml(this._agendaError || agenda.error || "")}</div>
+          <div class="actions"><button name="save">${escapeHtml(t.save)}</button>
+            <span class="status">${saved ? escapeHtml(t.saved) : ""}</span></div>
+        </form>
+      </ha-card>
+      <div class="label">${escapeHtml(t.upcoming)}</div>
+      ${upcoming.length
+        ? `<ha-card>${upcoming.map((item) => {
+            const parts = this._eventParts(item);
+            return `<div class="event"><span class="chip ${parts.today ? "today" : ""}">${escapeHtml(parts.day)}</span>
+              <span class="time">${escapeHtml(parts.time)}</span>${escapeHtml(item.title)}</div>`;
+          }).join("")}</ha-card>`
+        : `<div class="empty">${escapeHtml(t.noEvents)}</div>`}`;
+    this._agendaEl.querySelector("form").addEventListener("submit", (event) => this._saveAgenda(event));
+  }
+
   // ---- Shell ---------------------------------------------------------------------------------------
 
   _build() {
@@ -409,11 +543,22 @@ class ImmichFramePanel extends HTMLElement {
         button.danger { background: var(--error-color); }
         button:disabled { opacity: 0.4; cursor: default; }
         .empty { color: var(--secondary-text-color); text-align: center; padding: 32px 0; }
+        .label { font-weight: 500; margin-top: 4px; }
+        .checks { display: grid; gap: 6px; }
+        .checks.scroll { max-height: 240px; overflow: auto; }
+        .checks label { display: flex; align-items: center; gap: 8px; }
+        .hint { color: var(--secondary-text-color); font-size: 12px; }
+        .event { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+        .chip { padding: 2px 10px; border-radius: 999px; font-size: 13px; white-space: nowrap;
+          background: var(--secondary-background-color); }
+        .chip.today { background: rgba(255, 183, 77, 0.45); }
+        .event .time { color: var(--secondary-text-color); font-variant-numeric: tabular-nums; }
       </style>
       <div class="toolbar"><ha-menu-button></ha-menu-button><div class="title">${escapeHtml(t.title)}</div></div>
       <div class="tabs">
         <button class="tab" data-tab="calls">${escapeHtml(t.tabCalls)}</button>
         <button class="tab" data-tab="notices">${escapeHtml(t.tabNotices)}</button>
+        <button class="tab" data-tab="agenda">${escapeHtml(t.tabAgenda)}</button>
       </div>
       <section id="calls"></section>
       <section id="notices">
@@ -434,10 +579,12 @@ class ImmichFramePanel extends HTMLElement {
         </ha-card>
         <div id="notice-list" style="display: grid; gap: 12px"></div>
       </section>
+      <section id="agenda"></section>
       <audio autoplay playsinline></audio>`;
     const root = this.shadowRoot;
     this._callsEl = root.getElementById("calls");
     this._noticesEl = root.getElementById("notices");
+    this._agendaEl = root.getElementById("agenda");
     this._noticeListEl = root.getElementById("notice-list");
     this._noticeForm = root.querySelector("form");
     this._noticeErrorEl = root.querySelector("form .error");

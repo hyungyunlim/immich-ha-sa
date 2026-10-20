@@ -10,6 +10,7 @@ DEFAULT_DEVICE_ID = "lenovo"
 DATA_CLIENT = "client"
 DATA_COORDINATOR = "coordinator"
 DATA_HTTP_REGISTERED = f"{DOMAIN}_http_registered"
+DATA_AGENDA = f"{DOMAIN}_agenda"
 
 SERVICE_SET_ALBUM = "set_album"
 SERVICE_SET_PEOPLE = "set_people"

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.95
+
+- Add a **Calendar** tab to the Frames panel. Pick Home Assistant calendars (Google Calendar, Remote Calendar, local) and the frames that show them; frames show the next events between notices as *[Today] 19:00 Swimming*. The integration rereads the calendars every 15 minutes and drops events that two subscribed copies of a calendar repeat.
+- Calls from outside the home: every call now gets Cloudflare's public STUN server, and with a Cloudflare Realtime TURN key in the new `turn_key_id` / `turn_key_api_token` add-on options, short-lived TURN credentials that relay calls direct connections cannot carry. Needs Frame Mic 0.7 (attached to the release).
+- New controller endpoints: `GET /api/calls/ice-servers`, `GET`/`PUT /api/agenda`, and `GET /api/frame/:deviceId/agenda` (the frame page also receives live `agenda` events).
+- Restart Home Assistant Core after updating the integration, and reload the frames (or wait for their next reload) so they pick up the new frame page.
+
 ## 0.1.94
 
 - The **Frame Call** sidebar panel becomes **Frames**, with a **Calls** tab and a new **Notices** tab.

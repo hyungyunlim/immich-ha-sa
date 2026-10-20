@@ -1,4 +1,4 @@
-# Family Notices
+# Family Notices and Calendar
 
 Notices are short lines, such as *🍽️ Dinner out at 7 tonight*, that frames show as a small pill near the bottom of the slideshow. With several notices, the frame shows them one at a time, switching every 8 seconds.
 
@@ -13,6 +13,16 @@ Open **Frames** in the Home Assistant sidebar and choose the **Notices** tab.
 The list below the form shows every notice on the frames, where it shows, and until when. **Delete** removes it from the frames right away. Expired notices disappear by themselves.
 
 Notices work on every frame the controller serves; no companion app is needed. Frames hide them while the screen is off.
+
+## Calendar events
+
+The **Calendar** tab of the **Frames** panel shows upcoming events from Home Assistant calendars between the notices, such as *[Today] 19:00 Swimming* or *[Tomorrow] All day Grandma's birthday*.
+
+1. Tick the calendars to show. Any Home Assistant calendar works: the Google Calendar integration, Remote Calendar (an iCal link), or a local calendar.
+2. Tick the frames that show them, and choose today only, the next 3 days, or the next week.
+3. Select **Save**. The list below shows what the frames will display.
+
+The integration rereads the calendars every 15 minutes and right after you save. Frames show the next five events that have not ended, after the notices, with today's events marked in amber. Events in two subscribed copies of the same calendar show once.
 
 ## From automations
 

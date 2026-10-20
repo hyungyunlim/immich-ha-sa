@@ -56,6 +56,8 @@ if [ -f "$OPTIONS_PATH" ]; then
   set_env_from_option MQTT_USERNAME mqtt_username
   set_env_from_option MQTT_PASSWORD mqtt_password
   set_env_from_option MQTT_BASE_TOPIC mqtt_base_topic
+  set_env_from_option TURN_KEY_ID turn_key_id
+  set_env_from_option TURN_KEY_API_TOKEN turn_key_api_token
 fi
 
 # With no manual broker URL, ask the Supervisor for the shared MQTT service

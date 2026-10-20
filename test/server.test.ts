@@ -1715,6 +1715,104 @@ describe('controller API', () => {
   });
 });
 
+describe('calendar agenda', () => {
+  it('stores the agenda pushed by Home Assistant and serves it only to the chosen frames', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-agenda-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    store.createDevice({ ...config.defaultDevice, id: 'kitchen', name: 'Kitchen', alias: 'kitchen' });
+    const server = createTestServer({ config, store });
+    const items = [
+      { title: '도윤 수영', start: '2026-10-21T19:00:00+09:00', end: '2026-10-21T20:00:00+09:00', allDay: false },
+      { title: '할머니 생신', start: '2026-10-22', end: '2026-10-23', allDay: true },
+    ];
+
+    const empty = await server.inject({ method: 'GET', url: '/api/frame/lenovo/agenda' });
+    expect(empty.json().data).toEqual({ items: [], locale: 'en' });
+    const invalid = await server.inject({ method: 'PUT', url: '/api/agenda', payload: { items: [{ title: '', start: 'x', allDay: true }], deviceIds: [] } });
+    expect(invalid.statusCode).toBe(400);
+    const saved = await server.inject({ method: 'PUT', url: '/api/agenda', payload: { items, deviceIds: ['kitchen'], locale: 'ko' } });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json().data.updatedAt).toBeTruthy();
+
+    expect((await server.inject({ method: 'GET', url: '/api/frame/kitchen/agenda' })).json().data).toEqual({ items, locale: 'ko' });
+    expect((await server.inject({ method: 'GET', url: '/api/frame/lenovo/agenda' })).json().data).toEqual({ items: [], locale: 'ko' });
+    expect((await server.inject({ method: 'GET', url: '/api/agenda' })).json().data.deviceIds).toEqual(['kitchen']);
+    const page = await server.inject({ method: 'GET', url: '/f/lenovo' });
+    expect(page.body).toContain("addEventListener('agenda'");
+    await server.close();
+  });
+});
+
+describe('call ICE servers', () => {
+  it('hands out cached Cloudflare TURN credentials, drops port 53, and falls back to STUN', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-turn-'));
+    tempDirs.push(dir);
+    let turnRequests = 0;
+    let turnStatus = 201;
+    const cloudflare = createHttpServer((request, response) => {
+      turnRequests += 1;
+      expect(request.url).toBe('/v1/turn/keys/key-1/credentials/generate-ice-servers');
+      expect(request.headers.authorization).toBe('Bearer turn-secret');
+      response.statusCode = turnStatus;
+      response.end(JSON.stringify({
+        iceServers: [
+          { urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:53'] },
+          { urls: ['turn:turn.cloudflare.com:3478?transport=udp', 'turn:turn.cloudflare.com:53?transport=udp', 'turns:turn.cloudflare.com:443?transport=tcp'], username: 'u', credential: 'c' },
+        ],
+      }));
+    });
+    await new Promise<void>((resolve) => cloudflare.listen(0, '127.0.0.1', resolve));
+    const port = (cloudflare.address() as AddressInfo).port;
+    let iceHeader: string | undefined;
+    const frame = createHttpServer((request, response) => {
+      iceHeader = request.headers['x-ice-servers'] as string | undefined;
+      request.resume();
+      request.on('end', () => response.end('v=0\r\nanswer\r\n'));
+    });
+    await new Promise<void>((resolve) => frame.listen(0, '127.0.0.1', resolve));
+    const framePort = (frame.address() as AddressInfo).port;
+
+    const plainConfig = buildConfig(dir);
+    const plain = createTestServer({ config: plainConfig, store: new JsonStore(plainConfig.storePath, plainConfig.defaultDevice) });
+    expect((await plain.inject({ method: 'GET', url: '/api/calls/ice-servers' })).json().data)
+      .toEqual({ iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }], turn: false });
+    await plain.close();
+
+    const dir2 = mkdtempSync(join(tmpdir(), 'immich-frame-turn2-'));
+    tempDirs.push(dir2);
+    const config = { ...buildConfig(dir2), turn: { keyId: 'key-1', apiToken: 'turn-secret', apiBaseUrl: `http://127.0.0.1:${port}` } };
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    store.updateDevice('lenovo', { remoteApiUrl: `http://127.0.0.1:${framePort}`, micStreamKey: 'k', micStreamPort: framePort });
+    const server = createTestServer({ config, store });
+    const expected = [
+      { urls: ['stun:stun.cloudflare.com:3478'] },
+      { urls: ['turn:turn.cloudflare.com:3478?transport=udp', 'turns:turn.cloudflare.com:443?transport=tcp'], username: 'u', credential: 'c' },
+    ];
+    const first = await server.inject({ method: 'GET', url: '/api/calls/ice-servers' });
+    expect(first.json().data).toEqual({ iceServers: expected, turn: true });
+    const call = await server.inject({ method: 'POST', url: '/api/frames/lenovo/call', payload: { sdp: 'v=0\r\noffer\r\n' } });
+    expect(call.statusCode).toBe(200);
+    expect(JSON.parse(Buffer.from(iceHeader ?? '', 'base64').toString())).toEqual(expected);
+    expect(turnRequests).toBe(1); // the call reused the cached credentials
+    expect(first.body).not.toContain('turn-secret');
+
+    // A failing key keeps calls working on STUN
+    const dir3 = mkdtempSync(join(tmpdir(), 'immich-frame-turn3-'));
+    tempDirs.push(dir3);
+    turnStatus = 401;
+    const brokenConfig = { ...buildConfig(dir3), turn: config.turn };
+    const broken = createTestServer({ config: brokenConfig, store: new JsonStore(brokenConfig.storePath, brokenConfig.defaultDevice) });
+    expect((await broken.inject({ method: 'GET', url: '/api/calls/ice-servers' })).json().data.iceServers)
+      .toEqual([{ urls: 'stun:stun.cloudflare.com:3478' }]);
+    await broken.close();
+    await server.close();
+    await new Promise<void>((resolve) => cloudflare.close(() => resolve()));
+    await new Promise<void>((resolve) => frame.close(() => resolve()));
+  });
+});
+
 describe('family notices', () => {
   it('stores notices, filters them per frame, and drops expired ones', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-notices-'));

@@ -50,5 +50,11 @@ configuration:
   mqtt_base_topic:
     name: MQTT base topic
     description: FreeKiosk가 publish하는 base topic입니다. 비워두면 FreeKiosk 기본값 `freekiosk`를 사용합니다.
+  turn_key_id:
+    name: Cloudflare TURN 키 ID
+    description: 선택. Cloudflare 대시보드 > Realtime > TURN Server에서 만든 키입니다. 키가 있으면 Frames 패널 통화가 집 밖에서도 됩니다.
+  turn_key_api_token:
+    name: Cloudflare TURN API 토큰
+    description: TURN 키를 만들 때 함께 표시되는 API 토큰입니다.
 network:
   8080/TCP: Controller frame URL, setup page, API

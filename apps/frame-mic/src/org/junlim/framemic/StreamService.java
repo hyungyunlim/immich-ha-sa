@@ -14,6 +14,11 @@ import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.media.MediaRecorder;
 import android.os.IBinder;
+import android.util.Base64;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.webrtc.PeerConnection;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -28,7 +33,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -42,7 +49,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   GET /mic.wav   live 16 kHz mono WAV (lossless, for speech recognition)
  *   GET /mic.aac   live AAC-LC in ADTS (internet-radio format; players and speakers treat it as a live stream)
  *   GET /notify?on=1|0  show or hide who is listening in the Android notification (persisted, default on)
- *   POST /call     two-way WebRTC audio: body is an SDP offer with its ICE candidates, the response the answer
+ *   POST /call     two-way WebRTC audio: body is an SDP offer with its ICE candidates, the response the answer;
+ *                  an optional X-Ice-Servers header (base64 JSON, RTCIceServer[]) adds STUN/TURN servers
  *   GET /hangup    end the call
  *
  * A call and a stream both need the mic, so whichever starts last takes it over.
@@ -51,7 +59,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class StreamService extends Service {
     static final int PORT = 8765;
-    static final String VERSION = "0.6";
+    static final String VERSION = "0.7";
     static final int RATE = 16000;
     private static final String CHANNEL = "mic";
 
@@ -212,8 +220,10 @@ public class StreamService extends Service {
 
     private void answerCall(BufferedReader in, OutputStream out) throws IOException {
         int length = 0;
+        List<PeerConnection.IceServer> iceServers = new ArrayList<>();
         for (String header; (header = in.readLine()) != null && !header.isEmpty(); ) {
             if (header.regionMatches(true, 0, "Content-Length:", 0, 15)) length = Integer.parseInt(header.substring(15).trim());
+            if (header.regionMatches(true, 0, "X-Ice-Servers:", 0, 14)) iceServers = iceServers(header.substring(14).trim());
         }
         if (!enabled()) {
             respond(out, "423 Locked", "text/plain", "mic stream is off");
@@ -233,7 +243,7 @@ public class StreamService extends Service {
         while (streaming.get() && System.currentTimeMillis() < deadline) sleep(20);
         String answer;
         try {
-            answer = call.answer(new String(body), SOURCES[prefs.getInt("source", 0)]);
+            answer = call.answer(new String(body), SOURCES[prefs.getInt("source", 0)], iceServers);
         } catch (Exception e) {
             respond(out, "500 Internal Server Error", "text/plain", "call failed: " + e);
             return;
@@ -242,6 +252,31 @@ public class StreamService extends Service {
         out.write(("HTTP/1.0 200 OK\r\nContent-Type: application/sdp\r\nContent-Length: " + b.length
                 + "\r\nCache-Control: no-cache\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
         out.write(b);
+    }
+
+    /** Decodes RTCIceServer[] JSON (base64); a bad header just means no STUN/TURN, never a failed call. */
+    static List<PeerConnection.IceServer> iceServers(String base64) {
+        List<PeerConnection.IceServer> servers = new ArrayList<>();
+        try {
+            JSONArray list = new JSONArray(new String(Base64.decode(base64, Base64.DEFAULT), StandardCharsets.UTF_8));
+            for (int i = 0; i < list.length(); i++) {
+                JSONObject server = list.getJSONObject(i);
+                List<String> urls = new ArrayList<>();
+                JSONArray many = server.optJSONArray("urls");
+                if (many != null) {
+                    for (int j = 0; j < many.length(); j++) urls.add(many.getString(j));
+                } else {
+                    urls.add(server.getString("urls"));
+                }
+                servers.add(PeerConnection.IceServer.builder(urls)
+                        .setUsername(server.optString("username", ""))
+                        .setPassword(server.optString("credential", ""))
+                        .createIceServer());
+            }
+        } catch (Exception ignored) {
+            servers.clear();
+        }
+        return servers;
     }
 
     private void stream(Socket s, OutputStream out, boolean aac) throws IOException {

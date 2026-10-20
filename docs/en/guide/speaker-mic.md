@@ -49,12 +49,19 @@ The **Calls** tab of the **Frames** panel in the Home Assistant sidebar calls a 
 
 - Needs Frame Mic 0.6 or newer and the **Frame Mic Stream** switch on. Turning the switch off ends a call.
 - Open Home Assistant through its `https://` address; browsers allow the microphone only on HTTPS.
-- Audio goes directly between your device and the frame, so calls work on the home network and over a VPN that reaches the frame, not over the internet yet.
+- Audio goes directly between your device and the frame whenever it can. Cloudflare's public STUN server lets many calls from outside the home connect directly too. For calls that cannot (most mobile networks), add a free [Cloudflare TURN key](#calls-from-outside) to relay the audio. Calls from outside need Frame Mic 0.7 or newer.
 - The frame shows a small *On call* pill at the top of the screen when Frame Mic may *Display over other apps* (the app asks for it when opened). Allow it once in Android settings, or with adb: `adb shell appops set org.junlim.framemic SYSTEM_ALERT_WINDOW allow`.
 - Leaving the panel hangs up. A call and a Frame Mic stream share the microphone, so whichever starts last takes it over.
 - The frame cancels its own speaker echo in software. If the other side hears an echo, mute yourself while listening.
 
 The call plays at the frame's media volume, the same one the slideshow and the Frame Speaker use.
+
+### Calls from outside
+
+1. In the Cloudflare dashboard, open **Realtime** > **TURN Server** and create a key. Copy the **Turn Token ID** and the **API Token**.
+2. In the add-on **Configuration**, enter them as **Cloudflare TURN key ID** and **Cloudflare TURN API token**, then restart the add-on.
+
+The controller then hands each call short-lived Cloudflare TURN credentials. Calls on the home network still connect directly. A relayed call adds a few tens of milliseconds within the same region, and Cloudflare's first 1,000 GB a month are free (an hour of call audio is about 40 MB).
 
 ::: warning Privacy
 Only enable listening and calls on frames where everyone in the room knows about it.

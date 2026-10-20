@@ -268,7 +268,27 @@ export interface StoreData {
   personCache: PersonCache;
   frameClaims: Record<string, FrameClaim>;
   notices: FrameNotice[];
+  agenda: FrameAgenda;
   auth: ControllerAuth;
+}
+
+/** One calendar event, as Home Assistant's calendar.get_events returns it. */
+export interface AgendaItem {
+  title: string;
+  /** ISO date-time with offset, or YYYY-MM-DD for all-day events. */
+  start: string;
+  /** Exclusive end, in the same form as start. */
+  end?: string;
+  allDay: boolean;
+}
+
+/** Upcoming events pushed by the Home Assistant integration, shown on the listed frames between notices. */
+export interface FrameAgenda {
+  items: AgendaItem[];
+  deviceIds: string[];
+  /** Language for the day labels on the frame (today, tomorrow, weekdays). */
+  locale: string;
+  updatedAt?: string;
 }
 
 /** A short family notice shown on frames as a small pill over the slideshow. */

@@ -64,7 +64,7 @@ export default defineConfig({
                 { text: 'Controller Console', link: '/en/guide/controller-setup' },
                 { text: 'FreeKiosk Remote Control', link: '/en/guide/freekiosk' },
                 { text: 'Frame Speaker and Mic', link: '/en/guide/speaker-mic' },
-                { text: 'Family Notices', link: '/en/guide/notices' },
+                { text: 'Family Notices and Calendar', link: '/en/guide/notices' },
               ],
             },
             {
@@ -120,7 +120,7 @@ export default defineConfig({
                 { text: '컨트롤러 콘솔', link: '/ko/guide/controller-setup' },
                 { text: 'FreeKiosk 원격 제어', link: '/ko/guide/freekiosk' },
                 { text: '액자 스피커와 마이크', link: '/ko/guide/speaker-mic' },
-                { text: '가족 공지', link: '/ko/guide/notices' },
+                { text: '가족 공지와 일정', link: '/ko/guide/notices' },
               ],
             },
             {

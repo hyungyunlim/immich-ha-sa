@@ -202,6 +202,17 @@ class ImmichFrameClient:
     async def delete_notice(self, notice_id: str) -> dict[str, Any]:
         return await self._request("DELETE", f"/api/notices/{notice_id}", auth=True)
 
+    async def set_agenda(self, items: list[dict[str, Any]], device_ids: list[str], locale: str) -> dict[str, Any]:
+        return await self._request(
+            "PUT",
+            "/api/agenda",
+            json={"items": items, "deviceIds": device_ids, "locale": locale},
+            auth=True,
+        )
+
+    async def ice_servers(self) -> list[dict[str, Any]]:
+        return (await self._request("GET", "/api/calls/ice-servers", auth=True))["iceServers"]
+
     async def start_call(self, sdp: str) -> str:
         data = await self._request(
             "POST",

@@ -4,6 +4,7 @@
   this integration and the controller; the frame answers automatically and audio then flows directly
   between the browser and the frame, so the caller must reach the frame's network (home LAN or VPN).
 - Notices: short family notices the frames show as a pill over the slideshow.
+- Agenda: upcoming events from chosen Home Assistant calendars, shown between the notices.
 """
 
 from __future__ import annotations
@@ -19,8 +20,9 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.http import KEY_HASS
 from homeassistant.loader import async_get_integration
 
+from .agenda import AgendaManager
 from .api import ImmichFrameApiError, ImmichFrameClient
-from .const import DOMAIN
+from .const import DATA_AGENDA, DOMAIN
 from .media_source import coordinators, frame_name
 
 API_PATH = "/api/immich_frame"
@@ -31,6 +33,9 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     hass.http.register_view(ImmichFrameFramesView())
     hass.http.register_view(ImmichFrameCallView())
     hass.http.register_view(ImmichFrameNoticeView())
+    hass.http.register_view(ImmichFrameAgendaView())
+    agenda = hass.data[DATA_AGENDA] = AgendaManager(hass, lambda: controller_client(hass))
+    await agenda.async_start()
     await hass.http.async_register_static_paths(
         [StaticPathConfig(STATIC_PATH, str(Path(__file__).parent / "frontend"), cache_headers=False)]
     )
@@ -89,11 +94,20 @@ class ImmichFrameFramesView(HomeAssistantView):
 
 
 class ImmichFrameCallView(HomeAssistantView):
-    """POST {sdp} starts a call with the frame; DELETE hangs up."""
+    """GET returns the ICE servers for a call, POST {sdp} starts it, DELETE hangs up."""
 
     url = f"{API_PATH}/call/{{entry_id}}"
     name = "api:immich_frame:call"
     requires_auth = True
+
+    async def get(self, request: web.Request, entry_id: str) -> web.Response:
+        coordinator = coordinators(request.app[KEY_HASS]).get(entry_id)
+        if coordinator is None:
+            return self.json_message("Unknown frame", 404)
+        try:
+            return self.json({"iceServers": await coordinator.client.ice_servers()})
+        except ImmichFrameApiError:
+            return self.json({"iceServers": []})  # controller before 0.1.95: direct connections only
 
     async def post(self, request: web.Request, entry_id: str) -> web.Response:
         coordinator = coordinators(request.app[KEY_HASS]).get(entry_id)
@@ -159,3 +173,31 @@ class ImmichFrameNoticeView(HomeAssistantView):
         except ImmichFrameApiError as err:
             return _error(self, err)
         return self.json({"ok": True})
+
+
+class ImmichFrameAgendaView(HomeAssistantView):
+    """GET returns the agenda settings and upcoming events; POST {calendars, device_ids, days} saves them."""
+
+    url = f"{API_PATH}/agenda"
+    name = "api:immich_frame:agenda"
+    requires_auth = True
+
+    def _state(self, agenda: AgendaManager) -> web.Response:
+        return self.json({"settings": agenda.settings, "items": agenda.items, "error": agenda.error})
+
+    async def get(self, request: web.Request) -> web.Response:
+        return self._state(request.app[KEY_HASS].data[DATA_AGENDA])
+
+    async def post(self, request: web.Request) -> web.Response:
+        agenda: AgendaManager = request.app[KEY_HASS].data[DATA_AGENDA]
+        try:
+            body = await request.json()
+            calendars = [str(c) for c in body["calendars"] if str(c).startswith("calendar.")]
+            device_ids = [str(d) for d in body["device_ids"]]
+            days = int(body["days"])
+        except (ValueError, KeyError, TypeError):
+            return self.json_message("Send {calendars: [...], device_ids: [...], days: N}", 400)
+        if not 1 <= days <= 14:
+            return self.json_message("days must be between 1 and 14", 400)
+        await agenda.async_update(calendars, device_ids, days)
+        return self._state(agenda)

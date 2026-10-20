@@ -48,7 +48,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
     body.suspended #fallback {
       display: none;
     }
-    /* Family notices: a quiet pill near the bottom center, above immich-kiosk's date line, one notice at a time.
+    /* Family notices and calendar events: a quiet pill near the bottom center, above immich-kiosk's date line, one at a time.
        WebView 74 safe (no inset/gap/clamp). */
     #notice {
       position: fixed;
@@ -74,6 +74,22 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
     #notice.show {
       opacity: 1;
     }
+    #notice .chip {
+      display: inline-block;
+      margin-right: 1.4vmin;
+      padding: 0.2vmin 1.5vmin;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.2);
+      font-size: 0.82em;
+      vertical-align: 0.08em;
+    }
+    #notice .chip.today {
+      background: rgba(255, 183, 77, 0.5);
+    }
+    #notice .time {
+      margin-right: 1.2vmin;
+      opacity: 0.8;
+    }
     body.suspended #notice {
       display: none;
     }
@@ -90,9 +106,16 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       var eventsUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/events';
       var ackUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/commands/ack';
       var noticesUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/notices';
+      var agendaUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/agenda';
       var noticeEl = document.getElementById('notice');
       var notices = [];
+      var agenda = { items: [], locale: 'en' };
       var noticeIndex = -1;
+      var noticeKey = '';
+      var agendaWords = {
+        ko: { today: '오늘', tomorrow: '내일', allDay: '종일', days: ['일', '월', '화', '수', '목', '금', '토'] },
+        en: { today: 'Today', tomorrow: 'Tomorrow', allDay: 'All day', days: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] }
+      };
       var iframe = document.getElementById('renderer');
       var previewMode = ${JSON.stringify(previewMode)};
       var lastVersion = 0;
@@ -455,25 +478,81 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         }
       });
 
-      function activeNotices() {
-        var now = Date.now();
-        return notices.filter(function (notice) { return !notice.until || Date.parse(notice.until) > now; });
+      // All-day events come as YYYY-MM-DD and mean local midnight, not UTC
+      function eventDate(value, allDay) {
+        return allDay ? new Date(value + 'T00:00:00') : new Date(value);
       }
 
-      // Rotates through active notices; fades out before swapping the text.
+      function midnight(date) {
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+      }
+
+      function pad(value) {
+        return value < 10 ? '0' + value : String(value);
+      }
+
+      function eventEnd(item) {
+        if (item.end) return eventDate(item.end, item.allDay);
+        return new Date(eventDate(item.start, item.allDay).getTime() + (item.allDay ? 86400000 : 3600000));
+      }
+
+      // What rotates through the pill: notices first, then the next few calendar events
+      function displayItems() {
+        var now = new Date();
+        var words = agendaWords[String(agenda.locale).split('-')[0]] || agendaWords.en;
+        var list = notices
+          .filter(function (notice) { return !notice.until || Date.parse(notice.until) > now.getTime(); })
+          .map(function (notice) { return { key: 'n' + notice.id + notice.text, text: notice.text }; });
+        agenda.items
+          .filter(function (item) { return eventEnd(item).getTime() > now.getTime(); })
+          .slice(0, 5)
+          .forEach(function (item) {
+            var start = eventDate(item.start, item.allDay);
+            var days = Math.round((midnight(start) - midnight(now)) / 86400000);
+            var day = days <= 0 ? words.today : days === 1 ? words.tomorrow
+              : (start.getMonth() + 1) + '/' + start.getDate() + ' ' + words.days[start.getDay()];
+            list.push({
+              key: 'a' + item.start + item.title + day,
+              chip: day,
+              today: days <= 0,
+              time: item.allDay ? words.allDay : pad(start.getHours()) + ':' + pad(start.getMinutes()),
+              text: item.title
+            });
+          });
+        return list;
+      }
+
+      function renderNotice(item) {
+        noticeEl.textContent = '';
+        if (item.chip) {
+          var chip = document.createElement('span');
+          chip.className = item.today ? 'chip today' : 'chip';
+          chip.textContent = item.chip;
+          var time = document.createElement('span');
+          time.className = 'time';
+          time.textContent = item.time;
+          noticeEl.appendChild(chip);
+          noticeEl.appendChild(time);
+        }
+        noticeEl.appendChild(document.createTextNode(item.text));
+      }
+
+      // Rotates through the items; fades out before swapping.
       function showNextNotice() {
-        var items = activeNotices();
+        var items = displayItems();
         if (!items.length) {
           noticeEl.className = '';
+          noticeKey = '';
           return;
         }
         noticeIndex = (noticeIndex + 1) % items.length;
-        var text = items[noticeIndex].text;
-        if (noticeEl.className === 'show' && noticeEl.textContent === text) return;
+        var item = items[noticeIndex];
+        if (noticeEl.className === 'show' && noticeKey === item.key) return;
         var delay = noticeEl.className === 'show' ? 600 : 0;
         noticeEl.className = '';
+        noticeKey = item.key;
         setTimeout(function () {
-          noticeEl.textContent = text;
+          renderNotice(item);
           noticeEl.className = 'show';
         }, delay);
       }
@@ -482,6 +561,21 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         notices = items || [];
         noticeIndex = -1;
         showNextNotice();
+      }
+
+      function setAgenda(value) {
+        agenda = value && value.items ? value : { items: [], locale: 'en' };
+        noticeIndex = -1;
+        showNextNotice();
+      }
+
+      function loadAgenda() {
+        return fetch(agendaUrl, { cache: 'no-store' })
+          .then(function (response) { return response.json(); })
+          .then(function (payload) {
+            if (payload && payload.success) setAgenda(payload.data);
+          })
+          .catch(function () {});
       }
 
       function loadNotices() {
@@ -524,6 +618,9 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
           source.addEventListener('notices', function (event) {
             try { setNotices(JSON.parse(event.data).items); } catch (error) {}
           });
+          source.addEventListener('agenda', function (event) {
+            try { setAgenda(JSON.parse(event.data)); } catch (error) {}
+          });
           source.addEventListener('command', function (event) {
             try {
               var payload = JSON.parse(event.data);
@@ -543,8 +640,12 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         startPolling();
       });
       loadNotices();
+      loadAgenda();
       setInterval(showNextNotice, 8000);
-      setInterval(loadNotices, 60000); // safety net next to the live notices events
+      setInterval(function () { // safety net next to the live notices and agenda events
+        loadNotices();
+        loadAgenda();
+      }, 60000);
     })();
   </script>
 </body>

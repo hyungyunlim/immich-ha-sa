@@ -24,6 +24,7 @@ When the Mosquitto broker add-on is installed, this add-on auto-detects it throu
 - `mqtt_broker_url`: set only to override auto-detection or use an external broker. Accepts a host (`192.168.1.10`) or `mqtt://host:1883`.
 - `mqtt_username` / `mqtt_password`: broker credentials; auto-filled from Mosquitto when auto-detected.
 - `mqtt_base_topic`: FreeKiosk base topic. Leave blank for the default `freekiosk`.
+- `turn_key_id`, `turn_key_api_token`: optional Cloudflare Realtime TURN key so Frames panel calls also work from outside the home network.
 
 ## Pairing With Home Assistant
 

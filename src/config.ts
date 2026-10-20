@@ -38,6 +38,9 @@ const EnvSchema = z.object({
   MQTT_USERNAME: z.string().optional(),
   MQTT_PASSWORD: z.string().optional(),
   MQTT_BASE_TOPIC: z.string().default('freekiosk'),
+  TURN_KEY_ID: z.string().optional(),
+  TURN_KEY_API_TOKEN: z.string().optional(),
+  TURN_API_BASE_URL: z.string().url().default('https://rtc.live.cloudflare.com'),
 });
 
 export interface MqttConfig {
@@ -45,6 +48,13 @@ export interface MqttConfig {
   username?: string;
   password?: string;
   baseTopic: string;
+}
+
+/** Cloudflare Realtime TURN key, used to relay calls when the caller cannot reach the frame directly. */
+export interface TurnConfig {
+  keyId: string;
+  apiToken: string;
+  apiBaseUrl: string;
 }
 
 export interface AppConfig {
@@ -59,6 +69,7 @@ export interface AppConfig {
   controllerApiToken?: string;
   albumRefreshIntervalSeconds?: number;
   mqtt?: MqttConfig;
+  turn?: TurnConfig;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -104,6 +115,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         username: parsed.MQTT_USERNAME || undefined,
         password: parsed.MQTT_PASSWORD || undefined,
         baseTopic: parsed.MQTT_BASE_TOPIC.trim() || 'freekiosk',
+      }
+      : undefined,
+    turn: parsed.TURN_KEY_ID?.trim() && parsed.TURN_KEY_API_TOKEN?.trim()
+      ? {
+        keyId: parsed.TURN_KEY_ID.trim(),
+        apiToken: parsed.TURN_KEY_API_TOKEN.trim(),
+        apiBaseUrl: trimTrailingSlash(parsed.TURN_API_BASE_URL),
       }
       : undefined,
   };

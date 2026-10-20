@@ -6,6 +6,7 @@ import type {
   ControllerApiToken,
   ControllerPairingState,
   FrameClaim,
+  FrameAgenda,
   FrameDevice,
   FrameNotice,
   FrameProfile,
@@ -159,6 +160,16 @@ export class JsonStore {
     this.data.notices = this.getNotices().filter((notice) => notice.id !== noticeId);
     this.save();
     return this.data.notices.length < before;
+  }
+
+  getAgenda(): FrameAgenda {
+    return structuredClone(this.data.agenda);
+  }
+
+  setAgenda(agenda: FrameAgenda): FrameAgenda {
+    this.data.agenda = structuredClone(agenda);
+    this.save();
+    return structuredClone(agenda);
   }
 
   getFrameClaim(claimId: string): FrameClaim | undefined {
@@ -342,6 +353,7 @@ export class JsonStore {
       personCache: data.personCache ?? defaults.personCache,
       frameClaims: data.frameClaims ?? defaults.frameClaims,
       notices: data.notices ?? defaults.notices,
+      agenda: data.agenda ?? defaults.agenda,
       auth: {
         tokens: {
           ...defaults.auth.tokens,

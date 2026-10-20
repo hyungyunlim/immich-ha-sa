@@ -199,6 +199,7 @@ export function createDefaultStore(device: FrameDevice): StoreData {
     personCache: createEmptyPersonCache(),
     frameClaims: {},
     notices: [],
+    agenda: { items: [], deviceIds: [], locale: 'en' },
     auth: {
       tokens: {},
     },

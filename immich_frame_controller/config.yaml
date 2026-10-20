@@ -1,5 +1,5 @@
 name: Immich Frame Controller
-version: "0.1.94"
+version: "0.1.95"
 slug: immich_frame_controller
 description: Home Assistant managed controller for Immich, immich-kiosk, and a fixed-URL digital frame.
 url: https://github.com/hyungyunlim/immich-ha-sa
@@ -55,3 +55,5 @@ schema:
   mqtt_username: str?
   mqtt_password: password?
   mqtt_base_topic: str?
+  turn_key_id: str?
+  turn_key_api_token: password?

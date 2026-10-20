@@ -28,8 +28,8 @@ import org.webrtc.audio.AudioDeviceModule;
 import org.webrtc.audio.JavaAudioDeviceModule;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -41,8 +41,8 @@ import java.util.concurrent.TimeUnit;
  * Two-way WebRTC audio, answered automatically like an intercom. The caller POSTs an SDP offer that already
  * holds its ICE candidates and gets a complete answer back, so no signaling channel stays open.
  *
- * ponytail: one call at a time and the newest caller wins; no STUN/TURN, so callers must reach the frame
- * directly (home LAN or VPN). Add ICE servers here when calls from outside are needed.
+ * STUN/TURN servers come with each call (the controller hands out Cloudflare's), so callers outside the home
+ * network can connect too. ponytail: one call at a time and the newest caller wins.
  */
 final class Call {
     private final Context context;
@@ -67,11 +67,11 @@ final class Call {
     }
 
     /** Hangs up any running call, answers the offer, and returns the answer SDP. */
-    String answer(final String offer, final int audioSource) throws Exception {
+    String answer(final String offer, final int audioSource, final List<PeerConnection.IceServer> iceServers) throws Exception {
         return worker.submit(new Callable<String>() {
             @Override
             public String call() throws Exception {
-                return doAnswer(offer, audioSource);
+                return doAnswer(offer, audioSource, iceServers);
             }
         }).get(15, TimeUnit.SECONDS);
     }
@@ -88,12 +88,12 @@ final class Call {
         }
     }
 
-    private String doAnswer(String offer, int audioSource) throws Exception {
+    private String doAnswer(String offer, int audioSource, List<PeerConnection.IceServer> iceServers) throws Exception {
         close();
         if (factory == null) factory = createFactory(audioSource);
         final int call = generation;
         final CountDownLatch gathered = new CountDownLatch(1);
-        PeerConnection.RTCConfiguration config = new PeerConnection.RTCConfiguration(new ArrayList<PeerConnection.IceServer>());
+        PeerConnection.RTCConfiguration config = new PeerConnection.RTCConfiguration(iceServers);
         config.sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN;
         pc = factory.createPeerConnection(config, new Events(call, gathered));
         if (pc == null) throw new IOException("could not create a peer connection");
@@ -104,7 +104,7 @@ final class Call {
         pc.addTrack(track, Collections.singletonList("frame"));
         SessionDescription answer = new Sdp().create(pc);
         new Sdp().set(pc, answer, true);
-        gathered.await(3, TimeUnit.SECONDS); // host candidates only, normally done in milliseconds
+        gathered.await(4, TimeUnit.SECONDS); // host and STUN take milliseconds; TURN over TCP/TLS can take longer
         return pc.getLocalDescription().description;
     }
 

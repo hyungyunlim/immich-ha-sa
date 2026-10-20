@@ -50,5 +50,11 @@ configuration:
   mqtt_base_topic:
     name: MQTT base topic
     description: Base topic FreeKiosk publishes under. Leave blank for the FreeKiosk default `freekiosk`.
+  turn_key_id:
+    name: Cloudflare TURN key ID
+    description: Optional. From Cloudflare dashboard > Realtime > TURN Server. With a key, Frames panel calls also work from outside the home network.
+  turn_key_api_token:
+    name: Cloudflare TURN API token
+    description: The API token shown with the TURN key.
 network:
   8080/TCP: Controller frame URL, setup page, and API

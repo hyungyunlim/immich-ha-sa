@@ -28,12 +28,12 @@ The app listens on port `8765`. Every endpoint needs `?k=<key>`.
 | `GET /mic.aac` | Live AAC-LC (ADTS, 48 kbps) stream; plays as a live stream in most players and speakers |
 | `GET /mic.wav` | Live 16 kHz mono WAV stream, lossless for speech recognition |
 | `GET /notify?on=1\|0` | Show or hide the listener in the Android notification (persisted, default on) |
-| `POST /call` | Two-way WebRTC audio: the body is an SDP offer with all its ICE candidates, the response the answer (`application/sdp`) |
+| `POST /call` | Two-way WebRTC audio: the body is an SDP offer with all its ICE candidates, the response the answer (`application/sdp`). An optional `X-Ice-Servers` header (base64 JSON `RTCIceServer[]`, 0.7+) adds STUN/TURN servers |
 | `GET /hangup` | End the call |
 
 Streams and calls return `423` while disabled, and `/disable` also ends a call. A new stream request takes the mic over from the previous listener, because players such as nPlayer reconnect with `Range` requests right after the first connection. A call and a stream take the mic from each other the same way.
 
-Calls use no STUN or TURN server, so the caller must reach the frame directly (home network or VPN). The frame cancels its own speaker echo with WebRTC's software echo canceller, and plays the call at the media volume.
+The controller sends Cloudflare's STUN server with each call, plus short-lived Cloudflare TURN credentials when it has a TURN key, so callers outside the home network can connect too. Without them the caller must reach the frame directly (home network or VPN). The frame cancels its own speaker echo with WebRTC's software echo canceller, and plays the call at the media volume.
 
 The app picks the first Android audio source that delivers samples and remembers it. On the Lenovo Smart Frame `VOICE_COMMUNICATION` does not initialize, so it uses `VOICE_RECOGNITION` or `MIC`. Only one app can capture the microphone at a time, so close pages that use `getUserMedia` while listening.
 

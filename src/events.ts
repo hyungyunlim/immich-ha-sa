@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { FastifyReply } from 'fastify';
 import type {
+  AgendaItem,
   FrameCommand,
   FrameCommandAck,
   FrameCommandEvent,
@@ -102,6 +103,16 @@ export class FrameEventHub {
     }
   }
 
+  emitAgenda(deviceId: string, agenda: { items: AgendaItem[]; locale: string }): void {
+    for (const client of this.clients.get(deviceId) ?? []) {
+      try {
+        this.send(client, 'agenda', agenda);
+      } catch {
+        this.clients.get(deviceId)?.delete(client);
+      }
+    }
+  }
+
   issueCommand(deviceId: string, command: FrameCommand): FrameCommandDelivery {
     const event: FrameCommandEvent = {
       command,
@@ -188,7 +199,12 @@ export class FrameEventHub {
   private send(
     client: SseClient,
     event: string,
-    data: ResolvedFrameState | { at: string } | FrameCommandEvent | { items: Array<Pick<FrameNotice, 'id' | 'text' | 'until'>> },
+    data:
+      | ResolvedFrameState
+      | { at: string }
+      | FrameCommandEvent
+      | { items: Array<Pick<FrameNotice, 'id' | 'text' | 'until'>> }
+      | { items: AgendaItem[]; locale: string },
   ): void {
     client.reply.raw.write(`event: ${event}\n`);
     client.reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
