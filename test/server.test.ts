@@ -1562,7 +1562,7 @@ describe('controller API', () => {
       }
       if (request.url?.startsWith('/kiosk.js')) {
         response.setHeader('content-type', 'text/javascript');
-        response.end('const dataAttr = /^data-[\\w]+$/; navigator.serviceWorker.register("/assets/js/sw.js"); if (/^\\/asset\\/(new|offline|previous)$/.test(path)) startPolling();');
+        response.end('const dataAttr = /^data-[\\w]+$/; navigator.serviceWorker.register("/assets/js/sw.js"); fetch("/health",{cache:"no-store"}); if (/^\\/asset\\/(new|offline|previous)$/.test(path)) startPolling();');
         return;
       }
       if (request.url?.startsWith('/video')) {
@@ -1638,6 +1638,8 @@ describe('controller API', () => {
     expect(javascript.headers['cache-control']).toBe('no-store, max-age=0');
     expect(javascript.body).toContain('const dataAttr = /^data-[\\w]+$/;');
     expect(javascript.body).toContain('register("/kiosk-proxy/lenovo/assets/js/sw.js")');
+    // immich-kiosk 0.45+ polls /health from JS; unproxied it hits the controller root, 404s, and shows "Reconnecting"
+    expect(javascript.body).toContain('fetch("/kiosk-proxy/lenovo/health",');
     expect(javascript.body).toContain('if (/^\\/asset\\/(new|offline|previous)$/.test(path)) startPolling();');
     expect(javascript.body).toContain('early/proxied immich-kiosk asset request lifecycle compatibility');
     expect(javascript.body).toContain('EXACT_ASSET_REQUEST_PATH = /^\\/asset\\/(new|offline|previous)$/');

@@ -3240,7 +3240,7 @@ function rewriteProxyText(value: string, proxyPrefix: string, contentType: strin
   const normalizedPrefix = proxyPrefix.replace(/\/+$/, '');
   const normalizedContentType = contentType.toLowerCase();
   if (normalizedContentType.includes('javascript')) {
-    const rewritten = value.replace(/(["'`])\/(assets|asset)(?=[/"'`?])/g, `$1${normalizedPrefix}/$2`);
+    const rewritten = value.replace(/(["'`])\/(assets|asset|health)(?=[/"'`?])/g, `$1${normalizedPrefix}/$2`);
     return `${rewritten}\n${KIOSK_PROXY_COMPAT_JS}`;
   }
   if (normalizedContentType.startsWith('text/css')) {

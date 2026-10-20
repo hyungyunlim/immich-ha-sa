@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.89
+
+- Route immich-kiosk 0.45+ `/health` checks through the kiosk proxy. Unproxied they hit the controller root, failed, and made frames show **Reconnecting**.
+
 ## 0.1.88
 
 - Add a **Frame Speaker** media player per frame. It plays audio from the Home Assistant media browser, local media, or `tts.speak` on the frame speaker through FreeKiosk, with stop and volume control.
