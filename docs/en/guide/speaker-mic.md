@@ -5,6 +5,8 @@ Each frame that uses [FreeKiosk remote control](./freekiosk) gets two audio enti
 - **Frame Speaker** (`media_player`) plays audio on the frame speaker.
 - **Frame Mic Stream** (`switch`) lets you listen to the frame microphone through the Frame Mic companion app.
 
+The **Frame Call** sidebar panel adds two-way calls with the same app.
+
 ## Frame Speaker
 
 The speaker plays any audio URL the frame can reach, through FreeKiosk's audio player.
@@ -41,8 +43,21 @@ While someone listens, the frame's Android notification shows who it is. The **F
 
 The app talks to the controller on port `8765` at the same address as the FreeKiosk REST endpoint. For a frame behind another router, forward that port the same way as the REST port.
 
+## Frame Call
+
+**Frame Call** in the Home Assistant sidebar calls a frame like an intercom: the frame answers by itself, plays your voice on its speaker, and sends its microphone back. The delay is a fraction of a second, so you can talk normally.
+
+- Needs Frame Mic 0.6 or newer and the **Frame Mic Stream** switch on. Turning the switch off ends a call.
+- Open Home Assistant through its `https://` address; browsers allow the microphone only on HTTPS.
+- Audio goes directly between your device and the frame, so calls work on the home network and over a VPN that reaches the frame, not over the internet yet.
+- The frame shows a small *On call* pill at the top of the screen when Frame Mic may *Display over other apps* (the app asks for it when opened). Allow it once in Android settings, or with adb: `adb shell appops set org.junlim.framemic SYSTEM_ALERT_WINDOW allow`.
+- Leaving the panel hangs up. A call and a Frame Mic stream share the microphone, so whichever starts last takes it over.
+- The frame cancels its own speaker echo in software. If the other side hears an echo, mute yourself while listening.
+
+The call plays at the frame's media volume, the same one the slideshow and the Frame Speaker use.
+
 ::: warning Privacy
-Only enable listening on frames where everyone in the room knows about it.
+Only enable listening and calls on frames where everyone in the room knows about it.
 :::
 
 ### Troubleshooting

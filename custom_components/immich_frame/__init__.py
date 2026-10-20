@@ -20,7 +20,7 @@ from .const import (
     CONF_DEVICE_ID,
     DATA_CLIENT,
     DATA_COORDINATOR,
-    DATA_MIC_VIEW,
+    DATA_HTTP_REGISTERED,
     DEFAULT_DEVICE_ID,
     DOMAIN,
     SERVICE_REFRESH_ALBUMS,
@@ -34,6 +34,7 @@ from .const import (
     SERVICE_SET_RENDERER_OPTIONS,
 )
 from .coordinator import ImmichFrameCoordinator
+from .call import async_register_call_panel
 from .media_source import ImmichFrameMicStreamView
 from .profile_helpers import (
     existing_profile_for_id,
@@ -122,11 +123,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Media browser relay for Frame Mic streams; registered once for all frames
+    # Frame Mic media browser relay and the Frame Call panel; registered once for all frames
     # (kept outside hass.data[DOMAIN], whose values are all per-frame runtimes)
-    if not hass.data.get(DATA_MIC_VIEW):
+    if not hass.data.get(DATA_HTTP_REGISTERED):
+        hass.data[DATA_HTTP_REGISTERED] = True
         hass.http.register_view(ImmichFrameMicStreamView())
-        hass.data[DATA_MIC_VIEW] = True
+        await async_register_call_panel(hass)
 
     # Push real-time remote-status updates (motion, screen, availability) between
     # the coordinator's periodic polls. Falls back silently to polling when the

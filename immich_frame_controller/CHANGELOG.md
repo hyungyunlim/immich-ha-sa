@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.93
+
+- Add **Frame Call**, a sidebar panel for two-way calls with frames. The frame answers by itself like an intercom and shows a small *On call* pill. Audio flows directly over WebRTC, so the delay is a fraction of a second. Calls need Frame Mic 0.6 (attached to the release), the Frame Mic Stream switch on, Home Assistant opened over HTTPS, and a device on the home network or a VPN that reaches the frame.
+- New controller endpoints: `POST`/`DELETE /api/frames/:deviceId/call`.
+- Restart Home Assistant Core after updating the integration so the panel loads.
+
 ## 0.1.92
 
 - **Immich Frame Mic** in the media browser shows frames as tiles: ready, *LIVE* while someone listens, and greyed out while the switch is off. Frames use their Home Assistant device names, including names you set, and are sorted by name.

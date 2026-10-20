@@ -302,6 +302,7 @@ const MicStreamToggleSchema = z.object({
   notify: z.boolean().optional(),
 }).refine((value) => value.enabled !== undefined || value.notify !== undefined, 'Set enabled or notify.');
 
+const CallOfferSchema = z.object({ sdp: z.string().startsWith('v=0').max(20000) });
 const FrameAudioPlaySchema = z.object({
   url: z.string().url().refine((value) => /^https?:\/\//i.test(value), 'Use an http(s) URL the frame can reach.'),
   volume: z.number().int().min(0).max(100).optional(),
@@ -1757,6 +1758,34 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     }
   });
 
+  // Two-way audio with the Frame Mic app (0.6+): relays the caller's SDP offer and returns the frame's answer.
+  app.post('/api/frames/:deviceId/call', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const parsed = CallOfferSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', 'Send the SDP offer as { "sdp": "v=0..." }.'));
+      return;
+    }
+    const device = deviceOrReply(request, reply);
+    if (!device) return;
+    try {
+      return ok({ sdp: await micStreamCall(device, parsed.data.sdp) });
+    } catch (error) {
+      sendRemoteFailure(reply, error);
+    }
+  });
+
+  app.delete('/api/frames/:deviceId/call', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const device = deviceOrReply(request, reply);
+    if (!device) return;
+    try {
+      return ok(await micStreamRequest(device, 'hangup'));
+    } catch (error) {
+      sendRemoteFailure(reply, error);
+    }
+  });
+
   function deviceOrReply(request: FastifyRequest, reply: FastifyReply): FrameDevice | undefined {
     const { deviceId } = request.params as { deviceId: string };
     const device = store.getDevice(deviceId);
@@ -2930,7 +2959,7 @@ async function setRemoteAutoBrightness(
 }
 
 const MIC_STREAM_DEFAULT_PORT = 8765;
-type MicStreamAction = 'status' | 'enable' | 'disable' | 'notify?on=1' | 'notify?on=0';
+type MicStreamAction = 'status' | 'enable' | 'disable' | 'hangup' | 'notify?on=1' | 'notify?on=0';
 
 // The Frame Mic app runs next to FreeKiosk, so it shares the host of the frame's REST endpoint.
 function micStreamBaseUrl(device: FrameDevice): string | undefined {
@@ -2940,12 +2969,40 @@ function micStreamBaseUrl(device: FrameDevice): string | undefined {
   return host ? `http://${host}:${device.micStreamPort ?? MIC_STREAM_DEFAULT_PORT}` : undefined;
 }
 
-async function micStreamRequest(device: FrameDevice, action: MicStreamAction): Promise<Record<string, unknown>> {
+function micStreamTarget(device: FrameDevice): { baseUrl: string; key: string } {
   const baseUrl = micStreamBaseUrl(device);
   if (!baseUrl || !device.micStreamKey) {
     throw new RemoteCommandError('MIC_NOT_CONFIGURED', `Frame ${device.id} has no Frame Mic key or reachable host.`, 400);
   }
-  const key = encodeURIComponent(device.micStreamKey);
+  return { baseUrl, key: encodeURIComponent(device.micStreamKey) };
+}
+
+async function micStreamCall(device: FrameDevice, offer: string): Promise<string> {
+  const { baseUrl, key } = micStreamTarget(device);
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/call?k=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/sdp' },
+      body: offer,
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (error) {
+    throw new RemoteCommandError('MIC_UNREACHABLE', `Frame Mic is not reachable at ${baseUrl}: ${error instanceof Error ? error.message : String(error)}`, 502);
+  }
+  const answer = await response.text();
+  if (response.status === 423) {
+    throw new RemoteCommandError('MIC_DISABLED', 'Turn on Frame Mic Stream before calling.', 423);
+  }
+  if (!response.ok || !answer.startsWith('v=0')) {
+    // Frame Mic before 0.6 answers POST with 403, like a wrong key
+    throw new RemoteCommandError('MIC_CALL_FAILED', `Frame Mic call failed with HTTP ${response.status} (calls need Frame Mic 0.6+): ${answer.slice(0, 200)}`, 502);
+  }
+  return answer;
+}
+
+async function micStreamRequest(device: FrameDevice, action: MicStreamAction): Promise<Record<string, unknown>> {
+  const { baseUrl, key } = micStreamTarget(device);
   let response: Response;
   try {
     response = await fetch(`${baseUrl}/${action}${action.includes('?') ? '&' : '?'}k=${key}`, { signal: AbortSignal.timeout(REMOTE_REQUEST_TIMEOUT_MS) });

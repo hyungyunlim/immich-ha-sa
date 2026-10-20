@@ -42,12 +42,16 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   GET /mic.wav   live 16 kHz mono WAV (lossless, for speech recognition)
  *   GET /mic.aac   live AAC-LC in ADTS (internet-radio format; players and speakers treat it as a live stream)
  *   GET /notify?on=1|0  show or hide who is listening in the Android notification (persisted, default on)
+ *   POST /call     two-way WebRTC audio: body is an SDP offer with its ICE candidates, the response the answer
+ *   GET /hangup    end the call
+ *
+ * A call and a stream both need the mic, so whichever starts last takes it over.
  *
  * ponytail: one listener at a time and the newest wins; add a fan-out when two people need to listen at once.
  */
 public class StreamService extends Service {
     static final int PORT = 8765;
-    static final String VERSION = "0.5";
+    static final String VERSION = "0.6";
     static final int RATE = 16000;
     private static final String CHANNEL = "mic";
 
@@ -72,11 +76,18 @@ public class StreamService extends Service {
     private volatile String client = "";
     private volatile String detail = "idle";
     private SharedPreferences prefs;
+    private Call call;
 
     @Override
     public void onCreate() {
         super.onCreate();
         prefs = getSharedPreferences("framemic", MODE_PRIVATE);
+        call = new Call(this, new Runnable() {
+            @Override
+            public void run() {
+                refreshNote();
+            }
+        });
     }
 
     @Override
@@ -104,6 +115,7 @@ public class StreamService extends Service {
     @Override
     public void onDestroy() {
         running = false;
+        call.hangup();
         try {
             if (server != null) server.close();
         } catch (IOException ignored) {
@@ -123,6 +135,7 @@ public class StreamService extends Service {
     private Notification note() {
         String text = !prefs.getBoolean("notify", true) ? "Running"
                 : streaming.get() ? "Streaming to " + client
+                : !"idle".equals(call.state()) ? "Call: " + call.state()
                 : enabled() ? "On: mic opens only while someone listens" : "Off";
         return new Notification.Builder(this, CHANNEL)
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
@@ -163,7 +176,8 @@ public class StreamService extends Service {
         BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream(), StandardCharsets.US_ASCII));
         String request = in.readLine(); // e.g. "GET /mic.wav?k=KEY HTTP/1.1"
         OutputStream out = s.getOutputStream();
-        if (request == null || !request.startsWith("GET ") || !request.contains("k=" + key(this))) {
+        if (request == null || !(request.startsWith("GET ") || request.startsWith("POST "))
+                || !request.contains("k=" + key(this))) {
             respond(out, "403 Forbidden", "text/plain", "forbidden");
             return;
         }
@@ -176,6 +190,7 @@ public class StreamService extends Service {
             respond(out, "200 OK", "application/json", json());
         } else if (path.equals("/disable")) {
             setEnabled(false); // a running stream sees this within ~20 ms and ends
+            call.hangup();
             respond(out, "200 OK", "application/json", json());
         } else if (path.equals("/notify")) {
             prefs.edit().putBoolean("notify", !target.contains("on=0")).apply();
@@ -185,9 +200,48 @@ public class StreamService extends Service {
             stream(s, out, false);
         } else if (path.equals("/mic.aac")) {
             stream(s, out, true);
+        } else if (path.equals("/call") && request.startsWith("POST ")) {
+            answerCall(in, out);
+        } else if (path.equals("/hangup")) {
+            call.hangup();
+            respond(out, "200 OK", "application/json", json());
         } else {
             respond(out, "404 Not Found", "text/plain", "not found");
         }
+    }
+
+    private void answerCall(BufferedReader in, OutputStream out) throws IOException {
+        int length = 0;
+        for (String header; (header = in.readLine()) != null && !header.isEmpty(); ) {
+            if (header.regionMatches(true, 0, "Content-Length:", 0, 15)) length = Integer.parseInt(header.substring(15).trim());
+        }
+        if (!enabled()) {
+            respond(out, "423 Locked", "text/plain", "mic stream is off");
+            return;
+        }
+        if (length <= 0 || length > 65536) {
+            respond(out, "400 Bad Request", "text/plain", "send the SDP offer as the request body");
+            return;
+        }
+        char[] body = new char[length]; // SDP is ASCII, so chars and bytes match
+        for (int off = 0, n; off < length; off += n) {
+            if ((n = in.read(body, off, length - off)) < 0) throw new IOException("offer cut short");
+        }
+        // Take the mic from a running stream, which notices within ~20 ms
+        listener.incrementAndGet();
+        long deadline = System.currentTimeMillis() + 2000;
+        while (streaming.get() && System.currentTimeMillis() < deadline) sleep(20);
+        String answer;
+        try {
+            answer = call.answer(new String(body), SOURCES[prefs.getInt("source", 0)]);
+        } catch (Exception e) {
+            respond(out, "500 Internal Server Error", "text/plain", "call failed: " + e);
+            return;
+        }
+        byte[] b = answer.getBytes(StandardCharsets.US_ASCII); // exact SDP: its last line must keep its CRLF
+        out.write(("HTTP/1.0 200 OK\r\nContent-Type: application/sdp\r\nContent-Length: " + b.length
+                + "\r\nCache-Control: no-cache\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+        out.write(b);
     }
 
     private void stream(Socket s, OutputStream out, boolean aac) throws IOException {
@@ -195,6 +249,7 @@ public class StreamService extends Service {
             respond(out, "423 Locked", "text/plain", "mic stream is off");
             return;
         }
+        call.hangup(); // the newest user of the mic wins
         // The newest listener takes over the mic. Players such as nPlayer reconnect with Range requests
         // right after closing the first connection, before the old stream has noticed it is gone.
         int me = listener.incrementAndGet();
@@ -300,7 +355,7 @@ public class StreamService extends Service {
 
     private String json() {
         return "{\"version\":\"" + VERSION + "\",\"enabled\":" + enabled() + ",\"notify\":" + prefs.getBoolean("notify", true)
-                + ",\"streaming\":" + streaming.get()
+                + ",\"streaming\":" + streaming.get() + ",\"call\":\"" + call.state() + "\""
                 + ",\"client\":\"" + esc(client) + "\",\"source\":\"" + esc(SOURCE_NAMES[prefs.getInt("source", 0)])
                 + "\",\"detail\":\"" + esc(detail) + "\"}";
     }

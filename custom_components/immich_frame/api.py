@@ -188,6 +188,22 @@ class ImmichFrameClient:
             auth=True,
         )
 
+    async def start_call(self, sdp: str) -> str:
+        data = await self._request(
+            "POST",
+            f"/api/frames/{self.device_id}/call",
+            json={"sdp": sdp},
+            auth=True,
+        )
+        return data["sdp"]
+
+    async def end_call(self) -> dict[str, Any]:
+        return await self._request(
+            "DELETE",
+            f"/api/frames/{self.device_id}/call",
+            auth=True,
+        )
+
     async def play_audio(self, url: str, volume: int | None = None) -> dict[str, Any]:
         payload: dict[str, Any] = {"url": url}
         if volume is not None:

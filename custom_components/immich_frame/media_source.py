@@ -71,7 +71,13 @@ async def async_get_media_source(hass: HomeAssistant) -> ImmichFrameMicSource:
     return ImmichFrameMicSource(hass)
 
 
-def _coordinators(hass: HomeAssistant) -> dict:
+def frame_name(devices: dr.DeviceRegistry, device_id: str) -> str:
+    """The frame's Home Assistant device name, including a name the user set."""
+    device = devices.async_get_device(identifiers={(DOMAIN, device_id)})
+    return (device and (device.name_by_user or device.name)) or f"{frame_label(device_id)} Frame"
+
+
+def coordinators(hass: HomeAssistant) -> dict:
     return {
         entry_id: data[DATA_COORDINATOR]
         for entry_id, data in hass.data.get(DOMAIN, {}).items()
@@ -87,7 +93,7 @@ class ImmichFrameMicSource(MediaSource):
         self.hass = hass
 
     async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
-        if item.identifier not in _coordinators(self.hass):
+        if item.identifier not in coordinators(self.hass):
             raise Unresolvable(f"Unknown frame: {item.identifier}")
         # Relative /api path: Home Assistant signs it for the browser or media player that plays it
         return PlayMedia(MIC_STREAM_PATH.format(entry_id=item.identifier), "audio/aac")
@@ -97,13 +103,11 @@ class ImmichFrameMicSource(MediaSource):
             raise Unresolvable("Frame mics have no children")
         devices = dr.async_get(self.hass)
         children = []
-        for entry_id, coordinator in _coordinators(self.hass).items():
+        for entry_id, coordinator in coordinators(self.hass).items():
             mic = (coordinator.data or {}).get("mic")
             if not isinstance(mic, dict):
                 continue  # no Frame Mic key for this frame
-            device_id = coordinator.client.device_id
-            device = devices.async_get_device(identifiers={(DOMAIN, device_id)})
-            name = (device and (device.name_by_user or device.name)) or f"{frame_label(device_id)} Frame"
+            name = frame_name(devices, coordinator.client.device_id)
             enabled = bool(mic.get("enabled"))
             state = "live" if enabled and mic.get("streaming") else "ready" if enabled else "off"
             children.append(
@@ -141,7 +145,7 @@ class ImmichFrameMicStreamView(HomeAssistantView):
 
     async def get(self, request: web.Request, entry_id: str) -> web.StreamResponse:
         hass = request.app[KEY_HASS]
-        coordinator = _coordinators(hass).get(entry_id)
+        coordinator = coordinators(hass).get(entry_id)
         if coordinator is None:
             return web.Response(status=404, text="Unknown frame")
         try:

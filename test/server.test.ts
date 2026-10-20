@@ -1716,6 +1716,62 @@ describe('controller API', () => {
 });
 
 describe('frame mic and speaker', () => {
+  it('relays a call offer to the Frame Mic app and returns its answer', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-call-'));
+    tempDirs.push(dir);
+    const seen: Array<{ method?: string; url?: string; type?: string; body: string }> = [];
+    let enabled = false;
+    const frame = createHttpServer((request, response) => {
+      let raw = '';
+      request.on('data', (chunk) => { raw += chunk; });
+      request.on('end', () => {
+        seen.push({ method: request.method, url: request.url, type: request.headers['content-type'], body: raw });
+        const url = new URL(request.url ?? '/', 'http://frame.local');
+        if (url.pathname === '/call') {
+          response.statusCode = enabled ? 200 : 423;
+          response.end(enabled ? 'v=0\r\no=answer\r\na=end\r\n' : 'mic stream is off\n');
+          return;
+        }
+        response.setHeader('Content-Type', 'application/json');
+        response.end(JSON.stringify({ version: '0.6', enabled, call: 'idle' }));
+      });
+    });
+    await new Promise<void>((resolve) => frame.listen(0, '127.0.0.1', resolve));
+    const port = (frame.address() as AddressInfo).port;
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    store.updateDevice('lenovo', {
+      remoteControlType: 'freekiosk',
+      remoteApiUrl: `http://127.0.0.1:${port}`,
+      micStreamKey: 'mic-secret',
+      micStreamPort: port,
+    });
+    const server = createTestServer({ config, store });
+    const offer = 'v=0\r\no=offer\r\na=candidate:1 1 udp 1 192.168.1.5 5000 typ host\r\n';
+
+    const invalid = await server.inject({ method: 'POST', url: '/api/frames/lenovo/call', payload: { sdp: 'hello' } });
+    expect(invalid.statusCode).toBe(400);
+    const off = await server.inject({ method: 'POST', url: '/api/frames/lenovo/call', payload: { sdp: offer } });
+    expect(off.statusCode).toBe(423);
+    expect(off.json().error.code).toBe('MIC_DISABLED');
+    enabled = true;
+    const answered = await server.inject({ method: 'POST', url: '/api/frames/lenovo/call', payload: { sdp: offer } });
+    expect(answered.statusCode).toBe(200);
+    expect(answered.json().data.sdp).toBe('v=0\r\no=answer\r\na=end\r\n'); // byte-exact, trailing CRLF kept
+    const hangup = await server.inject({ method: 'DELETE', url: '/api/frames/lenovo/call' });
+    expect(hangup.statusCode).toBe(200);
+    expect(hangup.json().data.call).toBe('idle');
+
+    expect(seen.map(({ method, url }) => `${method} ${url}`)).toEqual([
+      'POST /call?k=mic-secret',
+      'POST /call?k=mic-secret',
+      'GET /hangup?k=mic-secret',
+    ]);
+    expect(seen[1]).toMatchObject({ type: 'application/sdp', body: offer });
+    await server.close();
+    await new Promise<void>((resolve) => frame.close(() => resolve()));
+  });
+
   it('controls the Frame Mic app and plays audio through FreeKiosk without leaking the mic key', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-mic-'));
     tempDirs.push(dir);

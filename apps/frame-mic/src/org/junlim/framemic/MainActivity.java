@@ -4,7 +4,9 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.widget.TextView;
 
 /** Asks for the microphone once, then starts the stream service and shows its URL. */
@@ -42,6 +44,11 @@ public class MainActivity extends Activity {
                 + "Enter this key in the controller console (device > Frame Mic Key).\n\n"
                 + "Listening stays off until it is switched on from Home Assistant,\n"
                 + "and the mic opens only while someone listens.\n\n"
-                + StreamService.url(this));
+                + StreamService.url(this)
+                + (Settings.canDrawOverlays(this) ? ""
+                : "\n\nAllow \"Display over other apps\" so calls show a small indicator on screen."));
+        if (!Settings.canDrawOverlays(this)) {
+            startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+        }
     }
 }
