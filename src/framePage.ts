@@ -94,19 +94,19 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
     body.suspended #notice {
       display: none;
     }
-    /* Calendar widget: this month with today marked, next to today's notices and events. */
+    /* Calendar widget: a small, quiet card with this month and today's notices and events. */
     #agenda-widget {
       position: fixed;
       left: 50%;
       bottom: 11vmin;
       z-index: 10;
       display: none;
-      padding: 2.6vmin 3.2vmin;
-      border-radius: 3vmin;
-      background: rgba(0, 0, 0, 0.5);
-      box-shadow: 0 0.4vmin 2.4vmin rgba(0, 0, 0, 0.3);
-      color: #fff;
-      font-size: 2.4vmin;
+      padding: 1.8vmin 2.4vmin;
+      border-radius: 2.4vmin;
+      background: rgba(0, 0, 0, 0.42);
+      box-shadow: 0 0.3vmin 1.8vmin rgba(0, 0, 0, 0.22);
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 1.85vmin;
       white-space: nowrap;
       transform: translateX(-50%);
       pointer-events: none;
@@ -116,72 +116,80 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       align-items: flex-start;
     }
     #agenda-widget .cal {
-      width: 30vmin;
+      width: 23vmin;
     }
-    #agenda-widget .cal-title,
-    #agenda-widget .cal-today {
-      margin-bottom: 1.2vmin;
-      font-weight: 600;
-    }
-    #agenda-widget .cal-today {
-      font-size: 2.9vmin;
+    #agenda-widget .label {
+      margin-bottom: 0.8vmin;
+      font-size: 1.45vmin;
+      letter-spacing: 0.05em;
+      opacity: 0.6;
     }
     #agenda-widget .cal-grid {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
-      font-size: 1.9vmin;
-      line-height: 3.8vmin;
+      font-size: 1.5vmin;
+      line-height: 3vmin;
       text-align: center;
     }
     #agenda-widget .wd {
-      font-size: 1.6vmin;
-      opacity: 0.65;
+      font-size: 1.25vmin;
+      opacity: 0.5;
     }
     #agenda-widget .sun {
-      color: #ff9e9e;
+      color: rgba(255, 196, 196, 0.85);
     }
     #agenda-widget .sat {
-      color: #9ec5ff;
+      color: rgba(196, 214, 255, 0.85);
     }
     #agenda-widget .day {
       position: relative;
     }
     #agenda-widget .day b {
       display: inline-block;
-      width: 3.4vmin;
-      line-height: 3.4vmin;
+      width: 2.7vmin;
+      line-height: 2.7vmin;
       border-radius: 50%;
       font-weight: 400;
     }
     #agenda-widget .day.today b {
-      background: rgba(255, 183, 77, 0.9);
-      color: #1a1a1a;
+      background: rgba(255, 255, 255, 0.24);
+      color: #fff;
       font-weight: 600;
     }
     #agenda-widget .day.has::after {
       content: '';
       position: absolute;
       left: 50%;
-      bottom: 0;
-      width: 0.6vmin;
-      height: 0.6vmin;
-      margin-left: -0.3vmin;
+      bottom: 0.05vmin;
+      width: 0.45vmin;
+      height: 0.45vmin;
+      margin-left: -0.225vmin;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.55);
     }
     #agenda-widget .cal-list {
-      min-width: 28vmin;
-      max-width: 46vmin;
-      margin-left: 3vmin;
-      padding-left: 3vmin;
-      border-left: 1px solid rgba(255, 255, 255, 0.2);
+      min-width: 20vmin;
+      max-width: 34vmin;
+      margin-left: 2.2vmin;
+      padding-left: 2.2vmin;
+      border-left: 1px solid rgba(255, 255, 255, 0.12);
     }
     #agenda-widget .row {
-      line-height: 4.6vmin;
+      line-height: 3.5vmin;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     #agenda-widget .row.empty {
+      opacity: 0.55;
+    }
+    #agenda-widget .chip {
+      margin-right: 1vmin;
+      padding: 0.1vmin 1.1vmin;
+      background: rgba(255, 255, 255, 0.13);
+      font-size: 0.8em;
+    }
+    #agenda-widget .time {
+      margin-right: 1vmin;
       opacity: 0.6;
     }
     body.suspended #agenda-widget {
@@ -205,6 +213,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       var noticeEl = document.getElementById('notice');
       var notices = [];
       var agenda = { items: [], locale: 'en', widget: false };
+      var agendaLoaded = false; // wait for it once, so the pill does not flash before the widget appears
       var noticeIndex = -1;
       var noticeKey = '';
       var widgetEl = document.getElementById('agenda-widget');
@@ -212,20 +221,14 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
       var agendaWords = {
         ko: {
-          today: '오늘', tomorrow: '내일', allDay: '종일', noEvents: '다가오는 일정 없음',
+          today: '오늘', tomorrow: '내일', allDay: '종일', listTitle: '오늘의 일정', noEvents: '일정 없음',
           days: ['일', '월', '화', '수', '목', '금', '토'],
-          monthTitle: function (year, month) { return year + '년 ' + (month + 1) + '월'; },
-          todayTitle: function (date) {
-            return (date.getMonth() + 1) + '월 ' + date.getDate() + '일 ' + ['일', '월', '화', '수', '목', '금', '토'][date.getDay()] + '요일';
-          }
+          monthTitle: function (month) { return (month + 1) + '월'; }
         },
         en: {
-          today: 'Today', tomorrow: 'Tomorrow', allDay: 'All day', noEvents: 'No upcoming events',
-          days: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-          monthTitle: function (year, month) { return months[month] + ' ' + year; },
-          todayTitle: function (date) {
-            return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][date.getDay()] + ', ' + months[date.getMonth()] + ' ' + date.getDate();
-          }
+          today: 'Today', tomorrow: 'Tomorrow', allDay: 'All day', listTitle: "Today's events", noEvents: 'No events',
+          days: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
+          monthTitle: function (month) { return months[month]; }
         }
       };
       var iframe = document.getElementById('renderer');
@@ -685,15 +688,16 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
           cells.push('<span class="day' + (d === now.getDate() ? ' today' : '') + (marked[d] ? ' has' : '')
             + (weekday === 0 ? ' sun' : weekday === 6 ? ' sat' : '') + '"><b>' + d + '</b></span>');
         }
-        var rows = displayItems().slice(0, 6).map(function (item) {
-          return '<div class="row">' + (item.chip
-            ? '<span class="chip' + (item.today ? ' today' : '') + '">' + escapeText(item.chip) + '</span>'
-              + '<span class="time">' + escapeText(item.time) + '</span>'
-            : '') + escapeText(item.text) + '</div>';
+        // Under "Today's events" today's items need only their time; later days keep their day chip
+        var rows = displayItems().slice(0, 5).map(function (item) {
+          return '<div class="row">'
+            + (item.chip && !item.today ? '<span class="chip">' + escapeText(item.chip) + '</span>' : '')
+            + (item.chip ? '<span class="time">' + escapeText(item.time) + '</span>' : '')
+            + escapeText(item.text) + '</div>';
         });
-        var html = '<div class="cal"><div class="cal-title">' + escapeText(words.monthTitle(year, month)) + '</div>'
+        var html = '<div class="cal"><div class="label">' + escapeText(words.monthTitle(month)) + '</div>'
           + '<div class="cal-grid">' + cells.join('') + '</div></div>'
-          + '<div class="cal-list"><div class="cal-today">' + escapeText(words.todayTitle(now)) + '</div>'
+          + '<div class="cal-list"><div class="label">' + escapeText(words.listTitle) + '</div>'
           + (rows.length ? rows.join('') : '<div class="row empty">' + escapeText(words.noEvents) + '</div>') + '</div>';
         if (html !== widgetHtml) {
           widgetHtml = html;
@@ -704,6 +708,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
 
       // Rotates through the items in the pill (fading out before swapping), or keeps the widget current.
       function showNextNotice() {
+        if (!agendaLoaded) return;
         if (agenda.widget) {
           noticeEl.className = ''; // notices are listed in the widget instead
           noticeKey = '';
@@ -737,6 +742,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
 
       function setAgenda(value) {
         agenda = value && value.items ? value : { items: [], locale: 'en', widget: false };
+        agendaLoaded = true;
         noticeIndex = -1;
         showNextNotice();
       }
@@ -745,9 +751,11 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         return fetch(agendaUrl, { cache: 'no-store' })
           .then(function (response) { return response.json(); })
           .then(function (payload) {
-            if (payload && payload.success) setAgenda(payload.data);
+            setAgenda(payload && payload.success ? payload.data : null);
           })
-          .catch(function () {});
+          .catch(function () {
+            if (!agendaLoaded) setAgenda(null);
+          });
       }
 
       function loadNotices() {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.97
+
+- The calendar widget is smaller and quieter: muted colors, today circled in translucent white, and a small *Today's events* label in place of the date heading. Today's events show just their time; later ones keep their day.
+- Frames no longer flash the notice pill for a moment before the widget appears.
+- Reload the frames so they pick up the new frame page.
+
 ## 0.1.96
 
 - Add a calendar widget, switched on and off in the Frames panel's **Calendar** tab. With it on, the chosen frames show a card near the bottom with this month's calendar (today circled, dots on days with events) next to today's date and the notices and upcoming events, in place of the pill. It also works without calendars, as a month calendar with the notices.
