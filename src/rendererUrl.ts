@@ -160,6 +160,8 @@ export function buildRendererUrl(
   url.searchParams.set('show_image_id', String(state.showImageId));
   url.searchParams.set('show_user', String(state.showUser));
   url.searchParams.set('show_more_info', String(state.showMoreInfo));
+  // immich-kiosk 0.44+ renamed show_more_info; older releases ignore the new key.
+  url.searchParams.set('more_info_display', String(state.showMoreInfo));
   url.searchParams.set('burn_in_interval', String(state.burnInInterval));
   url.searchParams.set('burn_in_duration', String(state.burnInDuration));
   url.searchParams.set('burn_in_opacity', String(state.burnInOpacity));

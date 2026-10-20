@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.87
+
+- Send the **Show More Info** setting as immich-kiosk's `more_info_display` parameter as well as the legacy `show_more_info`, so frames that hide the More Info overlay keep it hidden on immich-kiosk 0.44 and newer.
+
 ## 0.1.86
 
 - Send frame command acknowledgements with `XMLHttpRequest`, with a plain Fetch fallback, so older Android WebViews can confirm Play, Pause, Previous, and renderer suspend/resume commands.

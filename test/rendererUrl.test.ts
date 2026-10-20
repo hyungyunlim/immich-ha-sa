@@ -301,6 +301,7 @@ describe('renderer URL generation', () => {
     expect(resolved.rendererUrl).toContain('show_image_id=true');
     expect(resolved.rendererUrl).toContain('show_user=true');
     expect(resolved.rendererUrl).toContain('show_more_info=false');
+    expect(resolved.rendererUrl).toContain('more_info_display=false');
     expect(resolved.rendererUrl).toContain('burn_in_interval=30');
     expect(resolved.rendererUrl).toContain('burn_in_duration=20');
     expect(resolved.rendererUrl).toContain('burn_in_opacity=60');
