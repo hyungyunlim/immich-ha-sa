@@ -5,7 +5,7 @@
 - **Frame Speaker** (`media_player`): 액자 스피커로 소리를 재생합니다.
 - **Frame Mic Stream** (`switch`): Frame Mic 보조 앱을 통해 액자 마이크를 들을 수 있게 합니다.
 
-같은 앱으로 사이드바의 **Frame Call** 패널에서 양방향 통화도 할 수 있습니다.
+같은 앱으로 사이드바의 **Frames** 패널에서 양방향 통화도 할 수 있습니다.
 
 ## Frame Speaker
 
@@ -43,9 +43,9 @@ Home Assistant 안에서 바로 들으려면 **미디어** > **Immich Frame Mic*
 
 앱은 FreeKiosk REST와 같은 주소의 `8765` 포트를 씁니다. 다른 공유기 뒤에 있는 액자라면 REST 포트와 같은 방식으로 이 포트도 포워딩하세요.
 
-## Frame Call
+## 통화
 
-Home Assistant 사이드바의 **Frame Call**은 인터폰처럼 액자에 전화를 겁니다. 액자가 스스로 받아서 내 목소리를 스피커로 내보내고, 마이크 소리를 돌려보냅니다. 지연이 1초도 안 돼서 평소처럼 대화할 수 있습니다.
+Home Assistant 사이드바 **Frames** 패널의 **통화** 탭에서 인터폰처럼 액자에 전화를 겁니다. 액자가 스스로 받아서 내 목소리를 스피커로 내보내고, 마이크 소리를 돌려보냅니다. 지연이 1초도 안 돼서 평소처럼 대화할 수 있습니다.
 
 - Frame Mic 0.6 이상이 필요하고 **Frame Mic Stream** 스위치가 켜져 있어야 합니다. 스위치를 끄면 통화도 끊깁니다.
 - Home Assistant에 `https://` 주소로 접속하세요. 브라우저는 HTTPS에서만 마이크를 허용합니다.

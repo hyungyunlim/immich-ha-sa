@@ -37,6 +37,7 @@ All services accept an optional `device_id` (defaults to the configured device).
 | `immich_frame.refresh_people` | — |
 | `immich_frame.set_renderer_options` | See below |
 | `immich_frame.set_network_mode` | `network_mode`: `auto` / `local` / `external` (required) |
+| `immich_frame.show_notice` | `message` (required), `duration` (minutes); shows on every frame unless `device_id` is set. See [Family Notices](./notices) |
 
 ### Saving profiles
 

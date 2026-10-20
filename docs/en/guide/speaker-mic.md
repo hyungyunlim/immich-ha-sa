@@ -5,7 +5,7 @@ Each frame that uses [FreeKiosk remote control](./freekiosk) gets two audio enti
 - **Frame Speaker** (`media_player`) plays audio on the frame speaker.
 - **Frame Mic Stream** (`switch`) lets you listen to the frame microphone through the Frame Mic companion app.
 
-The **Frame Call** sidebar panel adds two-way calls with the same app.
+The **Frames** sidebar panel adds two-way calls with the same app.
 
 ## Frame Speaker
 
@@ -43,9 +43,9 @@ While someone listens, the frame's Android notification shows who it is. The **F
 
 The app talks to the controller on port `8765` at the same address as the FreeKiosk REST endpoint. For a frame behind another router, forward that port the same way as the REST port.
 
-## Frame Call
+## Calls
 
-**Frame Call** in the Home Assistant sidebar calls a frame like an intercom: the frame answers by itself, plays your voice on its speaker, and sends its microphone back. The delay is a fraction of a second, so you can talk normally.
+The **Calls** tab of the **Frames** panel in the Home Assistant sidebar calls a frame like an intercom: the frame answers by itself, plays your voice on its speaker, and sends its microphone back. The delay is a fraction of a second, so you can talk normally.
 
 - Needs Frame Mic 0.6 or newer and the **Frame Mic Stream** switch on. Turning the switch off ends a call.
 - Open Home Assistant through its `https://` address; browsers allow the microphone only on HTTPS.

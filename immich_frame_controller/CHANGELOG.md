@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.94
+
+- The **Frame Call** sidebar panel becomes **Frames**, with a **Calls** tab and a new **Notices** tab.
+- Add family notices: short lines that frames show as a small pill above the photo date, on every frame or a chosen one, until tonight, tomorrow night, for an hour, a week, or until deleted. Several notices take turns every 8 seconds. Notices work on every frame, without the Frame Mic app.
+- Add the `immich_frame.show_notice` service (`message`, optional `duration` in minutes and `device_id`) so automations can post notices.
+- New controller endpoints: `GET`/`POST /api/notices`, `DELETE /api/notices/:id`, and `GET /api/frame/:deviceId/notices` for the frame page, which also receives live `notices` events.
+- Restart Home Assistant Core after updating the integration so the renamed panel loads.
+
 ## 0.1.93
 
 - Add **Frame Call**, a sidebar panel for two-way calls with frames. The frame answers by itself like an intercom and shows a small *On call* pill. Audio flows directly over WebRTC, so the delay is a fraction of a second. Calls need Frame Mic 0.6 (attached to the release), the Frame Mic Stream switch on, Home Assistant opened over HTTPS, and a device on the home network or a VPN that reaches the frame.

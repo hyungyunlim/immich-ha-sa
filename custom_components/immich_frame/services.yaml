@@ -541,3 +541,23 @@ set_network_mode:
             - auto
             - local
             - external
+
+show_notice:
+  fields:
+    message:
+      required: true
+      example: "🧺 세탁이 끝났어요"
+      selector:
+        text:
+    duration:
+      required: false
+      example: 60
+      selector:
+        number:
+          min: 1
+          max: 10080
+          unit_of_measurement: min
+    device_id:
+      required: false
+      selector:
+        text:

@@ -5,6 +5,7 @@ import type {
   FrameCommandAck,
   FrameCommandEvent,
   FrameDevice,
+  FrameNotice,
   FrameState,
   ResolvedFrameState,
 } from './types.js';
@@ -87,6 +88,16 @@ export class FrameEventHub {
         }));
       } catch {
         clients.delete(client);
+      }
+    }
+  }
+
+  emitNotices(deviceId: string, items: Array<Pick<FrameNotice, 'id' | 'text' | 'until'>>): void {
+    for (const client of this.clients.get(deviceId) ?? []) {
+      try {
+        this.send(client, 'notices', { items });
+      } catch {
+        this.clients.get(deviceId)?.delete(client);
       }
     }
   }
@@ -174,7 +185,11 @@ export class FrameEventHub {
     }
   }
 
-  private send(client: SseClient, event: string, data: ResolvedFrameState | { at: string } | FrameCommandEvent): void {
+  private send(
+    client: SseClient,
+    event: string,
+    data: ResolvedFrameState | { at: string } | FrameCommandEvent | { items: Array<Pick<FrameNotice, 'id' | 'text' | 'until'>> },
+  ): void {
     client.reply.raw.write(`event: ${event}\n`);
     client.reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
   }

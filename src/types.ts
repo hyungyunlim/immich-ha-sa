@@ -267,7 +267,19 @@ export interface StoreData {
   albumCache: AlbumCache;
   personCache: PersonCache;
   frameClaims: Record<string, FrameClaim>;
+  notices: FrameNotice[];
   auth: ControllerAuth;
+}
+
+/** A short family notice shown on frames as a small pill over the slideshow. */
+export interface FrameNotice {
+  id: string;
+  text: string;
+  /** Frames that show it; every frame when empty. */
+  deviceIds: string[];
+  createdAt: string;
+  /** Hidden after this moment; shown until deleted when unset. */
+  until?: string;
 }
 
 export interface FrameClaim {

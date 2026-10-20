@@ -184,7 +184,7 @@ For frame display and audio hardware control, configure the FreeKiosk Remote API
 
 For frame-wide audio buttons, use the `Device Mute Toggle`, `Volume Up`, and `Volume Down` entities when FreeKiosk Remote API is configured. The immich-kiosk video mute control is exposed as a stateful `Kiosk Video Mute` switch backed by the controller's desired state, plus a press button for quick toggles.
 
-Each FreeKiosk frame also gets a **Frame Speaker** media player (play media-browser files or `tts.speak` on the frame speaker) and a **Frame Mic Stream** switch, and the **Frame Call** sidebar panel adds two-way calls. Listening and calls need the Frame Mic companion app from the GitHub release; see [Frame Speaker and Mic](https://immich-frame.junlim.org/en/guide/speaker-mic) and [`apps/frame-mic`](apps/frame-mic/README.md).
+Each FreeKiosk frame also gets a **Frame Speaker** media player (play media-browser files or `tts.speak` on the frame speaker) and a **Frame Mic Stream** switch, and the **Frames** sidebar panel adds two-way calls and family notices shown on the frames. Listening and calls need the Frame Mic companion app from the GitHub release; see [Frame Speaker and Mic](https://immich-frame.junlim.org/en/guide/speaker-mic) and [`apps/frame-mic`](apps/frame-mic/README.md).
 
 Provided services:
 

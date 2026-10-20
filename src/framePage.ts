@@ -48,17 +48,51 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
     body.suspended #fallback {
       display: none;
     }
+    /* Family notices: a quiet pill near the bottom center, above immich-kiosk's date line, one notice at a time.
+       WebView 74 safe (no inset/gap/clamp). */
+    #notice {
+      position: fixed;
+      left: 50%;
+      bottom: 11vmin;
+      z-index: 10;
+      max-width: 72vw;
+      padding: 1.2vmin 3vmin;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.55);
+      box-shadow: 0 0.4vmin 2vmin rgba(0, 0, 0, 0.25);
+      color: #fff;
+      font-size: 2.8vmin;
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0;
+      transform: translateX(-50%);
+      transition: opacity 0.6s;
+      pointer-events: none;
+    }
+    #notice.show {
+      opacity: 1;
+    }
+    body.suspended #notice {
+      display: none;
+    }
   </style>
 </head>
 <body class="empty">
   <iframe id="renderer" title="Immich frame renderer" referrerpolicy="no-referrer"></iframe>
   <div id="fallback">Waiting for frame state...</div>
+  <div id="notice"></div>
   <script>
     (function () {
       var deviceId = ${JSON.stringify(escapedDeviceId)};
       var stateUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/state';
       var eventsUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/events';
       var ackUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/commands/ack';
+      var noticesUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/notices';
+      var noticeEl = document.getElementById('notice');
+      var notices = [];
+      var noticeIndex = -1;
       var iframe = document.getElementById('renderer');
       var previewMode = ${JSON.stringify(previewMode)};
       var lastVersion = 0;
@@ -421,6 +455,44 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         }
       });
 
+      function activeNotices() {
+        var now = Date.now();
+        return notices.filter(function (notice) { return !notice.until || Date.parse(notice.until) > now; });
+      }
+
+      // Rotates through active notices; fades out before swapping the text.
+      function showNextNotice() {
+        var items = activeNotices();
+        if (!items.length) {
+          noticeEl.className = '';
+          return;
+        }
+        noticeIndex = (noticeIndex + 1) % items.length;
+        var text = items[noticeIndex].text;
+        if (noticeEl.className === 'show' && noticeEl.textContent === text) return;
+        var delay = noticeEl.className === 'show' ? 600 : 0;
+        noticeEl.className = '';
+        setTimeout(function () {
+          noticeEl.textContent = text;
+          noticeEl.className = 'show';
+        }, delay);
+      }
+
+      function setNotices(items) {
+        notices = items || [];
+        noticeIndex = -1;
+        showNextNotice();
+      }
+
+      function loadNotices() {
+        return fetch(noticesUrl, { cache: 'no-store' })
+          .then(function (response) { return response.json(); })
+          .then(function (payload) {
+            if (payload && payload.success) setNotices(payload.data.items);
+          })
+          .catch(function () {});
+      }
+
       function loadState() {
         return fetch(stateUrl, { cache: 'no-store' })
           .then(function (response) { return response.json(); })
@@ -449,6 +521,9 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
           source.addEventListener('state', function (event) {
             try { applyState(JSON.parse(event.data)); } catch (error) {}
           });
+          source.addEventListener('notices', function (event) {
+            try { setNotices(JSON.parse(event.data).items); } catch (error) {}
+          });
           source.addEventListener('command', function (event) {
             try {
               var payload = JSON.parse(event.data);
@@ -467,6 +542,9 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         startEvents();
         startPolling();
       });
+      loadNotices();
+      setInterval(showNextNotice, 8000);
+      setInterval(loadNotices, 60000); // safety net next to the live notices events
     })();
   </script>
 </body>

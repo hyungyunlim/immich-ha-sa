@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 import logging
 
 from aiohttp import ClientError
@@ -12,6 +13,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import aiohttp_client, config_validation as cv
+from homeassistant.util import dt as dt_util
 
 from .api import ImmichFrameApiError, ImmichFrameClient, TelemetryStreamUnsupported
 from .const import (
@@ -32,9 +34,10 @@ from .const import (
     SERVICE_SET_NETWORK_MODE,
     SERVICE_SET_PROFILE,
     SERVICE_SET_RENDERER_OPTIONS,
+    SERVICE_SHOW_NOTICE,
 )
 from .coordinator import ImmichFrameCoordinator
-from .call import async_register_call_panel
+from .panel import async_register_panel, controller_client
 from .media_source import ImmichFrameMicStreamView
 from .profile_helpers import (
     existing_profile_for_id,
@@ -123,12 +126,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Frame Mic media browser relay and the Frame Call panel; registered once for all frames
+    # Frame Mic media browser relay and the Frames panel; registered once for all frames
     # (kept outside hass.data[DOMAIN], whose values are all per-frame runtimes)
     if not hass.data.get(DATA_HTTP_REGISTERED):
         hass.data[DATA_HTTP_REGISTERED] = True
         hass.http.register_view(ImmichFrameMicStreamView())
-        await async_register_call_panel(hass)
+        await async_register_panel(hass)
 
     # Push real-time remote-status updates (motion, screen, availability) between
     # the coordinator's periodic polls. Falls back silently to polling when the
@@ -431,6 +434,32 @@ def _register_services(hass: HomeAssistant) -> None:
             {
                 vol.Optional(CONF_DEVICE_ID): cv.string,
                 "network_mode": vol.In(["auto", "local", "external"]),
+            }
+        ),
+    )
+
+    async def show_notice(call: ServiceCall) -> None:
+        """Shows a family notice on every frame, or on device_id, optionally for `duration` minutes."""
+        client = controller_client(hass)
+        if client is None:
+            raise HomeAssistantError("No Immich frame controller is configured")
+        minutes = call.data.get("duration")
+        until = (dt_util.utcnow() + timedelta(minutes=minutes)).isoformat() if minutes else None
+        device_id = call.data.get(CONF_DEVICE_ID)
+        try:
+            await client.add_notice(call.data["message"], [device_id] if device_id else [], until)
+        except ImmichFrameApiError as err:
+            raise HomeAssistantError(err.message) from err
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SHOW_NOTICE,
+        show_notice,
+        schema=vol.Schema(
+            {
+                vol.Required("message"): vol.All(cv.string, vol.Length(min=1, max=140)),
+                vol.Optional("duration"): vol.All(vol.Coerce(int), vol.Range(min=1, max=525600)),
+                vol.Optional(CONF_DEVICE_ID): cv.string,
             }
         ),
     )

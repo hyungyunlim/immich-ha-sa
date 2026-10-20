@@ -188,6 +188,20 @@ class ImmichFrameClient:
             auth=True,
         )
 
+    async def notices(self) -> list[dict[str, Any]]:
+        return (await self._request("GET", "/api/notices", auth=True))["items"]
+
+    async def add_notice(
+        self, text: str, device_ids: list[str] | None = None, until: str | None = None
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"text": text, "deviceIds": device_ids or []}
+        if until:
+            payload["until"] = until
+        return await self._request("POST", "/api/notices", json=payload, auth=True)
+
+    async def delete_notice(self, notice_id: str) -> dict[str, Any]:
+        return await self._request("DELETE", f"/api/notices/{notice_id}", auth=True)
+
     async def start_call(self, sdp: str) -> str:
         data = await self._request(
             "POST",

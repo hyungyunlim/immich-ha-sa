@@ -37,6 +37,7 @@
 | `immich_frame.refresh_people` | — |
 | `immich_frame.set_renderer_options` | 아래 참고 |
 | `immich_frame.set_network_mode` | `network_mode`: `auto` / `local` / `external` (필수) |
+| `immich_frame.show_notice` | `message` (필수), `duration` (분). `device_id`가 없으면 모든 액자에 표시. [가족 공지](./notices) 참고 |
 
 ### 프로필 저장
 

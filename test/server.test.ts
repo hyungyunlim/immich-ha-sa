@@ -1715,6 +1715,58 @@ describe('controller API', () => {
   });
 });
 
+describe('family notices', () => {
+  it('stores notices, filters them per frame, and drops expired ones', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-notices-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    store.createDevice({ ...config.defaultDevice, id: 'kitchen', name: 'Kitchen', alias: 'kitchen' });
+    const server = createTestServer({ config, store });
+    const post = (payload: Record<string, unknown>) => server.inject({ method: 'POST', url: '/api/notices', payload });
+
+    expect((await post({ text: '   ' })).statusCode).toBe(400);
+    expect((await post({ text: 'hi', deviceIds: ['nope'] })).json().error.code).toBe('FRAME_NOT_FOUND');
+    expect((await post({ text: 'hi', until: '2020-01-01T00:00:00Z' })).statusCode).toBe(400);
+
+    const everyone = await post({ text: '  🍽️ 저녁 7시 외식  ' });
+    expect(everyone.statusCode).toBe(200);
+    expect(everyone.json().data).toMatchObject({ text: '🍽️ 저녁 7시 외식', deviceIds: [] });
+    const until = new Date(Date.now() + 60_000).toISOString();
+    const kitchenOnly = await post({ text: '세탁 끝', deviceIds: ['kitchen'], until });
+    expect(kitchenOnly.json().data.until).toBe(until);
+
+    const lenovo = await server.inject({ method: 'GET', url: '/api/frame/lenovo/notices' });
+    expect(lenovo.json().data.items.map((n: { text: string }) => n.text)).toEqual(['🍽️ 저녁 7시 외식']);
+    const kitchen = await server.inject({ method: 'GET', url: '/api/frame/kitchen/notices' });
+    expect(kitchen.json().data.items).toEqual([
+      { id: everyone.json().data.id, text: '🍽️ 저녁 7시 외식' },
+      { id: kitchenOnly.json().data.id, text: '세탁 끝', until },
+    ]);
+    expect((await server.inject({ method: 'GET', url: '/api/frame/nope/notices' })).statusCode).toBe(404);
+
+    // Expired notices disappear without being deleted explicitly
+    const realNow = Date.now;
+    Date.now = () => realNow() + 120_000;
+    try {
+      const later = await server.inject({ method: 'GET', url: '/api/notices' });
+      expect(later.json().data.items.map((n: { text: string }) => n.text)).toEqual(['🍽️ 저녁 7시 외식']);
+    } finally {
+      Date.now = realNow;
+    }
+
+    const removed = await server.inject({ method: 'DELETE', url: `/api/notices/${everyone.json().data.id}` });
+    expect(removed.statusCode).toBe(200);
+    expect((await server.inject({ method: 'DELETE', url: `/api/notices/${everyone.json().data.id}` })).statusCode).toBe(404);
+    expect(store.getNotices().map((n) => n.text)).toEqual(['세탁 끝']);
+
+    const page = await server.inject({ method: 'GET', url: '/f/lenovo' });
+    expect(page.body).toContain('id="notice"');
+    expect(page.body).toContain("addEventListener('notices'");
+    await server.close();
+  });
+});
+
 describe('frame mic and speaker', () => {
   it('relays a call offer to the Frame Mic app and returns its answer', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-call-'));

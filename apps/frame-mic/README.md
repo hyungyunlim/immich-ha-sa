@@ -4,7 +4,7 @@ A tiny Android companion app that lets Home Assistant listen to a frame's microp
 
 - Listening is **off by default** and is switched on and off from Home Assistant (the *Frame Mic Stream* switch) through the controller.
 - When on, the microphone opens only while someone is connected to the stream, and the Android notification shows who is listening (the *Frame Mic Notification* switch can hide those details).
-- Calls (Home Assistant's *Frame Call* panel) are answered automatically while listening is on, and show a small *On call* pill on screen.
+- Calls (the *Calls* tab of Home Assistant's *Frames* panel) are answered automatically while listening is on, and show a small *On call* pill on screen.
 - Each install generates its own random key on first launch. Every request needs that key.
 
 ## Install

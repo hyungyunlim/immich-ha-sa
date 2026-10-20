@@ -7,6 +7,7 @@ import type {
   ControllerPairingState,
   FrameClaim,
   FrameDevice,
+  FrameNotice,
   FrameProfile,
   FrameState,
   PersonCache,
@@ -137,6 +138,27 @@ export class JsonStore {
 
   getPairingState(): ControllerPairingState | undefined {
     return this.data.auth.pairing ? structuredClone(this.data.auth.pairing) : undefined;
+  }
+
+  /** Notices that have not expired, oldest first. */
+  getNotices(): FrameNotice[] {
+    const now = Date.now();
+    return this.data.notices
+      .filter((notice) => !notice.until || Date.parse(notice.until) > now)
+      .map((notice) => structuredClone(notice));
+  }
+
+  addNotice(notice: FrameNotice): FrameNotice {
+    this.data.notices = [...this.getNotices(), structuredClone(notice)];
+    this.save();
+    return structuredClone(notice);
+  }
+
+  removeNotice(noticeId: string): boolean {
+    const before = this.data.notices.length;
+    this.data.notices = this.getNotices().filter((notice) => notice.id !== noticeId);
+    this.save();
+    return this.data.notices.length < before;
   }
 
   getFrameClaim(claimId: string): FrameClaim | undefined {
@@ -319,6 +341,7 @@ export class JsonStore {
       albumCache: data.albumCache ?? defaults.albumCache,
       personCache: data.personCache ?? defaults.personCache,
       frameClaims: data.frameClaims ?? defaults.frameClaims,
+      notices: data.notices ?? defaults.notices,
       auth: {
         tokens: {
           ...defaults.auth.tokens,

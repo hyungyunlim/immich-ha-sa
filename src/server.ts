@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { isIP } from 'node:net';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -16,7 +16,7 @@ import { FreeKioskMqttBridge, type FreeKioskMqttSnapshot } from './mqttClient.js
 import { buildProxiedRendererUrl, buildRendererUrl, controllerBaseUrlForContext } from './rendererUrl.js';
 import { renderSetupBlockedPage, renderSetupPage } from './setupPage.js';
 import { JsonStore } from './store.js';
-import type { AlbumCache, FrameClaim, FrameCommand, FrameDevice, FrameState, PersonCache } from './types.js';
+import type { AlbumCache, FrameClaim, FrameCommand, FrameDevice, FrameNotice, FrameState, PersonCache } from './types.js';
 
 const REMOTE_DISCOVERY_RETRY_MS = 30_000;
 const REMOTE_DISCOVERY_TIMEOUT_MS = 1_500;
@@ -302,6 +302,11 @@ const MicStreamToggleSchema = z.object({
   notify: z.boolean().optional(),
 }).refine((value) => value.enabled !== undefined || value.notify !== undefined, 'Set enabled or notify.');
 
+const NoticeCreateSchema = z.object({
+  text: z.string().trim().min(1).max(140),
+  deviceIds: z.array(z.string().min(1)).max(50).optional(),
+  until: z.string().datetime({ offset: true }).optional(),
+});
 const CallOfferSchema = z.object({ sdp: z.string().startsWith('v=0').max(20000) });
 const FrameAudioPlaySchema = z.object({
   url: z.string().url().refine((value) => /^https?:\/\//i.test(value), 'Use an http(s) URL the frame can reach.'),
@@ -1757,6 +1762,73 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       sendRemoteFailure(reply, error);
     }
   });
+
+  // Family notices: short lines shown as a pill over the slideshow on every frame, or on chosen ones.
+  app.get('/api/notices', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    return ok({ items: store.getNotices() });
+  });
+
+  app.post('/api/notices', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const parsed = NoticeCreateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid notice.'));
+      return;
+    }
+    const { text, deviceIds = [], until } = parsed.data;
+    const unknown = deviceIds.find((deviceId) => !store.getDevice(deviceId));
+    if (unknown) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${unknown}`));
+      return;
+    }
+    if (until && Date.parse(until) <= Date.now()) {
+      reply.status(400).send(fail('VALIDATION_ERROR', 'until must be in the future.'));
+      return;
+    }
+    const notice = store.addNotice({
+      id: randomUUID(),
+      text,
+      deviceIds,
+      createdAt: new Date().toISOString(),
+      ...(until ? { until: new Date(until).toISOString() } : {}),
+    });
+    broadcastNotices();
+    return ok(notice);
+  });
+
+  app.delete('/api/notices/:noticeId', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const { noticeId } = request.params as { noticeId: string };
+    if (!store.removeNotice(noticeId)) {
+      reply.status(404).send(fail('NOTICE_NOT_FOUND', `Notice not found: ${noticeId}`));
+      return;
+    }
+    broadcastNotices();
+    return ok({ removed: true });
+  });
+
+  // Read by the frame page, like /state; the page also gets live updates as `notices` events.
+  app.get('/api/frame/:deviceId/notices', async (request, reply) => {
+    const { deviceId } = request.params as { deviceId: string };
+    if (!store.getDevice(deviceId)) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
+    return ok({ items: noticesForFrame(deviceId) });
+  });
+
+  function noticesForFrame(deviceId: string): Array<Pick<FrameNotice, 'id' | 'text' | 'until'>> {
+    return store.getNotices()
+      .filter((notice) => notice.deviceIds.length === 0 || notice.deviceIds.includes(deviceId))
+      .map(({ id, text, until }) => ({ id, text, until }));
+  }
+
+  function broadcastNotices(): void {
+    for (const deviceId of Object.keys(store.getData().devices)) {
+      events.emitNotices(deviceId, noticesForFrame(deviceId));
+    }
+  }
 
   // Two-way audio with the Frame Mic app (0.6+): relays the caller's SDP offer and returns the frame's answer.
   app.post('/api/frames/:deviceId/call', async (request, reply) => {

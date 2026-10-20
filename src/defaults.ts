@@ -198,6 +198,7 @@ export function createDefaultStore(device: FrameDevice): StoreData {
     albumCache: createEmptyAlbumCache(),
     personCache: createEmptyPersonCache(),
     frameClaims: {},
+    notices: [],
     auth: {
       tokens: {},
     },
