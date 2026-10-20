@@ -176,7 +176,7 @@ class ImmichFrameNoticeView(HomeAssistantView):
 
 
 class ImmichFrameAgendaView(HomeAssistantView):
-    """GET returns the agenda settings and upcoming events; POST {calendars, device_ids, days} saves them."""
+    """GET returns the agenda settings and upcoming events; POST {calendars, device_ids, days, widget} saves them."""
 
     url = f"{API_PATH}/agenda"
     name = "api:immich_frame:agenda"
@@ -195,9 +195,10 @@ class ImmichFrameAgendaView(HomeAssistantView):
             calendars = [str(c) for c in body["calendars"] if str(c).startswith("calendar.")]
             device_ids = [str(d) for d in body["device_ids"]]
             days = int(body["days"])
+            widget = bool(body.get("widget", False))
         except (ValueError, KeyError, TypeError):
-            return self.json_message("Send {calendars: [...], device_ids: [...], days: N}", 400)
+            return self.json_message("Send {calendars: [...], device_ids: [...], days: N, widget: bool}", 400)
         if not 1 <= days <= 14:
             return self.json_message("days must be between 1 and 14", 400)
-        await agenda.async_update(calendars, device_ids, days)
+        await agenda.async_update(calendars, device_ids, days, widget)
         return self._state(agenda)

@@ -103,7 +103,7 @@ export class FrameEventHub {
     }
   }
 
-  emitAgenda(deviceId: string, agenda: { items: AgendaItem[]; locale: string }): void {
+  emitAgenda(deviceId: string, agenda: { items: AgendaItem[]; locale: string; widget: boolean }): void {
     for (const client of this.clients.get(deviceId) ?? []) {
       try {
         this.send(client, 'agenda', agenda);
@@ -204,7 +204,7 @@ export class FrameEventHub {
       | { at: string }
       | FrameCommandEvent
       | { items: Array<Pick<FrameNotice, 'id' | 'text' | 'until'>> }
-      | { items: AgendaItem[]; locale: string },
+      | { items: AgendaItem[]; locale: string; widget: boolean },
   ): void {
     client.reply.raw.write(`event: ${event}\n`);
     client.reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);

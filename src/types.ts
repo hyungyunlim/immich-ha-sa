@@ -288,6 +288,8 @@ export interface FrameAgenda {
   deviceIds: string[];
   /** Language for the day labels on the frame (today, tomorrow, weekdays). */
   locale: string;
+  /** Show a month calendar card with the event list instead of rotating events in the notice pill. */
+  widget?: boolean;
   updatedAt?: string;
 }
 

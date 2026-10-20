@@ -15,6 +15,8 @@ const STRINGS = {
     days1: "Today only",
     days3: "Next 3 days",
     days7: "Next week",
+    widget: "Show as a calendar widget",
+    widgetHint: "On: the frames show this month's calendar with the events and notices in one card. Off: events take turns with the notices in the pill.",
     save: "Save",
     saved: "Saved",
     upcoming: "Coming up on the frames",
@@ -61,6 +63,8 @@ const STRINGS = {
     days1: "오늘만",
     days3: "3일",
     days7: "1주일",
+    widget: "달력 위젯으로 보기",
+    widgetHint: "켜면 액자에 이번 달 달력과 일정·공지 목록이 카드 하나로 떠요. 끄면 일정이 공지와 함께 아래쪽 알약에 번갈아 나와요.",
     save: "저장",
     saved: "저장했어요",
     upcoming: "액자에 표시될 일정",
@@ -442,6 +446,7 @@ class ImmichFramePanel extends HTMLElement {
         calendars: checked("calendar"),
         device_ids: checked("frame"),
         days: Number(form.days.value),
+        widget: form.widget.checked,
       });
       this._agendaError = null;
       this._renderAgenda(true);
@@ -491,6 +496,8 @@ class ImmichFramePanel extends HTMLElement {
           <select name="days">
             ${[1, 3, 7].map((d) => `<option value="${d}" ${agenda.settings.days === d ? "selected" : ""}>${escapeHtml(t[`days${d}`])}</option>`).join("")}
           </select>
+          <label class="toggle"><input type="checkbox" name="widget" ${agenda.settings.widget ? "checked" : ""}>${escapeHtml(t.widget)}</label>
+          <div class="hint">${escapeHtml(t.widgetHint)}</div>
           <div class="error">${escapeHtml(this._agendaError || agenda.error || "")}</div>
           <div class="actions"><button name="save">${escapeHtml(t.save)}</button>
             <span class="status">${saved ? escapeHtml(t.saved) : ""}</span></div>
@@ -548,6 +555,7 @@ class ImmichFramePanel extends HTMLElement {
         .checks.scroll { max-height: 240px; overflow: auto; }
         .checks label { display: flex; align-items: center; gap: 8px; }
         .hint { color: var(--secondary-text-color); font-size: 12px; }
+        .toggle { display: flex; align-items: center; gap: 8px; font-weight: 500; }
         .event { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
         .chip { padding: 2px 10px; border-radius: 999px; font-size: 13px; white-space: nowrap;
           background: var(--secondary-background-color); }

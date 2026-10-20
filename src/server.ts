@@ -311,6 +311,7 @@ const AgendaSchema = z.object({
   })).max(100),
   deviceIds: z.array(z.string().min(1)).max(50),
   locale: z.string().min(2).max(10).default('en'),
+  widget: z.boolean().default(false),
 });
 const NoticeCreateSchema = z.object({
   text: z.string().trim().min(1).max(140),
@@ -1863,9 +1864,10 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return ok(agendaForFrame(deviceId));
   });
 
-  function agendaForFrame(deviceId: string): { items: AgendaItem[]; locale: string } {
+  function agendaForFrame(deviceId: string): { items: AgendaItem[]; locale: string; widget: boolean } {
     const agenda = store.getAgenda();
-    return { items: agenda.deviceIds.includes(deviceId) ? agenda.items : [], locale: agenda.locale };
+    const shown = agenda.deviceIds.includes(deviceId);
+    return { items: shown ? agenda.items : [], locale: agenda.locale, widget: shown && Boolean(agenda.widget) };
   }
 
   function noticesForFrame(deviceId: string): Array<Pick<FrameNotice, 'id' | 'text' | 'until'>> {

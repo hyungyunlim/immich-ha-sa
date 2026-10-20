@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.96
+
+- Add a calendar widget, switched on and off in the Frames panel's **Calendar** tab. With it on, the chosen frames show a card near the bottom with this month's calendar (today circled, dots on days with events) next to today's date and the notices and upcoming events, in place of the pill. It also works without calendars, as a month calendar with the notices.
+- Restart Home Assistant Core after updating the integration, and reload the frames so they pick up the new frame page.
+
 ## 0.1.95
 
 - Add a **Calendar** tab to the Frames panel. Pick Home Assistant calendars (Google Calendar, Remote Calendar, local) and the frames that show them; frames show the next events between notices as *[Today] 19:00 Swimming*. The integration rereads the calendars every 15 minutes and drops events that two subscribed copies of a calendar repeat.

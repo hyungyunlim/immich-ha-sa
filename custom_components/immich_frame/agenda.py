@@ -2,7 +2,8 @@
 
 Any calendar entity works (Google Calendar, Remote Calendar, local calendars). Every 15 minutes, and
 whenever the settings change in the Frames panel, the integration reads the next few days and pushes
-them to the controller, which shows them on the chosen frames between family notices.
+them to the controller. The chosen frames show them between family notices, or, with the widget on, in a
+card with this month's calendar.
 """
 
 from __future__ import annotations
@@ -36,7 +37,7 @@ class AgendaManager:
         self.hass = hass
         self._client = client  # () -> ImmichFrameClient | None
         self._store: Store[dict[str, Any]] = Store(hass, 1, f"{DOMAIN}.agenda")
-        self.settings: dict[str, Any] = {"calendars": [], "device_ids": [], "days": 3}
+        self.settings: dict[str, Any] = {"calendars": [], "device_ids": [], "days": 3, "widget": False}
         self.items: list[dict[str, Any]] = []
         self.error: str | None = None
 
@@ -48,8 +49,8 @@ class AgendaManager:
     async def _async_tick(self, *_: Any) -> None:
         await self.async_refresh()
 
-    async def async_update(self, calendars: list[str], device_ids: list[str], days: int) -> None:
-        self.settings = {"calendars": calendars, "device_ids": device_ids, "days": days}
+    async def async_update(self, calendars: list[str], device_ids: list[str], days: int, widget: bool) -> None:
+        self.settings = {"calendars": calendars, "device_ids": device_ids, "days": days, "widget": widget}
         await self._store.async_save(self.settings)
         await self.async_refresh()
 
@@ -60,7 +61,8 @@ class AgendaManager:
         calendars, device_ids = self.settings["calendars"], self.settings["device_ids"]
         try:
             self.items = await self._async_events(calendars) if calendars and device_ids else []
-            await client.set_agenda(self.items, device_ids if self.items else [], self.hass.config.language)
+            # The widget shows the month and notices even without calendars, so the frames always go along
+            await client.set_agenda(self.items, device_ids, self.hass.config.language, self.settings["widget"])
             self.error = None
         except (HomeAssistantError, ImmichFrameApiError, ClientError, TimeoutError) as err:
             self.error = str(getattr(err, "message", err))

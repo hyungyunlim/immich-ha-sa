@@ -1729,18 +1729,19 @@ describe('calendar agenda', () => {
     ];
 
     const empty = await server.inject({ method: 'GET', url: '/api/frame/lenovo/agenda' });
-    expect(empty.json().data).toEqual({ items: [], locale: 'en' });
+    expect(empty.json().data).toEqual({ items: [], locale: 'en', widget: false });
     const invalid = await server.inject({ method: 'PUT', url: '/api/agenda', payload: { items: [{ title: '', start: 'x', allDay: true }], deviceIds: [] } });
     expect(invalid.statusCode).toBe(400);
-    const saved = await server.inject({ method: 'PUT', url: '/api/agenda', payload: { items, deviceIds: ['kitchen'], locale: 'ko' } });
+    const saved = await server.inject({ method: 'PUT', url: '/api/agenda', payload: { items, deviceIds: ['kitchen'], locale: 'ko', widget: true } });
     expect(saved.statusCode).toBe(200);
     expect(saved.json().data.updatedAt).toBeTruthy();
 
-    expect((await server.inject({ method: 'GET', url: '/api/frame/kitchen/agenda' })).json().data).toEqual({ items, locale: 'ko' });
-    expect((await server.inject({ method: 'GET', url: '/api/frame/lenovo/agenda' })).json().data).toEqual({ items: [], locale: 'ko' });
+    expect((await server.inject({ method: 'GET', url: '/api/frame/kitchen/agenda' })).json().data).toEqual({ items, locale: 'ko', widget: true });
+    expect((await server.inject({ method: 'GET', url: '/api/frame/lenovo/agenda' })).json().data).toEqual({ items: [], locale: 'ko', widget: false });
     expect((await server.inject({ method: 'GET', url: '/api/agenda' })).json().data.deviceIds).toEqual(['kitchen']);
     const page = await server.inject({ method: 'GET', url: '/f/lenovo' });
     expect(page.body).toContain("addEventListener('agenda'");
+    expect(page.body).toContain('id="agenda-widget"');
     await server.close();
   });
 });
