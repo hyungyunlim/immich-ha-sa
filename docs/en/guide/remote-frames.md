@@ -50,3 +50,9 @@ To control hardware on a remote frame, put the controller host and the frame on 
 3. Slideshow navigation keeps using the event stream; screen, brightness, volume, and mute now go over the VPN.
 
 Without a VPN, a remote frame still works fully for photos and navigation — only the hardware controls are unavailable.
+
+## Notices, calendar, listening, and calls
+
+- **Notices and calendar events** reach remote frames like everything else on the frame page, through the tunnel.
+- **Frame Mic listening** needs the controller to reach the app on port `8765` at the frame's address, like the FreeKiosk REST port. Over a VPN, forward that port the same way (for example a port forward on the router at the frame's home).
+- **Calls** send their setup through the controller the same way, then carry audio directly between your device and the frame whenever they can. With a [Cloudflare TURN key](./speaker-mic#calls-from-outside), calls also connect when neither side can reach the other directly.

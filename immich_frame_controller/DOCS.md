@@ -24,7 +24,15 @@ When the Mosquitto broker add-on is installed, this add-on auto-detects it throu
 - `mqtt_broker_url`: set only to override auto-detection or use an external broker. Accepts a host (`192.168.1.10`) or `mqtt://host:1883`.
 - `mqtt_username` / `mqtt_password`: broker credentials; auto-filled from Mosquitto when auto-detected.
 - `mqtt_base_topic`: FreeKiosk base topic. Leave blank for the default `freekiosk`.
-- `turn_key_id`, `turn_key_api_token`: optional Cloudflare Realtime TURN key so Frames panel calls also work from outside the home network.
+
+## Optional Cloudflare TURN (calls from outside)
+
+Calls from the Frames panel carry audio directly between your device and the frame. Every call gets Cloudflare's public STUN server; for calls that still cannot connect directly (most mobile networks), add a free Cloudflare Realtime TURN key:
+
+- `turn_key_id`: the **Turn Token ID** from Cloudflare dashboard > Realtime > TURN Server.
+- `turn_key_api_token`: the API token shown with that key.
+
+Restart the add-on after changing them. The controller hands each call short-lived TURN credentials; the key itself never leaves the add-on. Calls from outside need Frame Mic 0.7 or newer on the frame.
 
 ## Pairing With Home Assistant
 
@@ -59,10 +67,21 @@ Device management is only available from the local console. For each new device,
 - Optional local and external controller/kiosk URL overrides.
 - Optional per-device immich-kiosk password override. Leave this blank to inherit the add-on `kiosk_password`.
 - Optional FreeKiosk REST remote-control settings.
+- Optional Frame Mic Key from the Frame Mic companion app, for listening and calls.
 
 Add the Home Assistant integration once per frame device ID. Home Assistant entities for the same device ID are grouped under one Home Assistant device page, so `lenovo`, `kitchen`, and `office` can each be adjusted independently.
 
 The Home Assistant config flow reads the controller's device list after pairing and shows those devices as choices. Device creation and editing still happen in the add-on Web UI so local URLs, external URLs, kiosk passwords, and FreeKiosk REST settings stay centralized in the controller.
+
+## Frames Panel
+
+The integration adds a **Frames** panel to the Home Assistant sidebar:
+
+- **Calls**: two-way audio with frames running the Frame Mic app (0.6+). The frame answers by itself and shows a small *On call* pill. Open Home Assistant over HTTPS so the browser allows the microphone.
+- **Notices**: short family notices shown on every frame or a chosen one, until tonight, tomorrow night, for an hour, a week, or until deleted. Automations can post them with `immich_frame.show_notice`.
+- **Calendar**: upcoming events from chosen Home Assistant calendars on chosen frames, taking turns with the notices in the pill, or in a month-calendar widget with notices in their own pill above it.
+
+Notices and the calendar are drawn by the controller's frame page, so they work on every frame without the companion app. Frames pick up frame page changes when they reload.
 
 ## FreeKiosk Remote Control
 

@@ -14,7 +14,7 @@ A tiny Android companion app that lets Home Assistant listen to a frame's microp
 3. In the controller console, open the device and enter the key under **Frame Mic Key**.
 4. Optional: allow *Display over other apps* (the app opens that setting) for the on-call pill, or run `adb shell appops set org.junlim.framemic SYSTEM_ALERT_WINDOW allow`.
 
-The app starts again by itself after a reboot or an update (for example `adb install -r`). Uninstalling it deletes the key; a reinstall shows a new one.
+The app starts again by itself after a reboot, and usually after an update (for example `adb install -r`). If it stays stopped after an update, open it once (`adb shell am start -n org.junlim.framemic/.MainActivity`). Uninstalling it deletes the key; a reinstall shows a new one.
 
 ## HTTP API
 

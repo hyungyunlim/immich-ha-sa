@@ -36,6 +36,7 @@ Immich
 | **Home Assistant 통합** | 앨범, 인물, 프로필, 필터, 렌더러 옵션을 엔티티(select, switch, number, button 등)와 서비스로 노출합니다. HACS로 설치합니다. |
 | **immich-kiosk** | 실제 슬라이드쇼를 렌더링합니다. 컨트롤러는 URL 쿼리 오버라이드만 덧붙이므로 kiosk 설정은 그대로 유지됩니다. |
 | **Immich** | 사진 라이브러리. API 자격증명은 컨트롤러 서버 측에만 보관되며 액자 브라우저에는 절대 노출되지 않습니다. |
+| **Frame Mic** (선택) | 듣기와 통화를 위한 액자용 작은 안드로이드 보조 앱. GitHub 릴리스에서 받습니다. |
 
 ## Home Assistant에서 제어할 수 있는 것
 
@@ -45,6 +46,9 @@ Immich
 - 렌더러 옵션: 전환 효과, 레이아웃, 이미지 핏, 시계, 날짜, 날씨, 이미지 메타데이터, 폰트 크기, 배경 블러, 진행 바, 번인 방지, 슬립 스케줄
 - 비디오 재생, 아카이브 자산 표시
 - [FreeKiosk REST API](./freekiosk)를 통한 화면 밝기, 볼륨, 화면 전원
+- 액자 오디오: Frame Speaker로 미디어와 `tts.speak` 재생, [Frame Mic 앱](./speaker-mic)으로 액자 마이크 듣기
+- 사이드바 **Frames** 패널에서 양방향 통화. 선택 사항인 [Cloudflare TURN 키](./speaker-mic#집-밖에서-통화하기)가 있으면 집 밖에서도 통화
+- 액자에 [가족 공지와 캘린더 일정](./notices)을 작은 알약이나 달력 위젯으로 표시, 자동화용 `immich_frame.show_notice` 서비스
 
 ## 보안 모델
 

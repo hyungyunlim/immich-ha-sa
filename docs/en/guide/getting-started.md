@@ -26,6 +26,7 @@ The controller and the Home Assistant integration are installed separately. The 
 
 - A controller console at `http://<home-assistant-host>:8082/setup` showing devices, URLs, and pairing codes
 - A Home Assistant device per frame with entities for albums, people, profiles, filters, and display options
+- A **Frames** panel in the Home Assistant sidebar for [calls](./speaker-mic#calls), [family notices, and the calendar](./notices) on your frames
 - A frame showing your Immich photos at a URL that never changes:
 
 ```text

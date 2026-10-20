@@ -88,5 +88,17 @@ title: Immich Frame Controller
       <h3>Nothing gets replaced</h3>
       <p>Your existing Immich and immich-kiosk keep doing their jobs. API keys and passwords stay on the server, never on the frame.</p>
     </div>
+    <div class="landing-point">
+      <h3>Talk to the frame</h3>
+      <p>Play music and announcements on the frame speaker, listen through its microphone, or call it like an intercom from the Frames panel — at home or away.</p>
+    </div>
+    <div class="landing-point">
+      <h3>Family notices</h3>
+      <p>Post a short line such as tonight's dinner plans to every frame or just one, for an hour, a week, or until you delete it. Automations can post too.</p>
+    </div>
+    <div class="landing-point">
+      <h3>Your calendar on the frame</h3>
+      <p>Show upcoming events from your Home Assistant calendars between notices, or as a quiet month-calendar widget.</p>
+    </div>
   </section>
 </div>

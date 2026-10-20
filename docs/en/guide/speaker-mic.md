@@ -70,4 +70,5 @@ Only enable listening and calls on frames where everyone in the room knows about
 ### Troubleshooting
 
 - **Switch unavailable**: the device has no Frame Mic Key, or the app is not reachable on port `8765`.
+- **Stopped after updating the app**: Android does not always restart Frame Mic after an update; open the app once on the frame.
 - **Stream starts slowly or cuts out**: another app is using the microphone. Android lets only one app capture at a time, so close pages that use the microphone, such as a `getUserMedia` test page in FreeKiosk.

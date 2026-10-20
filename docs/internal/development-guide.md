@@ -159,6 +159,8 @@ gh release create "$tag" \
   --notes-file /path/to/release-notes.md
 ```
 
+Attach the Frame Mic APK to every release (`apps/frame-mic/build/frame-mic-<version>.apk`) and list its SHA-256 in the notes. When the app changes, bump `versionCode` and `versionName` in `apps/frame-mic/AndroidManifest.xml` and rebuild with `apps/frame-mic/build.sh`, always with the same release keystore.
+
 Release notes should summarize user-visible controller and integration changes together and mention any required Home Assistant Core restart. Do not put credentials, API keys, private hostnames, or temporary test data in release notes.
 
 Verify the published tag, release, and commit all agree:
@@ -299,6 +301,9 @@ http://<ha-host>:8082/f/<frame-alias>
 ```
 
 or the configured external tunnel URL.
+
+8. When `src/framePage.ts` changed (notices, calendar, widget), reload the frames with FreeKiosk REST `POST /api/reload` or the Reload button. The frame command `reload` only reloads the immich-kiosk iframe, not the frame page around it.
+9. With a Cloudflare TURN key configured, `GET /api/calls/ice-servers` returns `turn: true` and TURN URLs. Never print the credentials.
 
 ## Operational Notes
 

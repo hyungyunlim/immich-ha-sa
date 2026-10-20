@@ -13,8 +13,10 @@ Or manually: open **HACS**, go to **Custom repositories**, and add `https://gith
 Download **Immich Frame Controller**, then restart Home Assistant.
 
 ::: info Versioning
-HACS installs the latest tagged GitHub release.
+HACS installs the latest tagged GitHub release. Restart Home Assistant after every update so new entities and the **Frames** sidebar panel load.
 :::
+
+The integration adds a **Frames** panel to the sidebar for [calls](./speaker-mic#calls), [family notices, and the calendar](./notices) on your frames.
 
 ## 3. Add the integration
 

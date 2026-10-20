@@ -28,11 +28,14 @@ CONTROLLER_API_TOKEN=
 MQTT_BROKER_URL=
 MQTT_USERNAME=
 MQTT_PASSWORD=
+TURN_KEY_ID=
+TURN_KEY_API_TOKEN=
 ```
 
 - `PORT` is the internal app port; `CONTROLLER_HOST_PORT` is the Docker host port. If `8082` is taken, pick another and update `LOCAL_PUBLIC_CONTROLLER_URL`, the integration's controller URL, and the frame URL to match.
 - `CONTROLLER_API_TOKEN` is an optional static fallback — leave it blank and use the [pairing flow](./pairing) instead.
 - `MQTT_BROKER_URL` is optional and enables [FreeKiosk MQTT push control](./freekiosk#_3-optional-mqtt-push-control). Accepts a bare host (`192.168.1.10`) or `mqtt://host:1883`; blank keeps MQTT off.
+- `TURN_KEY_ID` / `TURN_KEY_API_TOKEN` are optional: a Cloudflare Realtime TURN key so [calls](./speaker-mic#calls-from-outside) also work from outside the home network. Without them, calls use Cloudflare's public STUN server only.
 
 ## 2. Start the container
 

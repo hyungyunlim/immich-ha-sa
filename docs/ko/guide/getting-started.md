@@ -26,6 +26,7 @@ immich-kiosk에서 `KIOSK_PASSWORD`를 사용 중이라면 컨트롤러에도 �
 
 - `http://<home-assistant-host>:8082/setup`에서 디바이스, URL, 페어링 코드를 보여주는 컨트롤러 콘솔
 - 프레임마다 앨범, 인물, 프로필, 필터, 화면 옵션 엔티티가 있는 Home Assistant 디바이스
+- Home Assistant 사이드바의 **Frames** 패널: 액자와 [통화](./speaker-mic#통화), [가족 공지와 일정](./notices)
 - 절대 바뀌지 않는 URL로 Immich 사진을 보여주는 액자:
 
 ```text

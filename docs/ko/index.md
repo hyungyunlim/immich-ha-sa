@@ -88,5 +88,17 @@ title: Immich Frame Controller
       <h3>아무것도 대체하지 않음</h3>
       <p>기존 Immich와 immich-kiosk는 하던 일을 그대로 합니다. API 키와 비밀번호는 서버에만 있고 액자에는 가지 않습니다.</p>
     </div>
+    <div class="landing-point">
+      <h3>액자와 대화</h3>
+      <p>액자 스피커로 음악과 안내 방송을 틀고, 마이크로 듣고, Frames 패널에서 인터폰처럼 통화합니다 — 집에서도 밖에서도.</p>
+    </div>
+    <div class="landing-point">
+      <h3>가족 공지</h3>
+      <p>"오늘 저녁 7시 외식" 같은 한 줄을 모든 액자나 원하는 액자에 1시간, 1주일, 지울 때까지 띄웁니다. 자동화로도 보낼 수 있습니다.</p>
+    </div>
+    <div class="landing-point">
+      <h3>액자에 우리 집 일정</h3>
+      <p>Home Assistant 캘린더의 다가오는 일정을 공지 사이에, 또는 차분한 달력 위젯으로 보여줍니다.</p>
+    </div>
   </section>
 </div>

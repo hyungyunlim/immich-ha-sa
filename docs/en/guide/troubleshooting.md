@@ -82,6 +82,31 @@ The integration requires Home Assistant **2026.3.0** or newer. Update Home Assis
 
 immich-kiosk documents `require_all_people` as incompatible with other source buckets such as albums and date ranges. Use **Require All People** only with a person-only selection (set the Album select to `No Album Filter` first).
 
+## The Frames panel or its Calendar tab is missing
+
+Update the integration in HACS and restart Home Assistant; the panel loads at startup. Before 0.1.94 the panel was called **Frame Call**.
+
+## Notices or the calendar do not show on a frame
+
+- Tick the frame in the notice's target (or keep **All frames**) and in the **Calendar** tab.
+- Frames load a new frame page only when they reload. After a controller update, press the frame's **Reload** button or reload FreeKiosk.
+- Notices and events hide while the screen is off.
+
+## The Calendar tab lists no calendars or no events
+
+The tab lists Home Assistant calendar entities. Add the Google Calendar integration, or Remote Calendar with a calendar's iCal link. Events refresh every 15 minutes and whenever you save; an error under the form shows why the last refresh failed.
+
+## A call does not connect or goes silent
+
+- Open Home Assistant through its `https://` address; browsers block the microphone on `http://`.
+- Turn on the frame's **Frame Mic Stream** switch, and use Frame Mic 0.6 or newer (0.7 or newer for calls from outside).
+- From outside the home network, add a [Cloudflare TURN key](./speaker-mic#calls-from-outside).
+- If sound fades with your phone next to the frame, the two echo cancellers are cancelling each other; test from another room, or mute yourself while listening.
+
+## Frame Mic stopped after an app update
+
+Android usually restarts the app after an update, but not always. Open **Frame Mic** once on the frame, or run `adb shell am start -n org.junlim.framemic/.MainActivity`.
+
 ## Still stuck?
 
 Check the controller health endpoint and logs:

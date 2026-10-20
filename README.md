@@ -10,6 +10,13 @@ The frame keeps one fixed URL:
 http://<controller-host>:<controller-host-port>/frame/lenovo
 ```
 
+What it adds on top of immich-kiosk:
+
+- One fixed frame URL; albums, people, profiles, filters, renderer options, and sleep schedules change from Home Assistant.
+- FreeKiosk hardware control: screen, brightness, volume, and live telemetry over REST or MQTT.
+- A **Frame Speaker** media player, and listening, Home Assistant media-browser playback, and two-way calls through the optional [Frame Mic](apps/frame-mic/README.md) companion app. Calls also work from outside the home with an optional Cloudflare TURN key.
+- A **Frames** sidebar panel for calls, family notices, and calendar events (from any Home Assistant calendar) shown on the frames as a small pill or a month-calendar widget.
+
 For remote frames, the same route can be exposed through Cloudflare Tunnel:
 
 ```text
@@ -198,6 +205,7 @@ immich_frame.refresh_albums
 immich_frame.refresh_people
 immich_frame.set_renderer_options
 immich_frame.set_network_mode
+immich_frame.show_notice
 ```
 
 Example automation:
@@ -249,6 +257,17 @@ Refresh albums:
 curl -X POST http://localhost:8080/api/immich/albums/refresh \
   -H "Authorization: Bearer $CONTROLLER_API_TOKEN"
 ```
+
+Show a family notice on every frame until tonight (omit `deviceIds` for all frames, `until` to keep it until deleted):
+
+```bash
+curl -X POST http://localhost:8080/api/notices \
+  -H "Authorization: Bearer $CONTROLLER_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"🍽️ Dinner out at 7","deviceIds":["lenovo"],"until":"2026-10-21T23:59:00+09:00"}'
+```
+
+Other endpoints: `GET /api/notices`, `DELETE /api/notices/:id`, `GET`/`PUT /api/agenda` (calendar events, pushed by the integration), `GET /api/calls/ice-servers`, `GET`/`PUT /api/frames/:id/mic`, `POST`/`DELETE /api/frames/:id/call`, and `POST /api/frames/:id/audio`.
 
 ## Development
 

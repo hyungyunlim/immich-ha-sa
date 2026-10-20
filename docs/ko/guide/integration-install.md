@@ -13,8 +13,10 @@
 **Immich Frame Controller**를 다운로드한 뒤 Home Assistant를 재시작합니다.
 
 ::: info 버전 관리
-HACS는 최신 GitHub 릴리스 태그 버전을 설치합니다.
+HACS는 최신 GitHub 릴리스 태그 버전을 설치합니다. 업데이트할 때마다 Home Assistant를 재시작해야 새 엔티티와 사이드바 **Frames** 패널이 로드됩니다.
 :::
+
+통합은 사이드바에 **Frames** 패널을 추가합니다. 여기서 액자와 [통화](./speaker-mic#통화)하고 [가족 공지와 일정](./notices)을 띄웁니다.
 
 ## 3. 통합 추가
 

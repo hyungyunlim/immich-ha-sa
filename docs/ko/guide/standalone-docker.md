@@ -28,11 +28,14 @@ CONTROLLER_API_TOKEN=
 MQTT_BROKER_URL=
 MQTT_USERNAME=
 MQTT_PASSWORD=
+TURN_KEY_ID=
+TURN_KEY_API_TOKEN=
 ```
 
 - `PORT`는 내부 앱 포트, `CONTROLLER_HOST_PORT`는 Docker 호스트 포트입니다. `8082`가 사용 중이면 다른 포트를 고르고 `LOCAL_PUBLIC_CONTROLLER_URL`, 통합의 컨트롤러 URL, 액자 URL을 함께 수정하세요.
 - `CONTROLLER_API_TOKEN`은 선택적 고정 폴백입니다 — 비워두고 [페어링](./pairing)을 사용하세요.
 - `MQTT_BROKER_URL`은 선택이며 [FreeKiosk MQTT push 제어](./freekiosk#_3-선택-mqtt-push-제어)를 활성화합니다. 호스트만(`192.168.1.10`) 쓰거나 `mqtt://host:1883` 형식을 사용하고, 비워두면 MQTT가 꺼집니다.
+- `TURN_KEY_ID` / `TURN_KEY_API_TOKEN`은 선택입니다. 집 밖에서도 [통화](./speaker-mic#집-밖에서-통화하기)가 되게 하는 Cloudflare Realtime TURN 키이며, 없으면 Cloudflare 공개 STUN 서버만 씁니다.
 
 ## 2. 컨테이너 시작
 

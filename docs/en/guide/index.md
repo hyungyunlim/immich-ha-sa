@@ -36,6 +36,7 @@ Immich
 | **Home Assistant integration** | Exposes entities (selects, switches, numbers, buttons, …) and services for albums, people, profiles, filters, and renderer options. Installed via HACS. |
 | **immich-kiosk** | Renders the actual slideshow. The controller appends URL query overrides; your kiosk config stays untouched. |
 | **Immich** | Your photo library. API credentials stay server-side in the controller — the frame browser never sees them. |
+| **Frame Mic** (optional) | A small Android companion app on the frame for listening and calls, from the GitHub release. |
 
 ## What you can control from Home Assistant
 
@@ -45,6 +46,9 @@ Immich
 - Renderer options: transitions, layout, image fit, clock, date, weather, image metadata, font size, background blur, progress bar, burn-in protection, sleep schedule
 - Video playback and archived-asset visibility
 - Display brightness, volume, and screen power through the [FreeKiosk REST API](./freekiosk)
+- Audio on the frame: media and `tts.speak` on the Frame Speaker, and listening through the frame microphone with the [Frame Mic app](./speaker-mic)
+- Two-way calls from the **Frames** sidebar panel, also from outside the home with an optional [Cloudflare TURN key](./speaker-mic#calls-from-outside)
+- [Family notices and calendar events](./notices) on the frames, as a small pill or a month-calendar widget, plus the `immich_frame.show_notice` service for automations
 
 ## Security model
 

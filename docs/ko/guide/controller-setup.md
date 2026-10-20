@@ -25,6 +25,7 @@ http://<controller-host>:8082/
 - 선택적 로컬/외부 컨트롤러·kiosk URL 오버라이드
 - 선택적 디바이스별 immich-kiosk 비밀번호 오버라이드 — 비워두면 애드온 `kiosk_password`를 상속
 - 선택적 [FreeKiosk REST 원격 제어 설정](./freekiosk)
+- 선택적 **Frame Mic Key** — [Frame Mic 앱](./speaker-mic)의 키, 듣기와 통화용
 
 Home Assistant 통합은 디바이스 ID마다 한 번씩 추가합니다. 페어링 후 config flow가 컨트롤러의 디바이스 목록을 읽어 선택지로 제공합니다.
 

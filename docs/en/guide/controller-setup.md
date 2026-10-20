@@ -25,6 +25,7 @@ For each new device the controller creates:
 - Optional local and external controller/kiosk URL overrides
 - Optional per-device immich-kiosk password override — leave blank to inherit the add-on `kiosk_password`
 - Optional [FreeKiosk REST remote-control settings](./freekiosk)
+- Optional **Frame Mic Key** from the [Frame Mic app](./speaker-mic), for listening and calls
 
 Add the Home Assistant integration once per device ID; the config flow reads the controller's device list after pairing and offers the devices as choices.
 
