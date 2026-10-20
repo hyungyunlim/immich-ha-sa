@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.90
+
+- **Frame Mic Stream** `stream_url` is now a live AAC stream that players such as nPlayer and VLC treat as internet radio; the lossless WAV stream moved to `wav_url`. Needs Frame Mic 0.5 (attached to the release).
+- Add a **Frame Mic Notification** switch (on by default) that shows or hides the listener in the frame's Android notification.
+- Frame Mic 0.5: a new listener takes the mic over instead of getting `409`, which fixes players that reconnect with `Range` requests and stopped after a few seconds. The app also restarts itself after an update, so `adb install -r` needs no visit to the frame.
+- Restart Home Assistant Core after updating the integration so the new switch loads.
+
 ## 0.1.89
 
 - Route immich-kiosk 0.45+ `/health` checks through the kiosk proxy. Unproxied they hit the controller root, failed, and made frames show **Reconnecting**.

@@ -252,6 +252,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 remote_effective_muted_source,
             ),
             ImmichFrameMicStreamSwitch(coordinator),
+            ImmichFrameMicNotifySwitch(coordinator),
         ]
     )
 
@@ -409,6 +410,7 @@ class ImmichFrameMicStreamSwitch(CoordinatorEntity[ImmichFrameCoordinator], Swit
             "listener": mic.get("client") or None,
             "audio_source": mic.get("source"),
             "stream_url": mic.get("streamUrl"),
+            "wav_url": mic.get("wavUrl"),
             "app_version": mic.get("version"),
         }
 
@@ -420,4 +422,38 @@ class ImmichFrameMicStreamSwitch(CoordinatorEntity[ImmichFrameCoordinator], Swit
 
     async def _set(self, enabled: bool) -> None:
         await self.coordinator.client.set_mic_enabled(enabled)
+        await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameMicNotifySwitch(CoordinatorEntity[ImmichFrameCoordinator], SwitchEntity):
+    """Shows who is listening in the frame's Android notification (Frame Mic 0.5+, default on).
+
+    Android keeps a notification while the app runs; turning this off only hides the listener details.
+    """
+
+    _attr_icon = "mdi:bell-ring-outline"
+
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Mic Notification"
+        self._attr_unique_id = frame_unique_id(device_id, "mic_notify")
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def available(self) -> bool:
+        mic = self.coordinator.data.get("mic")
+        return super().available and isinstance(mic, dict) and "notify" in mic
+
+    @property
+    def is_on(self) -> bool | None:
+        mic = self.coordinator.data.get("mic")
+        return bool(mic.get("notify")) if isinstance(mic, dict) and "notify" in mic else None
+
+    async def async_turn_on(self, **kwargs) -> None:
+        await self.coordinator.client.set_mic_notify(True)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self.coordinator.client.set_mic_notify(False)
         await self.coordinator.async_request_refresh()

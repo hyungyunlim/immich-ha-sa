@@ -180,6 +180,14 @@ class ImmichFrameClient:
             auth=True,
         )
 
+    async def set_mic_notify(self, notify: bool) -> dict[str, Any]:
+        return await self._request(
+            "PUT",
+            f"/api/frames/{self.device_id}/mic",
+            json={"notify": notify},
+            auth=True,
+        )
+
     async def play_audio(self, url: str, volume: int | None = None) -> dict[str, Any]:
         payload: dict[str, Any] = {"url": url}
         if volume is not None:

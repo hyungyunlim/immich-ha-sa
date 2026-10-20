@@ -298,8 +298,9 @@ const DevicePatchSchema = z.object({
 });
 
 const MicStreamToggleSchema = z.object({
-  enabled: z.boolean(),
-});
+  enabled: z.boolean().optional(),
+  notify: z.boolean().optional(),
+}).refine((value) => value.enabled !== undefined || value.notify !== undefined, 'Set enabled or notify.');
 
 const FrameAudioPlaySchema = z.object({
   url: z.string().url().refine((value) => /^https?:\/\//i.test(value), 'Use an http(s) URL the frame can reach.'),
@@ -1711,7 +1712,10 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     const device = deviceOrReply(request, reply);
     if (!device) return;
     try {
-      return ok(await micStreamRequest(device, parsed.data.enabled ? 'enable' : 'disable'));
+      let result: Record<string, unknown> | undefined;
+      if (parsed.data.notify !== undefined) result = await micStreamRequest(device, parsed.data.notify ? 'notify?on=1' : 'notify?on=0');
+      if (parsed.data.enabled !== undefined) result = await micStreamRequest(device, parsed.data.enabled ? 'enable' : 'disable');
+      return ok(result);
     } catch (error) {
       sendRemoteFailure(reply, error);
     }
@@ -2926,7 +2930,7 @@ async function setRemoteAutoBrightness(
 }
 
 const MIC_STREAM_DEFAULT_PORT = 8765;
-type MicStreamAction = 'status' | 'enable' | 'disable';
+type MicStreamAction = 'status' | 'enable' | 'disable' | 'notify?on=1' | 'notify?on=0';
 
 // The Frame Mic app runs next to FreeKiosk, so it shares the host of the frame's REST endpoint.
 function micStreamBaseUrl(device: FrameDevice): string | undefined {
@@ -2944,7 +2948,7 @@ async function micStreamRequest(device: FrameDevice, action: MicStreamAction): P
   const key = encodeURIComponent(device.micStreamKey);
   let response: Response;
   try {
-    response = await fetch(`${baseUrl}/${action}?k=${key}`, { signal: AbortSignal.timeout(REMOTE_REQUEST_TIMEOUT_MS) });
+    response = await fetch(`${baseUrl}/${action}${action.includes('?') ? '&' : '?'}k=${key}`, { signal: AbortSignal.timeout(REMOTE_REQUEST_TIMEOUT_MS) });
   } catch (error) {
     throw new RemoteCommandError('MIC_UNREACHABLE', `Frame Mic is not reachable at ${baseUrl}: ${error instanceof Error ? error.message : String(error)}`, 502);
   }
@@ -2952,7 +2956,8 @@ async function micStreamRequest(device: FrameDevice, action: MicStreamAction): P
   if (!response.ok || !isRecord(payload)) {
     throw new RemoteCommandError('MIC_REQUEST_FAILED', `Frame Mic ${action} failed with HTTP ${response.status} at ${baseUrl}`, 502);
   }
-  return { ...payload, streamUrl: `${baseUrl}/mic.wav?k=${key}` };
+  // AAC (Frame Mic 0.5+) plays as a live stream in most players and speakers; WAV stays for speech recognition.
+  return { ...payload, streamUrl: `${baseUrl}/mic.aac?k=${key}`, wavUrl: `${baseUrl}/mic.wav?k=${key}` };
 }
 
 async function sendRemoteRequest(

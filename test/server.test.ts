@@ -1721,6 +1721,7 @@ describe('frame mic and speaker', () => {
     tempDirs.push(dir);
     const requests: Array<{ method?: string; url?: string; body?: unknown }> = [];
     let micEnabled = false;
+    let micNotify = true;
     // One fake host plays both roles: FreeKiosk REST and the Frame Mic app share the frame's address.
     const frame = createHttpServer((request, response) => {
       let raw = '';
@@ -1729,7 +1730,7 @@ describe('frame mic and speaker', () => {
         requests.push({ method: request.method, url: request.url, body: raw ? JSON.parse(raw) : undefined });
         response.setHeader('Content-Type', 'application/json');
         const url = new URL(request.url ?? '/', 'http://frame.local');
-        if (['/status', '/enable', '/disable'].includes(url.pathname)) {
+        if (['/status', '/enable', '/disable', '/notify'].includes(url.pathname)) {
           if (url.searchParams.get('k') !== 'mic-secret') {
             response.statusCode = 403;
             response.end('forbidden');
@@ -1737,7 +1738,8 @@ describe('frame mic and speaker', () => {
           }
           if (url.pathname === '/enable') micEnabled = true;
           if (url.pathname === '/disable') micEnabled = false;
-          response.end(JSON.stringify({ version: '0.2', enabled: micEnabled, streaming: false, source: 'MIC' }));
+          if (url.pathname === '/notify') micNotify = url.searchParams.get('on') !== '0';
+          response.end(JSON.stringify({ version: '0.5', enabled: micEnabled, notify: micNotify, streaming: false, source: 'MIC' }));
           return;
         }
         if (url.pathname === '/api/audio/play' || url.pathname === '/api/audio/stop') {
@@ -1773,12 +1775,17 @@ describe('frame mic and speaker', () => {
     const status = await server.inject({ method: 'GET', url: '/api/frames/lenovo/mic' });
     expect(status.statusCode).toBe(200);
     expect(status.json().data).toMatchObject({ enabled: false, source: 'MIC' });
-    expect(status.json().data.streamUrl).toBe(`http://127.0.0.1:${port}/mic.wav?k=mic-secret`);
+    expect(status.json().data.streamUrl).toBe(`http://127.0.0.1:${port}/mic.aac?k=mic-secret`);
+    expect(status.json().data.wavUrl).toBe(`http://127.0.0.1:${port}/mic.wav?k=mic-secret`);
 
     const on = await server.inject({ method: 'PUT', url: '/api/frames/lenovo/mic', payload: { enabled: true } });
     expect(on.json().data.enabled).toBe(true);
     const off = await server.inject({ method: 'PUT', url: '/api/frames/lenovo/mic', payload: { enabled: false } });
     expect(off.json().data.enabled).toBe(false);
+    const quiet = await server.inject({ method: 'PUT', url: '/api/frames/lenovo/mic', payload: { notify: false } });
+    expect(quiet.json().data.notify).toBe(false);
+    const empty = await server.inject({ method: 'PUT', url: '/api/frames/lenovo/mic', payload: {} });
+    expect(empty.statusCode).toBe(400);
 
     const badAudio = await server.inject({
       method: 'POST',
@@ -1799,6 +1806,7 @@ describe('frame mic and speaker', () => {
       { method: 'GET', url: '/status?k=mic-secret', body: undefined },
       { method: 'GET', url: '/enable?k=mic-secret', body: undefined },
       { method: 'GET', url: '/disable?k=mic-secret', body: undefined },
+      { method: 'GET', url: '/notify?on=0&k=mic-secret', body: undefined },
       {
         method: 'POST',
         url: '/api/audio/play',

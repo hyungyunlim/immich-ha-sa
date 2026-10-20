@@ -9,6 +9,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
+import android.media.MediaCodec;
+import android.media.MediaCodecInfo;
+import android.media.MediaFormat;
 import android.media.MediaRecorder;
 import android.os.IBinder;
 
@@ -27,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Serves the microphone as an endless 16 kHz mono WAV over HTTP, only while enabled and only while someone listens.
@@ -35,13 +39,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   GET /status    JSON state
  *   GET /enable    allow listening (persisted)
  *   GET /disable   stop any stream and refuse new ones (persisted, the default)
- *   GET /mic.wav   the live stream
+ *   GET /mic.wav   live 16 kHz mono WAV (lossless, for speech recognition)
+ *   GET /mic.aac   live AAC-LC in ADTS (internet-radio format; players and speakers treat it as a live stream)
+ *   GET /notify?on=1|0  show or hide who is listening in the Android notification (persisted, default on)
  *
- * ponytail: one listener at a time; add a fan-out when two people need to listen at once.
+ * ponytail: one listener at a time and the newest wins; add a fan-out when two people need to listen at once.
  */
 public class StreamService extends Service {
     static final int PORT = 8765;
-    static final String VERSION = "0.3";
+    static final String VERSION = "0.5";
     static final int RATE = 16000;
     private static final String CHANNEL = "mic";
 
@@ -59,6 +65,8 @@ public class StreamService extends Service {
             "VOICE_RECOGNITION", "VOICE_COMMUNICATION", "MIC", "CAMCORDER", "UNPROCESSED", "DEFAULT"};
 
     private final AtomicBoolean streaming = new AtomicBoolean();
+    // Bumped by every new listener; a running stream ends when it no longer holds the latest value.
+    private final AtomicInteger listener = new AtomicInteger();
     private volatile boolean running;
     private volatile ServerSocket server;
     private volatile String client = "";
@@ -113,7 +121,8 @@ public class StreamService extends Service {
     }
 
     private Notification note() {
-        String text = streaming.get() ? "Streaming to " + client
+        String text = !prefs.getBoolean("notify", true) ? "Running"
+                : streaming.get() ? "Streaming to " + client
                 : enabled() ? "On: mic opens only while someone listens" : "Off";
         return new Notification.Builder(this, CHANNEL)
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
@@ -168,23 +177,37 @@ public class StreamService extends Service {
         } else if (path.equals("/disable")) {
             setEnabled(false); // a running stream sees this within ~20 ms and ends
             respond(out, "200 OK", "application/json", json());
+        } else if (path.equals("/notify")) {
+            prefs.edit().putBoolean("notify", !target.contains("on=0")).apply();
+            refreshNote();
+            respond(out, "200 OK", "application/json", json());
         } else if (path.equals("/mic.wav")) {
-            stream(s, out);
+            stream(s, out, false);
+        } else if (path.equals("/mic.aac")) {
+            stream(s, out, true);
         } else {
             respond(out, "404 Not Found", "text/plain", "not found");
         }
     }
 
-    private void stream(Socket s, OutputStream out) throws IOException {
+    private void stream(Socket s, OutputStream out, boolean aac) throws IOException {
         if (!enabled()) {
             respond(out, "423 Locked", "text/plain", "mic stream is off");
             return;
         }
-        if (!streaming.compareAndSet(false, true)) {
-            respond(out, "409 Conflict", "text/plain", "already streaming to " + client);
+        // The newest listener takes over the mic. Players such as nPlayer reconnect with Range requests
+        // right after closing the first connection, before the old stream has noticed it is gone.
+        int me = listener.incrementAndGet();
+        long deadline = System.currentTimeMillis() + 2000;
+        while (streaming.get() && listener.get() == me && System.currentTimeMillis() < deadline) {
+            sleep(20);
+        }
+        if (listener.get() != me || !streaming.compareAndSet(false, true)) {
+            respond(out, "409 Conflict", "text/plain", "superseded by a newer listener");
             return;
         }
         AudioRecord rec = null;
+        AacEncoder encoder = null;
         try {
             byte[] buf = new byte[RATE * 2 / 10]; // 100 ms of 16-bit mono
             int[] first = new int[1];
@@ -195,15 +218,22 @@ public class StreamService extends Service {
             }
             client = s.getInetAddress().getHostAddress();
             refreshNote();
-            out.write("HTTP/1.0 200 OK\r\nContent-Type: audio/wav\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n"
-                    .getBytes(StandardCharsets.US_ASCII));
-            out.write(wavHeader());
-            out.write(buf, 0, first[0]);
+            out.write(("HTTP/1.0 200 OK\r\nContent-Type: " + (aac ? "audio/aac" : "audio/wav")
+                    + "\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            if (aac) {
+                encoder = new AacEncoder();
+                encoder.write(buf, first[0], out);
+            } else {
+                out.write(wavHeader());
+                out.write(buf, 0, first[0]);
+            }
             long lastData = System.currentTimeMillis();
-            while (running && enabled()) {
+            while (running && enabled() && listener.get() == me) {
                 int n = rec.read(buf, 0, buf.length, AudioRecord.READ_NON_BLOCKING);
                 if (n > 0) {
-                    out.write(buf, 0, n); // throws once the listener disconnects
+                    // throws once the listener disconnects
+                    if (encoder != null) encoder.write(buf, n, out);
+                    else out.write(buf, 0, n);
                     lastData = System.currentTimeMillis();
                 } else if (n < 0 || System.currentTimeMillis() - lastData > 3000) {
                     detail += " | stopped: read=" + n;
@@ -213,6 +243,7 @@ public class StreamService extends Service {
                 }
             }
         } finally {
+            if (encoder != null) encoder.release();
             if (rec != null) {
                 if (rec.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) rec.stop();
                 rec.release();
@@ -268,7 +299,8 @@ public class StreamService extends Service {
     }
 
     private String json() {
-        return "{\"version\":\"" + VERSION + "\",\"enabled\":" + enabled() + ",\"streaming\":" + streaming.get()
+        return "{\"version\":\"" + VERSION + "\",\"enabled\":" + enabled() + ",\"notify\":" + prefs.getBoolean("notify", true)
+                + ",\"streaming\":" + streaming.get()
                 + ",\"client\":\"" + esc(client) + "\",\"source\":\"" + esc(SOURCE_NAMES[prefs.getInt("source", 0)])
                 + "\",\"detail\":\"" + esc(detail) + "\"}";
     }
@@ -289,6 +321,72 @@ public class StreamService extends Service {
             Thread.sleep(ms);
         } catch (InterruptedException ignored) {
         }
+    }
+
+    /** Encodes 16 kHz mono PCM to AAC-LC and writes each frame with an ADTS header. */
+    private static final class AacEncoder {
+        private final MediaCodec codec;
+        private final MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+        private long ptsUs;
+
+        AacEncoder() throws IOException {
+            MediaFormat format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, RATE, 1);
+            format.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
+            format.setInteger(MediaFormat.KEY_BIT_RATE, 48000);
+            format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, RATE * 2);
+            codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC);
+            codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            codec.start();
+        }
+
+        void write(byte[] pcm, int len, OutputStream out) throws IOException {
+            int off = 0;
+            while (off < len) {
+                int in = codec.dequeueInputBuffer(10000);
+                if (in < 0) break; // encoder backed up: drop this slice instead of stalling the mic
+                ByteBuffer input = codec.getInputBuffer(in);
+                input.clear();
+                int n = Math.min(input.remaining(), len - off);
+                input.put(pcm, off, n);
+                codec.queueInputBuffer(in, 0, n, ptsUs, 0);
+                ptsUs += n / 2 * 1000000L / RATE;
+                off += n;
+            }
+            int index;
+            while ((index = codec.dequeueOutputBuffer(info, 0)) >= 0) {
+                if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0 && info.size > 0) {
+                    byte[] frame = new byte[info.size + 7];
+                    adtsHeader(frame, frame.length);
+                    ByteBuffer output = codec.getOutputBuffer(index);
+                    output.position(info.offset);
+                    output.get(frame, 7, info.size);
+                    out.write(frame);
+                }
+                codec.releaseOutputBuffer(index, false);
+            }
+        }
+
+        void release() {
+            try {
+                codec.stop();
+            } catch (RuntimeException ignored) {
+            }
+            codec.release();
+        }
+    }
+
+    /** 7-byte ADTS header: MPEG-4 AAC-LC, 16 kHz (index 8), mono, no CRC; len includes the header. */
+    static void adtsHeader(byte[] p, int len) {
+        final int profile = 2;
+        final int freqIndex = 8;
+        final int channels = 1;
+        p[0] = (byte) 0xFF;
+        p[1] = (byte) 0xF1;
+        p[2] = (byte) (((profile - 1) << 6) + (freqIndex << 2) + (channels >> 2));
+        p[3] = (byte) (((channels & 3) << 6) + (len >> 11));
+        p[4] = (byte) ((len & 0x7FF) >> 3);
+        p[5] = (byte) (((len & 7) << 5) + 0x1F);
+        p[6] = (byte) 0xFC;
     }
 
     /** WAV header with a huge length so players treat the response as a live stream. */

@@ -31,9 +31,11 @@ Listening needs the **Frame Mic** companion app on the frame. It stays off until
 1. Download `frame-mic-<version>.apk` from the [GitHub release](https://github.com/hyungyunlim/immich-ha-sa/releases) and install it on the frame.
 2. Open **Frame Mic** once and allow microphone access. The app shows its **key** and stream URL.
 3. In the [controller console](./controller-setup), open the device and enter the key under **Frame Mic Key**.
-4. In Home Assistant, turn on **Frame Mic Stream**. Its `stream_url` attribute is a live 16 kHz WAV stream; open it in VLC or any player that plays HTTP audio.
+4. In Home Assistant, turn on **Frame Mic Stream**. Its `stream_url` attribute is a live AAC stream (Frame Mic 0.5+); open it in VLC, nPlayer, or any player that plays internet radio. `wav_url` is the same audio as lossless WAV.
 
-Turn the switch off to end any running stream and refuse new ones. The frame shows an Android notification while someone listens.
+Turn the switch off to end any running stream and refuse new ones. One device listens at a time; a new connection takes over from the previous one.
+
+While someone listens, the frame's Android notification shows who it is. The **Frame Mic Notification** switch (on by default) hides those details; Android still keeps a plain *Frame Mic* notification while the app runs.
 
 The app talks to the controller on port `8765` at the same address as the FreeKiosk REST endpoint. For a frame behind another router, forward that port the same way as the REST port.
 
