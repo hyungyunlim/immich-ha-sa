@@ -251,6 +251,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 remote_effective_muted,
                 remote_effective_muted_source,
             ),
+            ImmichFrameMicStreamSwitch(coordinator),
         ]
     )
 
@@ -365,4 +366,58 @@ class ImmichFrameRemoteCommandSwitch(CoordinatorEntity[ImmichFrameCoordinator], 
             return
         command = self._turn_on_command if target else self._turn_off_command
         await self.coordinator.client.send_command(command)
+        await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameMicStreamSwitch(CoordinatorEntity[ImmichFrameCoordinator], SwitchEntity):
+    """Allows listening to the frame microphone through the Frame Mic app.
+
+    Unavailable until a Frame Mic key is set for the device in the controller.
+    When on, the mic still opens only while someone plays the stream URL.
+    """
+
+    _attr_icon = "mdi:microphone"
+
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Mic Stream"
+        self._attr_unique_id = frame_unique_id(device_id, "mic_stream")
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def _mic(self) -> dict | None:
+        mic = self.coordinator.data.get("mic")
+        return mic if isinstance(mic, dict) else None
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._mic is not None
+
+    @property
+    def is_on(self) -> bool | None:
+        mic = self._mic
+        return bool(mic.get("enabled")) if mic else None
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        mic = self._mic
+        if not mic:
+            return None
+        return {
+            "streaming": mic.get("streaming"),
+            "listener": mic.get("client") or None,
+            "audio_source": mic.get("source"),
+            "stream_url": mic.get("streamUrl"),
+            "app_version": mic.get("version"),
+        }
+
+    async def async_turn_on(self, **kwargs) -> None:
+        await self._set(True)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self._set(False)
+
+    async def _set(self, enabled: bool) -> None:
+        await self.coordinator.client.set_mic_enabled(enabled)
         await self.coordinator.async_request_refresh()

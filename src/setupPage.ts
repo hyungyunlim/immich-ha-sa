@@ -76,6 +76,7 @@ interface SetupPageDevice {
   lastSeenIp?: string;
   lastSeenAt?: string;
   remoteApiKeyConfigured?: boolean;
+  micStreamConfigured?: boolean;
   mqttTopicId?: string;
   remoteAvailability?: string;
   isDefault: boolean;
@@ -1159,6 +1160,10 @@ export function renderSetupPage(params: SetupPageParams): string {
       if (remoteApiKey) {
         payload.remoteApiKey = remoteApiKey;
       }
+      const micStreamKey = optionalValue(formData, 'micStreamKey');
+      if (micStreamKey) {
+        payload.micStreamKey = micStreamKey;
+      }
       if (formData.has('mqttTopicId')) {
         payload.mqttTopicId = optionalValue(formData, 'mqttTopicId') ?? (includeId ? undefined : null);
       }
@@ -1643,6 +1648,11 @@ function renderDeviceCard(device: SetupPageDevice, mqtt: SetupPageMqttStatus): s
           <label class="field full">
             <span class="label">Remote API Key</span>
             <input name="remoteApiKey" type="password" autocomplete="new-password" placeholder="${device.remoteApiKeyConfigured ? 'configured; leave blank to keep' : 'optional'}">
+          </label>
+          <label class="field full">
+            <span class="label">Frame Mic Key</span>
+            <input name="micStreamKey" type="password" autocomplete="new-password" placeholder="${device.micStreamConfigured ? 'configured; leave blank to keep' : 'optional'}">
+            <span class="help-text">Key of the Frame Mic companion app on this frame. Enables the on-demand mic stream switch; the stream stays off until switched on.</span>
           </label>
           <label class="field full">
             <span class="label">MQTT Topic ID</span>

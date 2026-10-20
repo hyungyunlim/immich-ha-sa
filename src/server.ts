@@ -273,6 +273,8 @@ const DeviceCreateSchema = z.object({
   remoteApiAutoPort: z.number().int().min(1).max(65535).default(8080),
   remoteApiKey: OptionalSecretSchema,
   mqttTopicId: OptionalMqttTopicIdSchema,
+  micStreamKey: OptionalSecretSchema,
+  micStreamPort: z.number().int().min(1).max(65535).optional(),
 });
 
 const DevicePatchSchema = z.object({
@@ -291,6 +293,18 @@ const DevicePatchSchema = z.object({
   remoteApiAutoPort: z.number().int().min(1).max(65535).optional(),
   remoteApiKey: OptionalSecretSchema,
   mqttTopicId: OptionalMqttTopicIdSchema.or(z.null()),
+  micStreamKey: OptionalPatchSecretSchema,
+  micStreamPort: z.number().int().min(1).max(65535).optional(),
+});
+
+const MicStreamToggleSchema = z.object({
+  enabled: z.boolean(),
+});
+
+const FrameAudioPlaySchema = z.object({
+  url: z.string().url().refine((value) => /^https?:\/\//i.test(value), 'Use an http(s) URL the frame can reach.'),
+  volume: z.number().int().min(0).max(100).optional(),
+  loop: z.boolean().optional(),
 });
 
 const FrameCommandSchema = z.object({
@@ -1675,6 +1689,84 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     }
   });
 
+  // Frame Mic companion app: on-demand mic stream that stays off until switched on here.
+  app.get('/api/frames/:deviceId/mic', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return; // the response carries the keyed stream URL
+    const device = deviceOrReply(request, reply);
+    if (!device) return;
+    try {
+      return ok(await micStreamRequest(device, 'status'));
+    } catch (error) {
+      sendRemoteFailure(reply, error);
+    }
+  });
+
+  app.put('/api/frames/:deviceId/mic', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const parsed = MicStreamToggleSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid mic request.'));
+      return;
+    }
+    const device = deviceOrReply(request, reply);
+    if (!device) return;
+    try {
+      return ok(await micStreamRequest(device, parsed.data.enabled ? 'enable' : 'disable'));
+    } catch (error) {
+      sendRemoteFailure(reply, error);
+    }
+  });
+
+  // Plays an audio URL (voice note, music, TTS) on the frame speaker through FreeKiosk.
+  app.post('/api/frames/:deviceId/audio', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const parsed = FrameAudioPlaySchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid audio request.'));
+      return;
+    }
+    const device = deviceOrReply(request, reply);
+    if (!device) return;
+    const { url, volume, loop } = parsed.data;
+    try {
+      return ok(await sendRemoteRequest(device, '/api/audio/play', {
+        method: 'POST',
+        body: { url, loop: loop ?? false, ...(volume === undefined ? {} : { volume }) },
+        timeoutMs: remoteTimeoutForDevice(device),
+      }));
+    } catch (error) {
+      sendRemoteFailure(reply, error);
+    }
+  });
+
+  app.post('/api/frames/:deviceId/audio/stop', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const device = deviceOrReply(request, reply);
+    if (!device) return;
+    try {
+      return ok(await sendRemoteRequest(device, '/api/audio/stop', {
+        method: 'POST',
+        timeoutMs: remoteTimeoutForDevice(device),
+      }));
+    } catch (error) {
+      sendRemoteFailure(reply, error);
+    }
+  });
+
+  function deviceOrReply(request: FastifyRequest, reply: FastifyReply): FrameDevice | undefined {
+    const { deviceId } = request.params as { deviceId: string };
+    const device = store.getDevice(deviceId);
+    if (!device) reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+    return device;
+  }
+
+  function sendRemoteFailure(reply: FastifyReply, error: unknown): void {
+    const remoteError = error instanceof RemoteCommandError
+      ? error
+      : new RemoteCommandError('REMOTE_COMMAND_FAILED', error instanceof Error ? error.message : String(error));
+    reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
+  }
+
   app.get('/api/mqtt/status', async (request, reply) => {
     if (!requireLocalConsoleAccess(request, reply)) return;
     return ok(buildMqttStatusPayload());
@@ -2833,6 +2925,36 @@ async function setRemoteAutoBrightness(
   };
 }
 
+const MIC_STREAM_DEFAULT_PORT = 8765;
+type MicStreamAction = 'status' | 'enable' | 'disable';
+
+// The Frame Mic app runs next to FreeKiosk, so it shares the host of the frame's REST endpoint.
+function micStreamBaseUrl(device: FrameDevice): string | undefined {
+  if (!device.micStreamKey) return undefined;
+  const remote = remoteEndpointCandidates(device)[0];
+  const host = remote ? new URL(remote.baseUrl).hostname : device.lastSeenIp;
+  return host ? `http://${host}:${device.micStreamPort ?? MIC_STREAM_DEFAULT_PORT}` : undefined;
+}
+
+async function micStreamRequest(device: FrameDevice, action: MicStreamAction): Promise<Record<string, unknown>> {
+  const baseUrl = micStreamBaseUrl(device);
+  if (!baseUrl || !device.micStreamKey) {
+    throw new RemoteCommandError('MIC_NOT_CONFIGURED', `Frame ${device.id} has no Frame Mic key or reachable host.`, 400);
+  }
+  const key = encodeURIComponent(device.micStreamKey);
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/${action}?k=${key}`, { signal: AbortSignal.timeout(REMOTE_REQUEST_TIMEOUT_MS) });
+  } catch (error) {
+    throw new RemoteCommandError('MIC_UNREACHABLE', `Frame Mic is not reachable at ${baseUrl}: ${error instanceof Error ? error.message : String(error)}`, 502);
+  }
+  const payload = parseJsonOrText(await response.text());
+  if (!response.ok || !isRecord(payload)) {
+    throw new RemoteCommandError('MIC_REQUEST_FAILED', `Frame Mic ${action} failed with HTTP ${response.status} at ${baseUrl}`, 502);
+  }
+  return { ...payload, streamUrl: `${baseUrl}/mic.wav?k=${key}` };
+}
+
 async function sendRemoteRequest(
   device: FrameDevice,
   endpoint: string,
@@ -3646,20 +3768,22 @@ function toControllerProxyUrl(
   return proxy.toString();
 }
 
-function publicDevice(device: FrameDevice): Omit<FrameDevice, 'remoteApiKey' | 'kioskPassword'> & {
+function publicDevice(device: FrameDevice): Omit<FrameDevice, 'remoteApiKey' | 'kioskPassword' | 'micStreamKey'> & {
   remoteApiKeyConfigured: boolean;
+  micStreamConfigured: boolean;
   kioskPasswordConfigured: boolean;
   remoteApiAutoUrl?: string;
   remoteApiEffectiveUrl?: string;
   remoteApiEffectiveSource: 'manual' | 'auto' | 'none';
   remoteApiConfigured: boolean;
 } {
-  const { remoteApiKey: _remoteApiKey, kioskPassword: _kioskPassword, ...publicFields } = device;
+  const { remoteApiKey: _remoteApiKey, kioskPassword: _kioskPassword, micStreamKey: _micStreamKey, ...publicFields } = device;
   const remote = remoteEndpointSummary(device);
   return {
     ...publicFields,
     remoteControlType: publicFields.remoteControlType ?? 'none',
     remoteApiKeyConfigured: Boolean(_remoteApiKey),
+    micStreamConfigured: Boolean(_micStreamKey),
     kioskPasswordConfigured: Boolean(_kioskPassword),
     remoteApiAutoPort: publicFields.remoteApiAutoPort ?? 8080,
     remoteApiAutoUrl: remote.autoUrl,
@@ -3878,6 +4002,8 @@ function createDeviceFromInput(
     remoteApiAutoPort: input.remoteApiAutoPort,
     remoteApiKey: input.remoteApiKey,
     mqttTopicId: input.mqttTopicId,
+    micStreamKey: input.micStreamKey,
+    micStreamPort: input.micStreamPort,
   };
 }
 
@@ -3919,6 +4045,8 @@ function normalizeDevicePatch(input: z.infer<typeof DevicePatchSchema>): Partial
   if (hasPatchKey(input, 'remoteApiAutoPort')) patch.remoteApiAutoPort = input.remoteApiAutoPort;
   if (hasPatchKey(input, 'remoteApiKey')) patch.remoteApiKey = input.remoteApiKey;
   if (hasPatchKey(input, 'mqttTopicId')) patch.mqttTopicId = input.mqttTopicId ?? undefined;
+  if (hasPatchKey(input, 'micStreamKey')) patch.micStreamKey = input.micStreamKey ?? undefined;
+  if (hasPatchKey(input, 'micStreamPort')) patch.micStreamPort = input.micStreamPort;
 
   return patch;
 }

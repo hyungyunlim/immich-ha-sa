@@ -165,6 +165,39 @@ class ImmichFrameClient:
             auth=True,
         )
 
+    async def mic_status(self) -> dict[str, Any]:
+        return await self._request(
+            "GET",
+            f"/api/frames/{self.device_id}/mic",
+            auth=True,
+        )
+
+    async def set_mic_enabled(self, enabled: bool) -> dict[str, Any]:
+        return await self._request(
+            "PUT",
+            f"/api/frames/{self.device_id}/mic",
+            json={"enabled": enabled},
+            auth=True,
+        )
+
+    async def play_audio(self, url: str, volume: int | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {"url": url}
+        if volume is not None:
+            payload["volume"] = volume
+        return await self._request(
+            "POST",
+            f"/api/frames/{self.device_id}/audio",
+            json=payload,
+            auth=True,
+        )
+
+    async def stop_audio(self) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            f"/api/frames/{self.device_id}/audio/stop",
+            auth=True,
+        )
+
     async def _request(
         self,
         method: str,

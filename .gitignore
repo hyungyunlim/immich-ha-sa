@@ -6,3 +6,8 @@ data/
 .DS_Store
 *.log
 __pycache__/
+
+# Frame Mic build output and signing material
+apps/frame-mic/build/
+*.jks
+*.keystore

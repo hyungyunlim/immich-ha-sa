@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.88
+
+- Add a **Frame Speaker** media player per frame. It plays audio from the Home Assistant media browser, local media, or `tts.speak` on the frame speaker through FreeKiosk, with stop and volume control.
+- Add a **Frame Mic Stream** switch and the **Frame Mic** companion app (APK attached to the release). Listening stays off until the switch is on, the microphone opens only while someone plays the stream URL, and each app install has its own key, entered under **Frame Mic Key** in the controller console. Frames without a key show the switch as unavailable.
+- New controller endpoints: `GET`/`PUT /api/frames/:deviceId/mic`, `POST /api/frames/:deviceId/audio`, and `POST /api/frames/:deviceId/audio/stop`.
+- Restart Home Assistant Core after updating the integration so the new entities load.
+
 ## 0.1.87
 
 - Send the **Show More Info** setting as immich-kiosk's `more_info_display` parameter as well as the legacy `show_more_info`, so frames that hide the More Info overlay keep it hidden on immich-kiosk 0.44 and newer.

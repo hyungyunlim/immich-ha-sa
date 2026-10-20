@@ -63,6 +63,7 @@ export default defineConfig({
                 { text: 'Pairing', link: '/en/guide/pairing' },
                 { text: 'Controller Console', link: '/en/guide/controller-setup' },
                 { text: 'FreeKiosk Remote Control', link: '/en/guide/freekiosk' },
+                { text: 'Frame Speaker and Mic', link: '/en/guide/speaker-mic' },
               ],
             },
             {
@@ -117,6 +118,7 @@ export default defineConfig({
                 { text: '페어링', link: '/ko/guide/pairing' },
                 { text: '컨트롤러 콘솔', link: '/ko/guide/controller-setup' },
                 { text: 'FreeKiosk 원격 제어', link: '/ko/guide/freekiosk' },
+                { text: '액자 스피커와 마이크', link: '/ko/guide/speaker-mic' },
               ],
             },
             {

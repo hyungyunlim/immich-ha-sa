@@ -35,10 +35,17 @@ class ImmichFrameCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             remote_status = await self.client.remote_status()
         except ImmichFrameApiError as err:
             LOGGER.debug("Unable to update FreeKiosk remote status: %s", err.message)
+        mic: dict[str, Any] | None = None
+        try:
+            mic = await self.client.mic_status()
+        except ImmichFrameApiError as err:
+            # MIC_NOT_CONFIGURED is the normal case for frames without the Frame Mic app
+            LOGGER.debug("Frame Mic status unavailable: %s", err.message)
         return {
             "state": state,
             "albums": albums,
             "people": people,
             "profiles": profiles,
             "remote_status": remote_status,
+            "mic": mic,
         }

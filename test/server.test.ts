@@ -1712,3 +1712,100 @@ describe('controller API', () => {
     await server.close();
   });
 });
+
+describe('frame mic and speaker', () => {
+  it('controls the Frame Mic app and plays audio through FreeKiosk without leaking the mic key', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-mic-'));
+    tempDirs.push(dir);
+    const requests: Array<{ method?: string; url?: string; body?: unknown }> = [];
+    let micEnabled = false;
+    // One fake host plays both roles: FreeKiosk REST and the Frame Mic app share the frame's address.
+    const frame = createHttpServer((request, response) => {
+      let raw = '';
+      request.on('data', (chunk) => { raw += chunk; });
+      request.on('end', () => {
+        requests.push({ method: request.method, url: request.url, body: raw ? JSON.parse(raw) : undefined });
+        response.setHeader('Content-Type', 'application/json');
+        const url = new URL(request.url ?? '/', 'http://frame.local');
+        if (['/status', '/enable', '/disable'].includes(url.pathname)) {
+          if (url.searchParams.get('k') !== 'mic-secret') {
+            response.statusCode = 403;
+            response.end('forbidden');
+            return;
+          }
+          if (url.pathname === '/enable') micEnabled = true;
+          if (url.pathname === '/disable') micEnabled = false;
+          response.end(JSON.stringify({ version: '0.2', enabled: micEnabled, streaming: false, source: 'MIC' }));
+          return;
+        }
+        if (url.pathname === '/api/audio/play' || url.pathname === '/api/audio/stop') {
+          response.end(JSON.stringify({ success: true, data: { executed: true } }));
+          return;
+        }
+        response.statusCode = 404;
+        response.end(JSON.stringify({ success: false, error: 'Endpoint not found' }));
+      });
+    });
+    await new Promise<void>((resolve) => frame.listen(0, '127.0.0.1', resolve));
+    const port = (frame.address() as AddressInfo).port;
+
+    const config = buildConfig(dir);
+    const store = new JsonStore(config.storePath, config.defaultDevice);
+    store.updateDevice('lenovo', { remoteControlType: 'freekiosk', remoteApiUrl: `http://127.0.0.1:${port}` });
+    const server = createTestServer({ config, store });
+
+    const unconfigured = await server.inject({ method: 'GET', url: '/api/frames/lenovo/mic' });
+    expect(unconfigured.statusCode).toBe(400);
+    expect(unconfigured.json().error.code).toBe('MIC_NOT_CONFIGURED');
+
+    const patched = await server.inject({
+      method: 'PATCH',
+      url: '/api/devices/lenovo',
+      payload: { micStreamKey: 'mic-secret', micStreamPort: port },
+    });
+    expect(patched.statusCode).toBe(200);
+    const devices = await server.inject({ method: 'GET', url: '/api/devices' });
+    expect(devices.body).not.toContain('mic-secret');
+    expect(devices.json().data.items[0].micStreamConfigured).toBe(true);
+
+    const status = await server.inject({ method: 'GET', url: '/api/frames/lenovo/mic' });
+    expect(status.statusCode).toBe(200);
+    expect(status.json().data).toMatchObject({ enabled: false, source: 'MIC' });
+    expect(status.json().data.streamUrl).toBe(`http://127.0.0.1:${port}/mic.wav?k=mic-secret`);
+
+    const on = await server.inject({ method: 'PUT', url: '/api/frames/lenovo/mic', payload: { enabled: true } });
+    expect(on.json().data.enabled).toBe(true);
+    const off = await server.inject({ method: 'PUT', url: '/api/frames/lenovo/mic', payload: { enabled: false } });
+    expect(off.json().data.enabled).toBe(false);
+
+    const badAudio = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/audio',
+      payload: { url: 'ftp://example.com/a.mp3' },
+    });
+    expect(badAudio.statusCode).toBe(400);
+    const play = await server.inject({
+      method: 'POST',
+      url: '/api/frames/lenovo/audio',
+      payload: { url: 'http://192.168.1.26:8123/api/tts_proxy/abc.mp3', volume: 40 },
+    });
+    expect(play.statusCode).toBe(200);
+    const stop = await server.inject({ method: 'POST', url: '/api/frames/lenovo/audio/stop' });
+    expect(stop.statusCode).toBe(200);
+
+    expect(requests).toEqual([
+      { method: 'GET', url: '/status?k=mic-secret', body: undefined },
+      { method: 'GET', url: '/enable?k=mic-secret', body: undefined },
+      { method: 'GET', url: '/disable?k=mic-secret', body: undefined },
+      {
+        method: 'POST',
+        url: '/api/audio/play',
+        body: { url: 'http://192.168.1.26:8123/api/tts_proxy/abc.mp3', loop: false, volume: 40 },
+      },
+      { method: 'POST', url: '/api/audio/stop', body: undefined },
+    ]);
+
+    await server.close();
+    await new Promise<void>((resolve) => frame.close(() => resolve()));
+  });
+});

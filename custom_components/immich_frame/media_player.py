@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from homeassistant.components import media_source
 from homeassistant.components.media_player import (
+    BrowseMedia,
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
     MediaPlayerState,
+    async_process_play_media_url,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -16,7 +19,12 @@ from .remote_status import remote_effective_muted, remote_status_bool, remote_st
 
 async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> None:
     coordinator: ImmichFrameCoordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
-    async_add_entities([ImmichFrameSlideshowMediaPlayer(coordinator)])
+    async_add_entities(
+        [
+            ImmichFrameSlideshowMediaPlayer(coordinator),
+            ImmichFrameSpeakerMediaPlayer(coordinator),
+        ]
+    )
 
 
 class ImmichFrameSlideshowMediaPlayer(
@@ -98,4 +106,65 @@ class ImmichFrameSlideshowMediaPlayer(
 
     async def _send_command(self, command: str) -> None:
         await self.coordinator.client.send_command(command)
+        await self.coordinator.async_request_refresh()
+
+
+class ImmichFrameSpeakerMediaPlayer(
+    CoordinatorEntity[ImmichFrameCoordinator],
+    MediaPlayerEntity,
+):
+    """Plays audio (voice notes, music, TTS) on the frame speaker through FreeKiosk."""
+
+    _attr_supported_features = (
+        MediaPlayerEntityFeature.PLAY_MEDIA
+        | MediaPlayerEntityFeature.BROWSE_MEDIA
+        | MediaPlayerEntityFeature.STOP
+        | MediaPlayerEntityFeature.VOLUME_SET
+    )
+    _attr_icon = "mdi:speaker"
+    # ponytail: FreeKiosk does not report when a clip ends, so the state stays idle; track playback when it does.
+    _attr_state = MediaPlayerState.IDLE
+
+    def __init__(self, coordinator: ImmichFrameCoordinator) -> None:
+        super().__init__(coordinator)
+        device_id = coordinator.client.device_id
+        self._attr_name = f"{frame_label(device_id)} Frame Speaker"
+        self._attr_unique_id = frame_unique_id(device_id, "speaker_media_player")
+        self._attr_device_info = frame_device_info(device_id)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.coordinator.data.get("remote_status") is not None
+
+    @property
+    def volume_level(self) -> float | None:
+        volume = remote_status_value(self.coordinator.data, ["audio", "volume"])
+        if not isinstance(volume, (int, float)):
+            return None
+        return max(0, min(100, float(volume))) / 100
+
+    async def async_play_media(self, media_type: str, media_id: str, **kwargs) -> None:
+        if media_source.is_media_source_id(media_id):
+            play_item = await media_source.async_resolve_media(self.hass, media_id, self.entity_id)
+            media_id = play_item.url
+        # Relative HA URLs (TTS, local media) become signed absolute URLs the frame can fetch
+        url = async_process_play_media_url(self.hass, media_id)
+        await self.coordinator.client.play_audio(url)
+
+    async def async_browse_media(
+        self,
+        media_content_type: str | None = None,
+        media_content_id: str | None = None,
+    ) -> BrowseMedia:
+        return await media_source.async_browse_media(
+            self.hass,
+            media_content_id,
+            content_filter=lambda item: item.media_content_type.startswith("audio/"),
+        )
+
+    async def async_media_stop(self) -> None:
+        await self.coordinator.client.stop_audio()
+
+    async def async_set_volume_level(self, volume: float) -> None:
+        await self.coordinator.client.set_remote_volume(round(max(0, min(1, volume)) * 100))
         await self.coordinator.async_request_refresh()

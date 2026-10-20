@@ -52,6 +52,9 @@ export interface FrameDevice {
   remoteBrightnessRestoreValue?: number;
   remoteVolumeRestoreValue?: number;
   mqttTopicId?: string;
+  /** Key baked into the Frame Mic companion app; enables the mic stream controls. */
+  micStreamKey?: string;
+  micStreamPort?: number;
 }
 
 export interface FrameState {
