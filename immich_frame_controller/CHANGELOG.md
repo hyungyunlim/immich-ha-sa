@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.92
+
+- **Immich Frame Mic** in the media browser shows frames as tiles: ready, *LIVE* while someone listens, and greyed out while the switch is off. Frames use their Home Assistant device names, including names you set, and are sorted by name.
+
 ## 0.1.91
 
 - Listen to frame microphones inside Home Assistant: **Media** > **Immich Frame Mic** lists each frame with a Frame Mic key and plays its live stream in the browser. Home Assistant relays the audio with its own login, so it works on HTTPS dashboards and in the companion app away from home. The Frame Mic Stream switch still has to be on.
