@@ -33,6 +33,8 @@ Listening needs the **Frame Mic** companion app on the frame. It stays off until
 3. In the [controller console](./controller-setup), open the device and enter the key under **Frame Mic Key**.
 4. In Home Assistant, turn on **Frame Mic Stream**. Its `stream_url` attribute is a live AAC stream (Frame Mic 0.5+); open it in VLC, nPlayer, or any player that plays internet radio. `wav_url` is the same audio as lossless WAV.
 
+To listen right in Home Assistant, open **Media** > **Immich Frame Mic** and pick the frame (it shows *switch off* until the switch is on). Home Assistant relays the stream with its own login, so this also works on an HTTPS dashboard or in the companion app away from home, where the frame's LAN address is out of reach.
+
 Turn the switch off to end any running stream and refuse new ones. One device listens at a time; a new connection takes over from the previous one.
 
 While someone listens, the frame's Android notification shows who it is. The **Frame Mic Notification** switch (on by default) hides those details; Android still keeps a plain *Frame Mic* notification while the app runs.

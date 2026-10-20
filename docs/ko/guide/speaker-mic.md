@@ -33,6 +33,8 @@ data:
 3. [컨트롤러 콘솔](./controller-setup)에서 디바이스를 열고 **Frame Mic Key**에 그 키를 입력합니다.
 4. Home Assistant에서 **Frame Mic Stream**을 켭니다. `stream_url` 속성이 AAC 실시간 스트림입니다(Frame Mic 0.5 이상). VLC, nPlayer처럼 인터넷 라디오를 재생할 수 있는 플레이어로 엽니다. `wav_url`은 같은 소리를 무손실 WAV로 제공합니다.
 
+Home Assistant 안에서 바로 들으려면 **미디어** > **Immich Frame Mic**에서 액자를 고릅니다(스위치가 꺼져 있으면 *switch off*로 표시됩니다). Home Assistant가 자체 로그인으로 스트림을 중계하므로, 액자의 LAN 주소에 닿지 않는 HTTPS 대시보드나 외부의 컴패니언 앱에서도 들을 수 있습니다.
+
 스위치를 끄면 진행 중인 스트림이 끊기고 새 접속도 거부됩니다. 한 번에 한 기기만 들을 수 있고, 새 접속이 들어오면 이전 접속에서 넘겨받습니다.
 
 누군가 듣는 동안에는 액자의 안드로이드 알림에 누가 듣는지 표시됩니다. **Frame Mic Notification** 스위치(기본 켜짐)를 끄면 그 정보가 숨겨집니다. 앱이 실행되는 동안 안드로이드는 단순한 *Frame Mic* 알림은 계속 유지합니다.

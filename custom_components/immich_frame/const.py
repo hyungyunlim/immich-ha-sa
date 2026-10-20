@@ -9,6 +9,7 @@ DEFAULT_DEVICE_ID = "lenovo"
 
 DATA_CLIENT = "client"
 DATA_COORDINATOR = "coordinator"
+DATA_MIC_VIEW = f"{DOMAIN}_mic_view_registered"
 
 SERVICE_SET_ALBUM = "set_album"
 SERVICE_SET_PEOPLE = "set_people"

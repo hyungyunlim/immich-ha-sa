@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.91
+
+- Listen to frame microphones inside Home Assistant: **Media** > **Immich Frame Mic** lists each frame with a Frame Mic key and plays its live stream in the browser. Home Assistant relays the audio with its own login, so it works on HTTPS dashboards and in the companion app away from home. The Frame Mic Stream switch still has to be on.
+- Restart Home Assistant Core after updating the integration so the media source loads.
+
 ## 0.1.90
 
 - **Frame Mic Stream** `stream_url` is now a live AAC stream that players such as nPlayer and VLC treat as internet radio; the lossless WAV stream moved to `wav_url`. Needs Frame Mic 0.5 (attached to the release).
