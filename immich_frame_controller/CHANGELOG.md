@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.98
+
+- The calendar widget card is a lighter charcoal and slightly less transparent.
+- Reload the frames so they pick up the new frame page.
+
 ## 0.1.97
 
 - The calendar widget is smaller and quieter: muted colors, today circled in translucent white, and a small *Today's events* label in place of the date heading. Today's events show just their time; later ones keep their day.

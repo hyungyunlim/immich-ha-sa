@@ -103,7 +103,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       display: none;
       padding: 1.8vmin 2.4vmin;
       border-radius: 2.4vmin;
-      background: rgba(0, 0, 0, 0.42);
+      background: rgba(60, 64, 72, 0.52);
       box-shadow: 0 0.3vmin 1.8vmin rgba(0, 0, 0, 0.22);
       color: rgba(255, 255, 255, 0.92);
       font-size: 1.85vmin;
