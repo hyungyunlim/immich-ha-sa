@@ -4,6 +4,10 @@
 
 Album options come from the controller cache. The integration reads the cache every 30 seconds and the controller refreshes it from Immich every `album_refresh_interval_seconds` (default 900). Press the **Refresh Albums** button (or call `immich_frame.refresh_albums`) to force an immediate refresh.
 
+## Videos play without sound
+
+Turn off the frame's **Kiosk Video Mute** switch, and check the **Media Volume** and **Device Mute Toggle**. Controller 0.1.100 and newer reapply the Kiosk Video Mute state whenever the renderer reloads (a page reload, or Screen Off then On); before that, immich-kiosk could fall back to its own muted default until the switch was toggled again.
+
 ## Videos show a poster but do not play
 
 - Turn on the frame's **Show Videos** switch (`show_videos=true`).

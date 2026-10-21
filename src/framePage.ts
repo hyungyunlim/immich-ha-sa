@@ -240,6 +240,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       var pollTimer = null;
       var pollIntervalMs = ${Math.max(previewMode ? 60 : 5, device.pollIntervalSeconds) * 1000};
       var frameVideoMuted = true;
+      var desiredVideoMuted = null; // the controller's Kiosk Video Mute state, reapplied whenever the renderer loads
       var keyMap = {
         next: { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 },
         previous: { key: 'ArrowLeft', code: 'ArrowLeft', keyCode: 37 },
@@ -255,6 +256,10 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
           try { target.contentWindow && target.contentWindow.focus(); } catch (error) {}
           if (playbackState === 'paused') {
             setTimeout(function () { applyPlaybackState('paused'); }, 0);
+          }
+          // A fresh renderer (page reload, screen off and on) starts with immich-kiosk's own mute default
+          if (desiredVideoMuted !== null) {
+            setTimeout(function () { applyVideoMutedState(desiredVideoMuted); }, 1500);
           }
         });
       }
@@ -301,6 +306,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         if (state.playbackState === 'playing' || state.playbackState === 'paused') {
           playbackState = state.playbackState;
         }
+        if (typeof state.kioskVideoMuted === 'boolean') desiredVideoMuted = state.kioskVideoMuted;
         if (state.rendererSuspended) {
           suspendRenderer();
           return;

@@ -1862,6 +1862,8 @@ describe('family notices', () => {
     const page = await server.inject({ method: 'GET', url: '/f/lenovo' });
     expect(page.body).toContain('id="notice"');
     expect(page.body).toContain("addEventListener('notices'");
+    // A fresh renderer gets the controller's Kiosk Video Mute state back
+    expect(page.body).toContain('applyVideoMutedState(desiredVideoMuted)');
     await server.close();
   });
 });

@@ -4,6 +4,10 @@
 
 앨범 선택지는 컨트롤러 캐시에서 나옵니다. 통합은 캐시를 30초마다 읽고, 컨트롤러는 `album_refresh_interval_seconds`(기본 900초)마다 Immich에서 캐시를 갱신합니다. 즉시 반영하려면 **Refresh Albums** 버튼을 누르거나 `immich_frame.refresh_albums` 서비스를 호출하세요.
 
+## 비디오는 재생되는데 소리가 안 나요
+
+액자의 **Kiosk Video Mute** 스위치를 끄고, **Media Volume**과 **Device Mute Toggle**도 확인하세요. 컨트롤러 0.1.100부터는 렌더러가 다시 로드될 때(페이지 새로고침, 화면 끄기 후 켜기)마다 Kiosk Video Mute 상태를 다시 적용합니다. 그 전에는 스위치를 다시 바꿀 때까지 immich-kiosk가 자체 기본값인 음소거로 돌아갈 수 있었습니다.
+
 ## 비디오가 포스터만 보이고 재생되지 않아요
 
 - 프레임의 **Show Videos** 스위치를 켜세요 (`show_videos=true`).
