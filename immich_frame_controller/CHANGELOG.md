@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.104
+
+- The renderer watchdog also reloads immich-kiosk when old frames pile up (more than two for 30 seconds), which can leave a stale picture on top while new assets load behind it, and reports such states to the controller log.
+- Reload the frames so they pick up the new frame page.
+
 ## 0.1.103
 
 - A renderer watchdog reloads immich-kiosk when it shows the same asset for longer than an asset plus the longest allowed video (on the dev frame, kiosk kept requesting new assets for minutes without showing them after a video froze). It does nothing while the slideshow is paused.

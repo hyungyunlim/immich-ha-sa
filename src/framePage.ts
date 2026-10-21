@@ -329,6 +329,8 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       // allowed video, reload the renderer. Skipped while the slideshow is paused.
       var shownFrame = null;
       var shownSince = Date.now();
+      var piledSince = 0;
+      var lastOddReport = 0;
 
       function stuckLimitMs() {
         var params = {};
@@ -346,6 +348,23 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         if (!doc) return;
         var frames = doc.querySelectorAll('.frame');
         var current = frames.length ? frames[frames.length - 1] : null;
+        // immich-kiosk normally holds one frame (two during a transition). Old frames piling up means the
+        // swap is wedged and a stale frame may stay on top, so report it and reload after 30 s.
+        if (frames.length > 2) {
+          if (Date.now() - lastOddReport > 60000) {
+            lastOddReport = Date.now();
+            reportDiag('frames-piling-up');
+          }
+          piledSince = piledSince || Date.now();
+          if (Date.now() - piledSince > 30000) {
+            piledSince = 0;
+            reportDiag('frames-piled-up-reload');
+            triggerKioskCommand('reload');
+            return;
+          }
+        } else {
+          piledSince = 0;
+        }
         if (current !== shownFrame || readPlaybackState() === 'paused') {
           shownFrame = current;
           shownSince = Date.now();
