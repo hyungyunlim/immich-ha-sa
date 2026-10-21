@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.106
+
+- Frames update themselves: the frame page knows the controller build it came from and reloads when the controller runs a newer one, so frame page fixes no longer wait for a kiosk-browser reload. The frame page is also served with `Cache-Control: no-store`.
+- Reload the frames once more so they pick up this page; later updates arrive by themselves.
+
 ## 0.1.105
 
 - The renderer watchdog compares the picture or video a frame shows instead of the element, so it also notices immich-kiosk staying on one asset while it reuses or adds elements.

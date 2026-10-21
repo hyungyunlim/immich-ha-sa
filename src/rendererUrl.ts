@@ -190,6 +190,8 @@ function setBooleanOverride(url: URL, param: string, value: KioskBooleanOverride
   }
 }
 
+export const FRAME_PAGE_VERSION = process.env.BUILD_VERSION ?? process.env.npm_package_version ?? 'dev';
+
 export function buildProxiedRendererUrl(
   device: FrameDevice,
   state: FrameState,
@@ -204,6 +206,7 @@ export function buildProxiedRendererUrl(
     resolvedNetworkMode: resolveNetworkMode(device, state, request),
     rendererUrl,
     lastKnownGoodRendererUrl: rendererUrl,
+    pageVersion: FRAME_PAGE_VERSION,
   };
 }
 

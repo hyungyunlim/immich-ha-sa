@@ -1,3 +1,4 @@
+import { FRAME_PAGE_VERSION } from './rendererUrl.js';
 import type { FrameDevice } from './types.js';
 
 interface FramePageOptions {
@@ -205,6 +206,8 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
   <script>
     (function () {
       var deviceId = ${JSON.stringify(escapedDeviceId)};
+      var pageVersion = ${JSON.stringify(FRAME_PAGE_VERSION)};
+      var reloadingForUpdate = false;
       var stateUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/state';
       var eventsUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/events';
       var ackUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/commands/ack';
@@ -471,6 +474,14 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
 
       function applyState(state) {
         if (!state) return;
+        // After a controller update the frame picks up the new page by itself, without a kiosk-browser reload
+        if (state.pageVersion && state.pageVersion !== pageVersion && !previewMode) {
+          if (!reloadingForUpdate) {
+            reloadingForUpdate = true;
+            window.location.reload();
+          }
+          return;
+        }
         if (state.version && state.version < lastVersion) return;
         var stateChanged = Boolean(state.version && state.version > lastVersion);
         if (state.version) lastVersion = state.version;

@@ -1860,6 +1860,10 @@ describe('family notices', () => {
     expect(store.getNotices().map((n) => n.text)).toEqual(['세탁 끝']);
 
     const page = await server.inject({ method: 'GET', url: '/f/lenovo' });
+    expect(page.headers['cache-control']).toContain('no-store');
+    expect(page.body).toContain('state.pageVersion !== pageVersion');
+    const frameState = await server.inject({ method: 'GET', url: '/api/frame/lenovo/state' });
+    expect(frameState.json().data.pageVersion).toBeTruthy();
     expect(page.body).toContain('id="notice"');
     expect(page.body).toContain("addEventListener('notices'");
     // A fresh renderer gets the controller's Kiosk Video Mute state back

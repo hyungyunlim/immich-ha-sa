@@ -97,7 +97,7 @@ Update the integration in HACS and restart Home Assistant; the panel loads at st
 ## Notices or the calendar do not show on a frame
 
 - Tick the frame in the notice's target (or keep **All frames**) and in the **Calendar** tab.
-- Frames load a new frame page only when they reload. After a controller update, press the frame's **Reload** button or reload FreeKiosk.
+- From controller 0.1.106, frames reload their page by themselves after a controller update. With older pages, reload FreeKiosk once.
 - Notices and events hide while the screen is off.
 
 ## The Calendar tab lists no calendars or no events

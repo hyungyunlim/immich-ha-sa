@@ -81,7 +81,7 @@ The integration adds a **Frames** panel to the Home Assistant sidebar:
 - **Notices**: short family notices shown on every frame or a chosen one, until tonight, tomorrow night, for an hour, a week, or until deleted. Automations can post them with `immich_frame.show_notice`.
 - **Calendar**: upcoming events from chosen Home Assistant calendars on chosen frames, taking turns with the notices in the pill, or in a month-calendar widget with notices in their own pill above it.
 
-Notices and the calendar are drawn by the controller's frame page, so they work on every frame without the companion app. Frames pick up frame page changes when they reload.
+Notices and the calendar are drawn by the controller's frame page, so they work on every frame without the companion app. Frames reload their page by themselves when the controller is updated.
 
 ## FreeKiosk Remote Control
 

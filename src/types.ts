@@ -148,6 +148,8 @@ export interface FrameState {
 export interface ResolvedFrameState extends FrameState {
   resolvedNetworkMode: ResolvedNetworkMode;
   rendererUrl: string;
+  /** Controller build serving the frame page; a page from another build reloads itself. */
+  pageVersion?: string;
 }
 
 export interface FrameProfile {

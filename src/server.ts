@@ -1168,7 +1168,10 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     if (query.preview !== '1') {
       rememberFrameClient(device, request);
     }
-    reply.type('text/html; charset=utf-8').send(renderFramePage(device, { preview: query.preview === '1' }));
+    // Never cached: frames must load the page of the running controller
+    reply.header('cache-control', 'no-store, max-age=0')
+      .type('text/html; charset=utf-8')
+      .send(renderFramePage(device, { preview: query.preview === '1' }));
   });
 
   app.get('/api/frame-claims', async (request, reply) => {
@@ -1411,7 +1414,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     if (query.preview !== '1') {
       rememberFrameClient(device, request);
     }
-    reply.type('text/html; charset=utf-8').send(renderFramePage(device, { preview: query.preview === '1' }));
+    reply.header('cache-control', 'no-store, max-age=0')
+      .type('text/html; charset=utf-8')
+      .send(renderFramePage(device, { preview: query.preview === '1' }));
   });
 
   app.all('/kiosk-proxy/:deviceId', proxyKioskRequest);

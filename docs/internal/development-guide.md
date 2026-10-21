@@ -302,7 +302,7 @@ http://<ha-host>:8082/f/<frame-alias>
 
 or the configured external tunnel URL.
 
-8. When `src/framePage.ts` changed (notices, calendar, widget), reload the frames with FreeKiosk REST `POST /api/reload` or the Reload button. The frame command `reload` only reloads the immich-kiosk iframe, not the frame page around it.
+8. Frames running a 0.1.106+ page reload themselves when the controller build changes (`pageVersion` in the frame state). Check the controller log for a `GET /f/<alias>` from each frame after the update. FreeKiosk REST `POST /api/reload` does not always fetch the page again, and the frame command `reload` only reloads the immich-kiosk iframe; use `{"command":"diag"}` to get a renderer snapshot in the log.
 9. With a Cloudflare TURN key configured, `GET /api/calls/ice-servers` returns `turn: true` and TURN URLs. Never print the credentials.
 
 ## Operational Notes
