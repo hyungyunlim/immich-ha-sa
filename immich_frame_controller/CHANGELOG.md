@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.109
+
+- Notices can go to several frames at once: the Frames panel's notice form picks frames with buttons (**All frames**, or any number of frames) instead of a one-frame list, both for new notices and when editing.
+- Integration-only change; the controller is unchanged apart from the version.
+
 ## 0.1.108
 
 - Edit posted notices: the Frames panel's **Notices** tab has an **Edit** button that loads a notice into the form to change its text, frame, or how long it stays. API: `PATCH /api/notices/:id` with any of `text`, `deviceIds`, `until` (`null` keeps it until deleted).

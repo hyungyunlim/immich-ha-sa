@@ -154,6 +154,7 @@ class ImmichFramePanel extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._frames = [];
     this._notices = [];
+    this._noticeFrames = new Set(); // frames chosen in the notice form; empty means every frame
     this._errors = {};
     this._call = null; // { entryId, state, pc, stream, muted, rtt, stats }
     try {
@@ -374,9 +375,8 @@ class ImmichFramePanel extends HTMLElement {
     this._noticeError = null;
     try {
       if (this._editing) {
-        // "keep" leaves the end as it is, "*" the several frames a notice from the API may have
-        const body = { text };
-        if (form.frame.value !== "*") body.device_ids = form.frame.value ? [form.frame.value] : [];
+        // "keep" leaves the end as it is
+        const body = { text, device_ids: [...this._noticeFrames] };
         if (form.duration.value !== "keep") body.until = DURATIONS[form.duration.value]()?.toISOString() ?? null;
         await this._hass.callApi("PATCH", `immich_frame/notices/${this._editing.id}`, body);
         this._editNotice(null);
@@ -384,7 +384,7 @@ class ImmichFramePanel extends HTMLElement {
         const until = DURATIONS[form.duration.value]();
         await this._hass.callApi("POST", "immich_frame/notices", {
           text,
-          device_ids: form.frame.value ? [form.frame.value] : [],
+          device_ids: [...this._noticeFrames],
           until: until ? until.toISOString() : undefined,
         });
         form.text.value = "";
@@ -418,20 +418,19 @@ class ImmichFramePanel extends HTMLElement {
     form.text.value = notice ? notice.text : "";
     form.send.textContent = notice ? t.saveEdit : t.send;
     form.cancel.hidden = !notice;
-    this._renderNotices(); // the frame choices depend on the notice
+    // Frames removed since the notice was posted are dropped
+    this._noticeFrames = new Set((notice?.deviceIds || []).filter((id) => this._frames.some((f) => f.device_id === id)));
+    this._renderNotices();
     if (notice) {
       form.duration.insertAdjacentHTML(
         "afterbegin",
         `<option value="keep">${escapeHtml(t.keepDuration.replace("{when}", this._noticeEnd(notice)))}</option>`,
       );
       form.duration.value = "keep";
-      const ids = notice.deviceIds || [];
-      form.frame.value = ids.length > 1 ? "*" : ids[0] || "";
       form.text.focus();
       form.scrollIntoView({ block: "nearest" });
     } else {
       form.duration.value = "today";
-      form.frame.value = "";
     }
   }
 
@@ -444,19 +443,11 @@ class ImmichFramePanel extends HTMLElement {
     if (!this._noticeListEl) return;
     const t = this._t;
     const names = Object.fromEntries(this._frames.map((f) => [f.device_id, f.name]));
-    const several = this._editing?.deviceIds?.length > 1 ? this._editing.deviceIds : null;
-    // Refresh the frame choices only when they change, so an open dropdown is left alone
-    const targets = JSON.stringify([this._frames.map((f) => [f.device_id, f.name]), several]);
-    if (targets !== this._targets) {
-      this._targets = targets;
-      const select = this._noticeForm.frame; // not "target": that name is a built-in form property
-      const current = select.value;
-      select.innerHTML =
-        (several ? `<option value="*">${escapeHtml(several.map((id) => names[id] || id).join(", "))}</option>` : "") +
-        `<option value="">${escapeHtml(t.allFrames)}</option>` +
-        this._frames.map((f) => `<option value="${escapeHtml(f.device_id)}">${escapeHtml(f.name)}</option>`).join("");
-      select.value = current;
-    }
+    const chosen = this._noticeFrames;
+    this._noticeFramesEl.innerHTML = [["", t.allFrames, !chosen.size], ...this._frames.map((f) => [f.device_id, f.name, chosen.has(f.device_id)])]
+      .map(([id, name, on]) => `<button type="button" class="quiet ${on ? "active" : ""}" data-notice-frame="${escapeHtml(id)}"
+          aria-pressed="${on}">${escapeHtml(name)}</button>`)
+      .join("");
     this._noticeErrorEl.textContent = this._noticeError || "";
     if (!this._notices.length) {
       this._noticeListEl.innerHTML = `<div class="empty">${escapeHtml(t.noNotices)}</div>`;
@@ -601,7 +592,6 @@ class ImmichFramePanel extends HTMLElement {
         .row { display: flex; align-items: center; gap: 12px; }
         .notice-text { font-size: 17px; line-height: 1.4; word-break: break-word; }
         .compose { display: grid; gap: 8px; }
-        .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         input, select { font: inherit; padding: 10px 12px; border-radius: 10px; min-width: 0;
           border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
           background: var(--card-background-color, var(--primary-background-color)); color: var(--primary-text-color); }
@@ -640,14 +630,12 @@ class ImmichFramePanel extends HTMLElement {
         <ha-card>
           <form class="compose">
             <input name="text" maxlength="140" autocomplete="off" placeholder="${escapeHtml(t.noticePlaceholder)}">
-            <div class="choices">
-              <select name="frame"></select>
-              <select name="duration">
-                ${["today", "tomorrow", "hour", "week", "forever"]
-                  .map((key) => `<option value="${key}">${escapeHtml(t[key])}</option>`)
-                  .join("")}
-              </select>
-            </div>
+            <div class="frame-tabs" id="notice-frames"></div>
+            <select name="duration">
+              ${["today", "tomorrow", "hour", "week", "forever"]
+                .map((key) => `<option value="${key}">${escapeHtml(t[key])}</option>`)
+                .join("")}
+            </select>
             <div class="error"></div>
             <div class="actions"><button name="send">${escapeHtml(t.send)}</button>
               <button type="button" name="cancel" class="quiet" data-action="cancel-edit" hidden>${escapeHtml(t.cancel)}</button></div>
@@ -662,6 +650,7 @@ class ImmichFramePanel extends HTMLElement {
     this._noticesEl = root.getElementById("notices");
     this._agendaEl = root.getElementById("agenda");
     this._noticeListEl = root.getElementById("notice-list");
+    this._noticeFramesEl = root.getElementById("notice-frames");
     this._noticeForm = root.querySelector("form");
     this._noticeErrorEl = root.querySelector("form .error");
     this._audio = root.querySelector("audio");
@@ -680,6 +669,12 @@ class ImmichFramePanel extends HTMLElement {
       if (button.dataset.action === "delete-notice") this._deleteNotice(button.dataset.id);
       if (button.dataset.action === "edit-notice") this._editNotice(this._notices.find((n) => n.id === button.dataset.id) || null);
       if (button.dataset.action === "cancel-edit") this._editNotice(null);
+      if (button.dataset.noticeFrame !== undefined) {
+        const id = button.dataset.noticeFrame;
+        if (!id) this._noticeFrames.clear(); // "All frames"
+        else if (!this._noticeFrames.delete(id)) this._noticeFrames.add(id);
+        this._renderNotices();
+      }
       if (button.dataset.agendaFrame) {
         this._agendaFrame = button.dataset.agendaFrame;
         this._renderAgenda();

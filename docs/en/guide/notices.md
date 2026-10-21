@@ -7,10 +7,10 @@ Notices are short lines, such as *🍽️ Dinner out at 7 tonight*, that frames 
 Open **Frames** in the Home Assistant sidebar and choose the **Notices** tab.
 
 1. Type the notice (up to 140 characters; emoji welcome).
-2. Pick **All frames** or one frame, and how long to show it: until tonight, until tomorrow night, 1 hour, 1 week, or until deleted.
+2. Pick **All frames** or tap one or more frames, and how long to show it: until tonight, until tomorrow night, 1 hour, 1 week, or until deleted.
 3. Select **Show on frames**. Frames update within a second.
 
-The list below the form shows every notice on the frames, where it shows, and until when. **Edit** loads a notice into the form: change the text, the frame, or how long it stays (or keep its current end), then select **Save changes**, or **Cancel**. **Delete** removes it from the frames right away. Expired notices disappear by themselves.
+The list below the form shows every notice on the frames, where it shows, and until when. **Edit** loads a notice into the form: change the text, the frames, or how long it stays (or keep its current end), then select **Save changes**, or **Cancel**. **Delete** removes it from the frames right away. Expired notices disappear by themselves.
 
 Notices work on every frame the controller serves; no companion app is needed. Frames hide them while the screen is off.
 

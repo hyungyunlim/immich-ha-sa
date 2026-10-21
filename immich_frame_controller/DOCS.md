@@ -78,7 +78,7 @@ The Home Assistant config flow reads the controller's device list after pairing 
 The integration adds a **Frames** panel to the Home Assistant sidebar:
 
 - **Calls**: two-way audio with frames running the Frame Mic app (0.6+). The frame answers by itself and shows a small *On call* pill. Open Home Assistant over HTTPS so the browser allows the microphone.
-- **Notices**: short family notices shown on every frame or a chosen one, until tonight, tomorrow night, for an hour, a week, or until deleted. Posted notices can be edited (text, frame, how long) or deleted. Automations can post them with `immich_frame.show_notice`.
+- **Notices**: short family notices shown on every frame or the chosen ones, until tonight, tomorrow night, for an hour, a week, or until deleted. Posted notices can be edited (text, frame, how long) or deleted. Automations can post them with `immich_frame.show_notice`.
 - **Calendar**: upcoming events from Home Assistant calendars, with calendars, days, and the widget chosen per frame. Events take turns with the notices in the pill, or show in a month-calendar widget with notices in their own pill above it.
 
 Notices and the calendar are drawn by the controller's frame page, so they work on every frame without the companion app. Frames reload their page by themselves when the controller is updated.
