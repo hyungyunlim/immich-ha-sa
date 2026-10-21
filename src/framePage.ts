@@ -297,30 +297,33 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         }).observe(doc.body, { childList: true, subtree: true });
       }
 
-      // If the playing video keeps its clock running but decodes no frames for 4 s, the decoder is stuck:
-      // restart that video once, and skip to the next asset if it sticks again.
-      var stall = { video: null, frames: 0, time: 0, count: 0, restarted: null };
+      // Watchdog for a stuck decoder or stream. immich-kiosk skips a video that never starts, but waits forever for one
+      // that freezes midway. Stuck means the clock runs with no new frames for 4 s (picture frozen, sound playing on),
+      // or the clock itself stands still for 8 s. Restart that video once; if it sticks again, skip to the next asset.
+      var stall = { video: null, frames: 0, time: 0, frozen: 0, still: 0, restarted: null };
 
       function checkVideoStall() {
         var doc = rendererSuspended ? null : iframeDocument();
         var video = null;
         if (doc) {
           Array.prototype.forEach.call(doc.querySelectorAll('video'), function (candidate) {
-            if (!candidate.paused && !candidate.ended && candidate.readyState >= 2) video = candidate;
+            if (!candidate.paused && !candidate.ended && candidate.currentTime > 0) video = candidate;
           });
         }
-        if (!video || typeof video.webkitDecodedFrameCount !== 'number') {
+        if (!video) {
           stall.video = null;
           return;
         }
-        var frames = video.webkitDecodedFrameCount;
-        var stuck = video === stall.video && frames === stall.frames && video.currentTime > stall.time + 1;
-        stall.count = stuck ? stall.count + 1 : 0;
+        var frames = typeof video.webkitDecodedFrameCount === 'number' ? video.webkitDecodedFrameCount : -1;
+        var same = video === stall.video;
+        stall.frozen = same && frames >= 0 && frames === stall.frames && video.currentTime > stall.time + 0.5 ? stall.frozen + 1 : 0;
+        stall.still = same && video.currentTime === stall.time ? stall.still + 1 : 0;
         stall.video = video;
         stall.frames = frames;
         stall.time = video.currentTime;
-        if (stall.count < 2) return;
-        stall.count = 0;
+        if (stall.frozen < 2 && stall.still < 4) return;
+        stall.frozen = 0;
+        stall.still = 0;
         if (stall.restarted === video) {
           triggerKioskCommand('next');
           return;

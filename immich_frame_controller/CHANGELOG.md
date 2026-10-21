@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.102
+
+- The video watchdog also catches a video whose whole playback stalls midway (its clock stands still for 8 seconds). immich-kiosk only skips videos that never start, so such a video kept the frame on its last picture until someone pressed Next.
+- Reload the frames so they pick up the new frame page.
+
 ## 0.1.101
 
 - Steadier video on weak frames: the frame page frees a video's hardware decoder as soon as immich-kiosk swaps it out (WebView otherwise keeps it until garbage collection, so two or three decoders overlapped), and restarts a video whose picture stops while its sound plays on, skipping to the next asset if it sticks again.
