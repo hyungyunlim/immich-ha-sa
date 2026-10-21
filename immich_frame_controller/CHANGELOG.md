@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.103
+
+- A renderer watchdog reloads immich-kiosk when it shows the same asset for longer than an asset plus the longest allowed video (on the dev frame, kiosk kept requesting new assets for minutes without showing them after a video froze). It does nothing while the slideshow is paused.
+- Frame watchdogs report what the renderer looked like when they stepped in (`POST /api/frame/:deviceId/diag`, logged as `frame watchdog report`, at most one per frame every 5 seconds).
+- Reload the frames so they pick up the new frame page.
+
 ## 0.1.102
 
 - The video watchdog also catches a video whose whole playback stalls midway (its clock stands still for 8 seconds). immich-kiosk only skips videos that never start, so such a video kept the frame on its last picture until someone pressed Next.

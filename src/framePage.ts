@@ -209,6 +209,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       var eventsUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/events';
       var ackUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/commands/ack';
       var noticesUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/notices';
+      var diagUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/diag';
       var agendaUrl = '/api/frame/' + encodeURIComponent(deviceId) + '/agenda';
       var noticeEl = document.getElementById('notice');
       var notices = [];
@@ -297,6 +298,65 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         }).observe(doc.body, { childList: true, subtree: true });
       }
 
+      // Tells the controller log what the renderer looked like when a watchdog stepped in.
+      function reportDiag(reason) {
+        var doc = iframeDocument();
+        var body = { reason: reason, frames: 0, videos: [], bodyClass: '' };
+        if (doc) {
+          body.frames = doc.querySelectorAll('.frame').length;
+          body.bodyClass = String(doc.body && doc.body.className || '').slice(0, 200);
+          body.videos = Array.prototype.slice.call(doc.querySelectorAll('video'), 0, 4).map(function (video) {
+            return {
+              paused: video.paused,
+              ended: video.ended,
+              time: Math.round(video.currentTime * 10) / 10,
+              readyState: video.readyState,
+              networkState: video.networkState,
+              error: video.error ? video.error.code : null,
+              decoded: typeof video.webkitDecodedFrameCount === 'number' ? video.webkitDecodedFrameCount : null
+            };
+          });
+        }
+        try {
+          var request = new XMLHttpRequest();
+          request.open('POST', diagUrl, true);
+          request.setRequestHeader('content-type', 'application/json');
+          request.send(JSON.stringify(body));
+        } catch (error) {}
+      }
+
+      // Watchdog for a wedged renderer: if immich-kiosk shows the same asset for longer than an asset plus the longest
+      // allowed video, reload the renderer. Skipped while the slideshow is paused.
+      var shownFrame = null;
+      var shownSince = Date.now();
+
+      function stuckLimitMs() {
+        var params = {};
+        (lastRendererUrl.split('?')[1] || '').split('&').forEach(function (pair) {
+          var parts = pair.split('=');
+          params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1] || '');
+        });
+        var duration = Number(params.duration) || 60;
+        var longestVideo = Number(params.exclude_videos_over) || 300;
+        return (duration + longestVideo + 30) * 1000;
+      }
+
+      function checkRendererStuck() {
+        var doc = rendererSuspended ? null : iframeDocument();
+        if (!doc) return;
+        var frames = doc.querySelectorAll('.frame');
+        var current = frames.length ? frames[frames.length - 1] : null;
+        if (current !== shownFrame || readPlaybackState() === 'paused') {
+          shownFrame = current;
+          shownSince = Date.now();
+          return;
+        }
+        if (Date.now() - shownSince < stuckLimitMs()) return;
+        reportDiag('renderer-stuck');
+        shownSince = Date.now();
+        triggerKioskCommand('reload');
+      }
+
       // Watchdog for a stuck decoder or stream. immich-kiosk skips a video that never starts, but waits forever for one
       // that freezes midway. Stuck means the clock runs with no new frames for 4 s (picture frozen, sound playing on),
       // or the clock itself stands still for 8 s. Restart that video once; if it sticks again, skip to the next asset.
@@ -325,9 +385,11 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         stall.frozen = 0;
         stall.still = 0;
         if (stall.restarted === video) {
+          reportDiag('video-stuck-skip');
           triggerKioskCommand('next');
           return;
         }
+        reportDiag('video-stuck-restart');
         stall.restarted = video;
         var at = video.currentTime;
         video.addEventListener('loadedmetadata', function () {
@@ -908,7 +970,10 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       loadNotices();
       loadAgenda();
       setInterval(showNextNotice, 8000);
-      if (!previewMode) setInterval(checkVideoStall, 2000);
+      if (!previewMode) {
+        setInterval(checkVideoStall, 2000);
+        setInterval(checkRendererStuck, 5000);
+      }
       setInterval(function () { // safety net next to the live notices and agenda events
         loadNotices();
         loadAgenda();

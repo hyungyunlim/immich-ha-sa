@@ -10,7 +10,7 @@ Turn off the frame's **Kiosk Video Mute** switch, and check the **Media Volume**
 
 ## Videos stutter or freeze while the sound plays on
 
-Some frames (such as the Lenovo Smart Frame's MediaTek chip behind WebView 74) have fragile hardware video decoders. Controller 0.1.101 and newer free each video's decoder as soon as immich-kiosk moves on, and restart a video that freezes midway, whether the picture stops while the sound runs or the whole video stalls (0.1.102), skipping to the next asset if it sticks again. If freezes persist, lower **Exclude Videos Over**, or turn off **Show Videos** on that frame.
+Some frames (such as the Lenovo Smart Frame's MediaTek chip behind WebView 74) have fragile hardware video decoders. Controller 0.1.101 and newer free each video's decoder as soon as immich-kiosk moves on, and restart a video that freezes midway, whether the picture stops while the sound runs or the whole video stalls (0.1.102), skipping to the next asset if it sticks again. If immich-kiosk keeps showing one asset for longer than an asset plus the longest allowed video (0.1.103), the frame reloads its renderer. Each of these recoveries writes a `frame watchdog report` line to the controller log. If freezes persist, lower **Exclude Videos Over**, or turn off **Show Videos** on that frame.
 
 ## Videos show a poster but do not play
 

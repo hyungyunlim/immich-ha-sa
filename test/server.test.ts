@@ -1865,6 +1865,10 @@ describe('family notices', () => {
     // A fresh renderer gets the controller's Kiosk Video Mute state back
     expect(page.body).toContain('applyVideoMutedState(desiredVideoMuted)');
     expect(page.body).toContain('setInterval(checkVideoStall, 2000)');
+    expect(page.body).toContain('setInterval(checkRendererStuck, 5000)');
+    const diag = await server.inject({ method: 'POST', url: '/api/frame/lenovo/diag', payload: { reason: 'renderer-stuck', frames: 2 } });
+    expect(diag.statusCode).toBe(204);
+    expect((await server.inject({ method: 'POST', url: '/api/frame/nope/diag', payload: {} })).statusCode).toBe(404);
     await server.close();
   });
 });

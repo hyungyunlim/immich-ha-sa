@@ -1473,6 +1473,22 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return ok(resolved, { version: resolved.version, updatedAt: resolved.updatedAt });
   });
 
+  // Frame-side watchdog reports (what the renderer looked like when it stepped in), for the controller log only.
+  const lastDiagAt = new Map<string, number>();
+  app.post('/api/frame/:deviceId/diag', async (request, reply) => {
+    const { deviceId } = request.params as { deviceId: string };
+    if (!store.getDevice(deviceId)) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${deviceId}`));
+      return;
+    }
+    const now = Date.now();
+    if (now - (lastDiagAt.get(deviceId) ?? 0) >= 5000) { // unauthenticated, like acks: keep the log from flooding
+      lastDiagAt.set(deviceId, now);
+      app.log.warn({ deviceId, diag: JSON.stringify(request.body ?? null).slice(0, 2000) }, 'frame watchdog report');
+    }
+    reply.status(204).send();
+  });
+
   app.post('/api/frame/:deviceId/commands/ack', async (request, reply) => {
     const { deviceId } = request.params as { deviceId: string };
     if (!store.getDevice(deviceId)) {
