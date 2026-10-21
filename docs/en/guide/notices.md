@@ -10,17 +10,20 @@ Open **Frames** in the Home Assistant sidebar and choose the **Notices** tab.
 2. Pick **All frames** or one frame, and how long to show it: until tonight, until tomorrow night, 1 hour, 1 week, or until deleted.
 3. Select **Show on frames**. Frames update within a second.
 
-The list below the form shows every notice on the frames, where it shows, and until when. **Delete** removes it from the frames right away. Expired notices disappear by themselves.
+The list below the form shows every notice on the frames, where it shows, and until when. **Edit** loads a notice into the form: change the text, the frame, or how long it stays (or keep its current end), then select **Save changes**, or **Cancel**. **Delete** removes it from the frames right away. Expired notices disappear by themselves.
 
 Notices work on every frame the controller serves; no companion app is needed. Frames hide them while the screen is off.
 
 ## Calendar events
 
-The **Calendar** tab of the **Frames** panel shows upcoming events from Home Assistant calendars between the notices, such as *[Today] 19:00 Swimming* or *[Tomorrow] All day Grandma's birthday*.
+The **Calendar** tab of the **Frames** panel shows upcoming events from Home Assistant calendars between the notices, such as *[Today] 19:00 Swimming* or *[Tomorrow] All day Grandma's birthday*. Each frame has its own calendars, days, and widget setting, so the kitchen can show the family calendar while grandma's frame shows only the grandchildren's events.
 
-1. Tick the calendars to show. Any Home Assistant calendar works: the Google Calendar integration, Remote Calendar (an iCal link), or a local calendar.
-2. Tick the frames that show them, and choose today only, the next 3 days, or the next week.
-3. Select **Save**. The list below shows what the frames will display.
+1. Pick a frame at the top of the tab. Frames that already show an agenda have a dot.
+2. Tick the calendars to show on it. Any Home Assistant calendar works: the Google Calendar integration, Remote Calendar (an iCal link), or a local calendar.
+3. Choose today only, the next 3 days, or the next week.
+4. Select **Save**. The list below shows what that frame will display.
+
+A frame with no calendars ticked and the widget off shows no agenda. Settings from before 0.1.108, when every chosen frame shared one setting, carry over to each of those frames.
 
 ### Calendar widget
 

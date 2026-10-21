@@ -267,7 +267,7 @@ curl -X POST http://localhost:8080/api/notices \
   -d '{"text":"🍽️ Dinner out at 7","deviceIds":["lenovo"],"until":"2026-10-21T23:59:00+09:00"}'
 ```
 
-Other endpoints: `GET /api/notices`, `DELETE /api/notices/:id`, `GET`/`PUT /api/agenda` (calendar events, pushed by the integration), `GET /api/calls/ice-servers`, `GET`/`PUT /api/frames/:id/mic`, `POST`/`DELETE /api/frames/:id/call`, and `POST /api/frames/:id/audio`.
+Other endpoints: `GET /api/notices`, `PATCH`/`DELETE /api/notices/:id`, `GET`/`PUT /api/agenda` (each frame's calendar events, pushed by the integration), `GET /api/calls/ice-servers`, `GET`/`PUT /api/frames/:id/mic`, `POST`/`DELETE /api/frames/:id/call`, and `POST /api/frames/:id/audio`.
 
 ## Development
 

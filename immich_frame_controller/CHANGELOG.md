@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.108
+
+- Edit posted notices: the Frames panel's **Notices** tab has an **Edit** button that loads a notice into the form to change its text, frame, or how long it stays. API: `PATCH /api/notices/:id` with any of `text`, `deviceIds`, `until` (`null` keeps it until deleted).
+- Calendars per frame: the **Calendar** tab picks a frame at the top, and each frame keeps its own calendars, number of days, and widget setting. `PUT /api/agenda` now takes `{frames: {deviceId: {items, widget}}, locale}`; the old `{items, deviceIds, widget}` form from earlier integrations still works, and the stored agenda and the integration's settings carry over to each frame that was chosen.
+- Update the add-on and the integration together: the 0.1.108 integration sends the new agenda form, which older controllers reject.
+
 ## 0.1.107
 
 - Frames reopen their event stream after 70 seconds without a message (the controller sends a heartbeat every 25 seconds). A controller restart can drop the stream silently, and a few dead connections were enough to stall every request from the frame, leaving immich-kiosk on "Trying to reconnect" until the frame rebooted.

@@ -134,7 +134,7 @@ class ImmichFrameCallView(HomeAssistantView):
 
 
 class ImmichFrameNoticeView(HomeAssistantView):
-    """GET lists notices, POST {text, device_ids?, until?} adds one, DELETE /{id} removes it."""
+    """GET lists notices, POST {text, device_ids?, until?} adds one, PATCH /{id} changes it, DELETE /{id} removes it."""
 
     url = f"{API_PATH}/notices"
     extra_urls = [f"{API_PATH}/notices/{{notice_id}}"]
@@ -164,6 +164,21 @@ class ImmichFrameNoticeView(HomeAssistantView):
         except ImmichFrameApiError as err:
             return _error(self, err)
 
+    async def patch(self, request: web.Request, notice_id: str | None = None) -> web.Response:
+        client = controller_client(request.app[KEY_HASS])
+        if client is None or not notice_id:
+            return self.json_message("Unknown notice", 404)
+        try:
+            body = await request.json()
+            # until: null keeps the notice until it is deleted; keys left out stay as they are
+            patch = {key: body[name] for name, key in (("text", "text"), ("device_ids", "deviceIds"), ("until", "until")) if name in body}
+        except (ValueError, TypeError):
+            return self.json_message("Send {text?, device_ids?, until?}", 400)
+        try:
+            return self.json(await client.update_notice(notice_id, patch))
+        except ImmichFrameApiError as err:
+            return _error(self, err)
+
     async def delete(self, request: web.Request, notice_id: str | None = None) -> web.Response:
         client = controller_client(request.app[KEY_HASS])
         if client is None or not notice_id:
@@ -176,7 +191,7 @@ class ImmichFrameNoticeView(HomeAssistantView):
 
 
 class ImmichFrameAgendaView(HomeAssistantView):
-    """GET returns the agenda settings and upcoming events; POST {calendars, device_ids, days, widget} saves them."""
+    """GET returns each frame's agenda settings and events; POST {device_id, calendars, days, widget} saves one frame."""
 
     url = f"{API_PATH}/agenda"
     name = "api:immich_frame:agenda"
@@ -192,13 +207,13 @@ class ImmichFrameAgendaView(HomeAssistantView):
         agenda: AgendaManager = request.app[KEY_HASS].data[DATA_AGENDA]
         try:
             body = await request.json()
+            device_id = str(body["device_id"])
             calendars = [str(c) for c in body["calendars"] if str(c).startswith("calendar.")]
-            device_ids = [str(d) for d in body["device_ids"]]
             days = int(body["days"])
             widget = bool(body.get("widget", False))
         except (ValueError, KeyError, TypeError):
-            return self.json_message("Send {calendars: [...], device_ids: [...], days: N, widget: bool}", 400)
+            return self.json_message("Send {device_id, calendars: [...], days: N, widget: bool}", 400)
         if not 1 <= days <= 14:
             return self.json_message("days must be between 1 and 14", 400)
-        await agenda.async_update(calendars, device_ids, days, widget)
+        await agenda.async_update(device_id, calendars, days, widget)
         return self._state(agenda)

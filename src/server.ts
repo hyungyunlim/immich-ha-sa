@@ -302,21 +302,37 @@ const MicStreamToggleSchema = z.object({
   notify: z.boolean().optional(),
 }).refine((value) => value.enabled !== undefined || value.notify !== undefined, 'Set enabled or notify.');
 
-const AgendaSchema = z.object({
-  items: z.array(z.object({
-    title: z.string().trim().min(1).max(140),
-    start: z.string().min(10).max(40),
-    end: z.string().min(10).max(40).optional(),
-    allDay: z.boolean(),
-  })).max(100),
-  deviceIds: z.array(z.string().min(1)).max(50),
-  locale: z.string().min(2).max(10).default('en'),
-  widget: z.boolean().default(false),
-});
+const AgendaItemsSchema = z.array(z.object({
+  title: z.string().trim().min(1).max(140),
+  start: z.string().min(10).max(40),
+  end: z.string().min(10).max(40).optional(),
+  allDay: z.boolean(),
+})).max(100);
+const AgendaSchema = z.union([
+  z.object({
+    frames: z.record(z.object({ items: AgendaItemsSchema, widget: z.boolean().default(false) }))
+      .refine((frames) => Object.keys(frames).length <= 50, 'At most 50 frames.'),
+    locale: z.string().min(2).max(10).default('en'),
+  }),
+  // The integration before 0.1.108 sends one agenda for a list of frames
+  z.object({
+    items: AgendaItemsSchema,
+    deviceIds: z.array(z.string().min(1)).max(50),
+    locale: z.string().min(2).max(10).default('en'),
+    widget: z.boolean().default(false),
+  }).transform(({ items, deviceIds, locale, widget }) => ({
+    frames: Object.fromEntries(deviceIds.map((id) => [id, { items, widget }])),
+    locale,
+  })),
+]);
 const NoticeCreateSchema = z.object({
   text: z.string().trim().min(1).max(140),
   deviceIds: z.array(z.string().min(1)).max(50).optional(),
   until: z.string().datetime({ offset: true }).optional(),
+});
+// until: null keeps the notice until it is deleted
+const NoticeUpdateSchema = NoticeCreateSchema.partial().extend({
+  until: z.string().datetime({ offset: true }).nullable().optional(),
 });
 type IceServer = { urls: string | string[]; username?: string; credential?: string };
 // Public STUN lets many calls from outside connect directly even without a TURN key
@@ -1835,6 +1851,37 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return ok(notice);
   });
 
+  app.patch('/api/notices/:noticeId', async (request, reply) => {
+    if (!auth.requireMutationAuth(request, reply)) return;
+    const { noticeId } = request.params as { noticeId: string };
+    const parsed = NoticeUpdateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid notice.'));
+      return;
+    }
+    const { text, deviceIds, until } = parsed.data;
+    const unknown = deviceIds?.find((deviceId) => !store.getDevice(deviceId));
+    if (unknown) {
+      reply.status(404).send(fail('FRAME_NOT_FOUND', `Frame not found: ${unknown}`));
+      return;
+    }
+    if (until && Date.parse(until) <= Date.now()) {
+      reply.status(400).send(fail('VALIDATION_ERROR', 'until must be in the future.'));
+      return;
+    }
+    const notice = store.updateNotice(noticeId, {
+      ...(text !== undefined ? { text } : {}),
+      ...(deviceIds !== undefined ? { deviceIds } : {}),
+      ...(until !== undefined ? { until: until === null ? undefined : new Date(until).toISOString() } : {}),
+    });
+    if (!notice) {
+      reply.status(404).send(fail('NOTICE_NOT_FOUND', `Notice not found: ${noticeId}`));
+      return;
+    }
+    broadcastNotices();
+    return ok(notice);
+  });
+
   app.delete('/api/notices/:noticeId', async (request, reply) => {
     if (!auth.requireMutationAuth(request, reply)) return;
     const { noticeId } = request.params as { noticeId: string };
@@ -1856,7 +1903,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     return ok({ items: noticesForFrame(deviceId) });
   });
 
-  // Calendar agenda: Home Assistant pushes upcoming events and the frames that should show them.
+  // Calendar agenda: Home Assistant pushes each frame's upcoming events and whether it shows the widget.
   app.get('/api/agenda', async (request, reply) => {
     if (!auth.requireMutationAuth(request, reply)) return;
     return ok(store.getAgenda());
@@ -1887,8 +1934,8 @@ export function createServer(deps: ServerDeps): FastifyInstance {
 
   function agendaForFrame(deviceId: string): { items: AgendaItem[]; locale: string; widget: boolean } {
     const agenda = store.getAgenda();
-    const shown = agenda.deviceIds.includes(deviceId);
-    return { items: shown ? agenda.items : [], locale: agenda.locale, widget: shown && Boolean(agenda.widget) };
+    const entry = agenda.frames[deviceId];
+    return { items: entry?.items ?? [], locale: agenda.locale, widget: Boolean(entry?.widget) };
   }
 
   function noticesForFrame(deviceId: string): Array<Pick<FrameNotice, 'id' | 'text' | 'until'>> {

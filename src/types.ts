@@ -284,15 +284,19 @@ export interface AgendaItem {
   allDay: boolean;
 }
 
-/** Upcoming events pushed by the Home Assistant integration, shown on the listed frames between notices. */
+/** Upcoming events pushed by the Home Assistant integration, chosen per frame. */
 export interface FrameAgenda {
-  items: AgendaItem[];
-  deviceIds: string[];
+  /** Frames that show an agenda; the rest show none. */
+  frames: Record<string, FrameAgendaEntry>;
   /** Language for the day labels on the frame (today, tomorrow, weekdays). */
   locale: string;
-  /** Show a month calendar card with the event list instead of rotating events in the notice pill. */
-  widget?: boolean;
   updatedAt?: string;
+}
+
+export interface FrameAgendaEntry {
+  items: AgendaItem[];
+  /** Show a month calendar card with the event list instead of rotating events in the notice pill. */
+  widget: boolean;
 }
 
 /** A short family notice shown on frames as a small pill over the slideshow. */

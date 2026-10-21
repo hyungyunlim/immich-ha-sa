@@ -1716,7 +1716,7 @@ describe('controller API', () => {
 });
 
 describe('calendar agenda', () => {
-  it('stores the agenda pushed by Home Assistant and serves it only to the chosen frames', async () => {
+  it('stores the agenda Home Assistant pushes for each frame', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-agenda-'));
     tempDirs.push(dir);
     const config = buildConfig(dir);
@@ -1732,13 +1732,22 @@ describe('calendar agenda', () => {
     expect(empty.json().data).toEqual({ items: [], locale: 'en', widget: false });
     const invalid = await server.inject({ method: 'PUT', url: '/api/agenda', payload: { items: [{ title: '', start: 'x', allDay: true }], deviceIds: [] } });
     expect(invalid.statusCode).toBe(400);
-    const saved = await server.inject({ method: 'PUT', url: '/api/agenda', payload: { items, deviceIds: ['kitchen'], locale: 'ko', widget: true } });
-    expect(saved.statusCode).toBe(200);
-    expect(saved.json().data.updatedAt).toBeTruthy();
-
+    // The integration before 0.1.108 sends one agenda for a list of frames
+    const legacy = await server.inject({ method: 'PUT', url: '/api/agenda', payload: { items, deviceIds: ['kitchen'], locale: 'ko', widget: true } });
+    expect(legacy.statusCode).toBe(200);
+    expect(legacy.json().data.updatedAt).toBeTruthy();
     expect((await server.inject({ method: 'GET', url: '/api/frame/kitchen/agenda' })).json().data).toEqual({ items, locale: 'ko', widget: true });
     expect((await server.inject({ method: 'GET', url: '/api/frame/lenovo/agenda' })).json().data).toEqual({ items: [], locale: 'ko', widget: false });
-    expect((await server.inject({ method: 'GET', url: '/api/agenda' })).json().data.deviceIds).toEqual(['kitchen']);
+
+    const saved = await server.inject({
+      method: 'PUT',
+      url: '/api/agenda',
+      payload: { frames: { kitchen: { items: items.slice(1), widget: false }, lenovo: { items, widget: true } }, locale: 'ko' },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect((await server.inject({ method: 'GET', url: '/api/frame/kitchen/agenda' })).json().data).toEqual({ items: items.slice(1), locale: 'ko', widget: false });
+    expect((await server.inject({ method: 'GET', url: '/api/frame/lenovo/agenda' })).json().data).toEqual({ items, locale: 'ko', widget: true });
+    expect(Object.keys((await server.inject({ method: 'GET', url: '/api/agenda' })).json().data.frames)).toEqual(['kitchen', 'lenovo']);
     const page = await server.inject({ method: 'GET', url: '/f/lenovo' });
     expect(page.body).toContain("listen('agenda', setAgenda)");
     expect(page.body).toContain('id="agenda-widget"');
@@ -1853,6 +1862,17 @@ describe('family notices', () => {
     } finally {
       Date.now = realNow;
     }
+
+    const patch = (id: string, payload: Record<string, unknown>) => server.inject({ method: 'PATCH', url: `/api/notices/${id}`, payload });
+    const kitchenId = kitchenOnly.json().data.id;
+    expect((await patch(kitchenId, { text: ' ' })).statusCode).toBe(400);
+    expect((await patch(kitchenId, { deviceIds: ['nope'] })).json().error.code).toBe('FRAME_NOT_FOUND');
+    expect((await patch('missing', { text: 'x' })).json().error.code).toBe('NOTICE_NOT_FOUND');
+    const edited = await patch(kitchenId, { text: '세탁 끝! 널어주세요', deviceIds: [] });
+    expect(edited.json().data).toMatchObject({ text: '세탁 끝! 널어주세요', deviceIds: [], until });
+    expect((await server.inject({ method: 'GET', url: '/api/frame/lenovo/notices' })).json().data.items).toHaveLength(2);
+    expect((await patch(kitchenId, { until: null })).json().data.until).toBeUndefined();
+    expect((await patch(kitchenId, { text: '세탁 끝', deviceIds: ['kitchen'], until })).json().data.until).toBe(until);
 
     const removed = await server.inject({ method: 'DELETE', url: `/api/notices/${everyone.json().data.id}` });
     expect(removed.statusCode).toBe(200);

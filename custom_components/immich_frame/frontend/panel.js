@@ -2,7 +2,7 @@
 //   Calls   - two-way WebRTC audio with frames running Frame Mic 0.6+. The offer goes through
 //             Home Assistant (/api/immich_frame/call); audio flows straight to the frame.
 //   Notices - short family notices the frames show as a pill over the slideshow.
-//   Agenda  - upcoming events from chosen Home Assistant calendars, shown between the notices.
+//   Agenda  - upcoming events from Home Assistant calendars, chosen per frame, shown between the notices.
 
 const STRINGS = {
   en: {
@@ -11,15 +11,16 @@ const STRINGS = {
     tabNotices: "Notices",
     tabAgenda: "Calendar",
     calendars: "Calendars",
-    showOn: "Show on",
+    agendaOff: "With no calendars and the widget off, this frame shows no agenda.",
+    noFrames: "No frames are set up yet.",
     days1: "Today only",
     days3: "Next 3 days",
     days7: "Next week",
     widget: "Show as a calendar widget",
-    widgetHint: "On: the frames show this month's calendar with the events in a card, with notices in their own pill above it. Off: events take turns with the notices in the pill.",
+    widgetHint: "On: the frame shows this month's calendar with the events in a card, with notices in their own pill above it. Off: events take turns with the notices in the pill.",
     save: "Save",
     saved: "Saved",
-    upcoming: "Coming up on the frames",
+    upcoming: "Coming up on this frame",
     noEvents: "No upcoming events.",
     noCalendars: "Home Assistant has no calendars yet.",
     dayToday: "Today",
@@ -50,6 +51,10 @@ const STRINGS = {
     week: "1 week",
     send: "Show on frames",
     remove: "Delete",
+    edit: "Edit",
+    saveEdit: "Save changes",
+    cancel: "Cancel",
+    keepDuration: "Keep: {when}",
     untilDate: "until {date}",
     noNotices: "No notices on the frames right now.",
   },
@@ -59,15 +64,16 @@ const STRINGS = {
     tabNotices: "공지",
     tabAgenda: "일정",
     calendars: "캘린더",
-    showOn: "표시할 액자",
+    agendaOff: "캘린더를 고르지 않고 위젯도 끄면 이 액자에는 일정이 나오지 않아요.",
+    noFrames: "아직 설정된 액자가 없어요.",
     days1: "오늘만",
     days3: "3일",
     days7: "1주일",
     widget: "달력 위젯으로 보기",
-    widgetHint: "켜면 액자에 이번 달 달력과 일정이 카드로 뜨고, 공지는 그 위에 따로 알약으로 나와요. 끄면 일정이 공지와 함께 알약에 번갈아 나와요.",
+    widgetHint: "켜면 이 액자에 이번 달 달력과 일정이 카드로 뜨고, 공지는 그 위에 따로 알약으로 나와요. 끄면 일정이 공지와 함께 알약에 번갈아 나와요.",
     save: "저장",
     saved: "저장했어요",
-    upcoming: "액자에 표시될 일정",
+    upcoming: "이 액자에 표시될 일정",
     noEvents: "다가오는 일정이 없어요.",
     noCalendars: "Home Assistant에 캘린더가 없어요.",
     dayToday: "오늘",
@@ -98,6 +104,10 @@ const STRINGS = {
     week: "1주일",
     send: "액자에 띄우기",
     remove: "삭제",
+    edit: "수정",
+    saveEdit: "수정 저장",
+    cancel: "취소",
+    keepDuration: "그대로: {when}",
     untilDate: "{date}까지",
     noNotices: "지금 액자에 띄운 공지가 없어요.",
   },
@@ -360,16 +370,25 @@ class ImmichFramePanel extends HTMLElement {
     const form = event.target;
     const text = form.text.value.trim();
     if (!text) return;
-    const until = DURATIONS[form.duration.value]();
     form.send.disabled = true;
     this._noticeError = null;
     try {
-      await this._hass.callApi("POST", "immich_frame/notices", {
-        text,
-        device_ids: form.frame.value ? [form.frame.value] : [],
-        until: until ? until.toISOString() : undefined,
-      });
-      form.text.value = "";
+      if (this._editing) {
+        // "keep" leaves the end as it is, "*" the several frames a notice from the API may have
+        const body = { text };
+        if (form.frame.value !== "*") body.device_ids = form.frame.value ? [form.frame.value] : [];
+        if (form.duration.value !== "keep") body.until = DURATIONS[form.duration.value]()?.toISOString() ?? null;
+        await this._hass.callApi("PATCH", `immich_frame/notices/${this._editing.id}`, body);
+        this._editNotice(null);
+      } else {
+        const until = DURATIONS[form.duration.value]();
+        await this._hass.callApi("POST", "immich_frame/notices", {
+          text,
+          device_ids: form.frame.value ? [form.frame.value] : [],
+          until: until ? until.toISOString() : undefined,
+        });
+        form.text.value = "";
+      }
       this._notices = await this._hass.callApi("GET", "immich_frame/notices");
     } catch (err) {
       this._noticeError = errorMessage(err);
@@ -382,22 +401,58 @@ class ImmichFramePanel extends HTMLElement {
     try {
       await this._hass.callApi("DELETE", `immich_frame/notices/${id}`);
       this._notices = this._notices.filter((notice) => notice.id !== id);
+      if (this._editing?.id === id) this._editNotice(null);
     } catch (err) {
       this._noticeError = errorMessage(err);
     }
     this._renderNotices();
   }
 
+  // Loads a notice into the form above the list (or empties the form again with null)
+  _editNotice(notice) {
+    const t = this._t;
+    const form = this._noticeForm;
+    this._editing = notice;
+    this._noticeError = null;
+    form.querySelector('option[value="keep"]')?.remove();
+    form.text.value = notice ? notice.text : "";
+    form.send.textContent = notice ? t.saveEdit : t.send;
+    form.cancel.hidden = !notice;
+    this._renderNotices(); // the frame choices depend on the notice
+    if (notice) {
+      form.duration.insertAdjacentHTML(
+        "afterbegin",
+        `<option value="keep">${escapeHtml(t.keepDuration.replace("{when}", this._noticeEnd(notice)))}</option>`,
+      );
+      form.duration.value = "keep";
+      const ids = notice.deviceIds || [];
+      form.frame.value = ids.length > 1 ? "*" : ids[0] || "";
+      form.text.focus();
+      form.scrollIntoView({ block: "nearest" });
+    } else {
+      form.duration.value = "today";
+      form.frame.value = "";
+    }
+  }
+
+  _noticeEnd(notice) {
+    const format = new Intl.DateTimeFormat(this._lang, { month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
+    return notice.until ? this._t.untilDate.replace("{date}", format.format(new Date(notice.until))) : this._t.forever;
+  }
+
   _renderNotices() {
     if (!this._noticeListEl) return;
     const t = this._t;
+    const names = Object.fromEntries(this._frames.map((f) => [f.device_id, f.name]));
+    const several = this._editing?.deviceIds?.length > 1 ? this._editing.deviceIds : null;
     // Refresh the frame choices only when they change, so an open dropdown is left alone
-    const targets = JSON.stringify(this._frames.map((f) => [f.device_id, f.name]));
+    const targets = JSON.stringify([this._frames.map((f) => [f.device_id, f.name]), several]);
     if (targets !== this._targets) {
       this._targets = targets;
       const select = this._noticeForm.frame; // not "target": that name is a built-in form property
       const current = select.value;
       select.innerHTML =
+        (several ? `<option value="*">${escapeHtml(several.map((id) => names[id] || id).join(", "))}</option>` : "") +
         `<option value="">${escapeHtml(t.allFrames)}</option>` +
         this._frames.map((f) => `<option value="${escapeHtml(f.device_id)}">${escapeHtml(f.name)}</option>`).join("");
       select.value = current;
@@ -407,17 +462,16 @@ class ImmichFramePanel extends HTMLElement {
       this._noticeListEl.innerHTML = `<div class="empty">${escapeHtml(t.noNotices)}</div>`;
       return;
     }
-    const names = Object.fromEntries(this._frames.map((f) => [f.device_id, f.name]));
-    const format = new Intl.DateTimeFormat(this._lang, { month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
     this._noticeListEl.innerHTML = this._notices
       .map((notice) => {
         const where = notice.deviceIds?.length ? notice.deviceIds.map((id) => names[id] || id).join(", ") : t.allFrames;
-        const when = notice.until ? t.untilDate.replace("{date}", format.format(new Date(notice.until))) : t.forever;
-        return `<ha-card class="notice">
+        const id = escapeHtml(notice.id);
+        return `<ha-card class="notice ${this._editing?.id === notice.id ? "editing" : ""}">
           <div class="notice-text">${escapeHtml(notice.text)}</div>
           <div class="row">
-            <div class="status">${escapeHtml(where)} · ${escapeHtml(when)}</div>
-            <button class="quiet" data-action="delete-notice" data-id="${escapeHtml(notice.id)}">${escapeHtml(t.remove)}</button>
+            <div class="status">${escapeHtml(where)} · ${escapeHtml(this._noticeEnd(notice))}</div>
+            <button class="quiet" data-action="edit-notice" data-id="${id}">${escapeHtml(t.edit)}</button>
+            <button class="quiet" data-action="delete-notice" data-id="${id}">${escapeHtml(t.remove)}</button>
           </div>
         </ha-card>`;
       })
@@ -443,8 +497,8 @@ class ImmichFramePanel extends HTMLElement {
     form.save.disabled = true;
     try {
       this._agenda = await this._hass.callApi("POST", "immich_frame/agenda", {
+        device_id: this._agendaFrame,
         calendars: checked("calendar"),
-        device_ids: checked("frame"),
         days: Number(form.days.value),
         widget: form.widget.checked,
       });
@@ -468,16 +522,28 @@ class ImmichFramePanel extends HTMLElement {
   _renderAgenda(saved = false) {
     if (!this._agendaEl) return;
     const t = this._t;
-    const agenda = this._agenda || { settings: { calendars: [], device_ids: [], days: 3 }, items: [] };
+    const agenda = this._agenda || { settings: { frames: {} }, items: {} };
+    if (!this._frames.length) {
+      this._agendaEl.innerHTML = `<div class="empty">${escapeHtml(t.noFrames)}</div>`;
+      return;
+    }
+    const configured = agenda.settings.frames || {};
+    if (!this._frames.some((f) => f.device_id === this._agendaFrame)) {
+      this._agendaFrame = (this._frames.find((f) => configured[f.device_id]) || this._frames[0]).device_id;
+    }
+    const settings = configured[this._agendaFrame] || { calendars: [], days: 3, widget: false };
     const calendars = Object.values(this._hass.states)
       .filter((state) => state.entity_id.startsWith("calendar."))
       .map((state) => ({ id: state.entity_id, name: state.attributes.friendly_name || state.entity_id }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    const chosen = new Set(agenda.settings.calendars);
-    const shownOn = new Set(agenda.settings.device_ids);
+    const chosen = new Set(settings.calendars);
     const now = Date.now();
-    const upcoming = (agenda.items || []).filter((item) => eventEnd(item).getTime() > now).slice(0, 20);
+    const upcoming = (agenda.items?.[this._agendaFrame] || []).filter((item) => eventEnd(item).getTime() > now).slice(0, 20);
     this._agendaEl.innerHTML = `
+      <div class="frame-tabs">
+        ${this._frames.map((f) => `<button type="button" class="quiet ${f.device_id === this._agendaFrame ? "active" : ""}
+            ${configured[f.device_id] ? "on" : ""}" data-agenda-frame="${escapeHtml(f.device_id)}">${escapeHtml(f.name)}</button>`).join("")}
+      </div>
       <ha-card>
         <form class="compose">
           <div class="label">${escapeHtml(t.calendars)}</div>
@@ -488,16 +554,12 @@ class ImmichFramePanel extends HTMLElement {
                   <span class="hint">${escapeHtml(c.id.slice("calendar.".length))}</span></label>`).join("")
               : `<div class="status">${escapeHtml(t.noCalendars)}</div>`}
           </div>
-          <div class="label">${escapeHtml(t.showOn)}</div>
-          <div class="checks">
-            ${this._frames.map((f) => `<label><input type="checkbox" name="frame" value="${escapeHtml(f.device_id)}"
-                ${shownOn.has(f.device_id) ? "checked" : ""}>${escapeHtml(f.name)}</label>`).join("")}
-          </div>
           <select name="days">
-            ${[1, 3, 7].map((d) => `<option value="${d}" ${agenda.settings.days === d ? "selected" : ""}>${escapeHtml(t[`days${d}`])}</option>`).join("")}
+            ${[1, 3, 7].map((d) => `<option value="${d}" ${settings.days === d ? "selected" : ""}>${escapeHtml(t[`days${d}`])}</option>`).join("")}
           </select>
-          <label class="toggle"><input type="checkbox" name="widget" ${agenda.settings.widget ? "checked" : ""}>${escapeHtml(t.widget)}</label>
+          <label class="toggle"><input type="checkbox" name="widget" ${settings.widget ? "checked" : ""}>${escapeHtml(t.widget)}</label>
           <div class="hint">${escapeHtml(t.widgetHint)}</div>
+          <div class="hint">${escapeHtml(t.agendaOff)}</div>
           <div class="error">${escapeHtml(this._agendaError || agenda.error || "")}</div>
           <div class="actions"><button name="save">${escapeHtml(t.save)}</button>
             <span class="status">${saved ? escapeHtml(t.saved) : ""}</span></div>
@@ -557,6 +619,11 @@ class ImmichFramePanel extends HTMLElement {
         .hint { color: var(--secondary-text-color); font-size: 12px; }
         .toggle { display: flex; align-items: center; gap: 8px; font-weight: 500; }
         .event { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+        ha-card.notice.editing { outline: 2px solid var(--primary-color); }
+        .frame-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+        .frame-tabs button.active { background: var(--primary-color); color: var(--text-primary-color, white); }
+        .frame-tabs button.on::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 8px;
+          border-radius: 50%; background: currentColor; vertical-align: middle; opacity: 0.7; }
         .chip { padding: 2px 10px; border-radius: 999px; font-size: 13px; white-space: nowrap;
           background: var(--secondary-background-color); }
         .chip.today { background: rgba(255, 183, 77, 0.45); }
@@ -582,7 +649,8 @@ class ImmichFramePanel extends HTMLElement {
               </select>
             </div>
             <div class="error"></div>
-            <div class="actions"><button name="send">${escapeHtml(t.send)}</button></div>
+            <div class="actions"><button name="send">${escapeHtml(t.send)}</button>
+              <button type="button" name="cancel" class="quiet" data-action="cancel-edit" hidden>${escapeHtml(t.cancel)}</button></div>
           </form>
         </ha-card>
         <div id="notice-list" style="display: grid; gap: 12px"></div>
@@ -610,6 +678,12 @@ class ImmichFramePanel extends HTMLElement {
       if (button.dataset.action === "hangup") this._hangup();
       if (button.dataset.action === "mute") this._toggleMute();
       if (button.dataset.action === "delete-notice") this._deleteNotice(button.dataset.id);
+      if (button.dataset.action === "edit-notice") this._editNotice(this._notices.find((n) => n.id === button.dataset.id) || null);
+      if (button.dataset.action === "cancel-edit") this._editNotice(null);
+      if (button.dataset.agendaFrame) {
+        this._agendaFrame = button.dataset.agendaFrame;
+        this._renderAgenda();
+      }
     });
     this._selectTab(this._tab);
   }

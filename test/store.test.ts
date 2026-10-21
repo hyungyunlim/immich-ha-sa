@@ -76,10 +76,12 @@ describe('JsonStore', () => {
         },
       },
       albumCache: { items: [], stale: true },
+      agenda: { items: [{ title: 'Swim', start: '2026-10-22', allDay: true }], deviceIds: ['lenovo'], locale: 'ko', widget: true },
       auth: { tokens: {} },
     })}\n`);
 
     const store = new JsonStore(path, device);
+    expect(store.getAgenda().frames).toEqual({ lenovo: { items: [{ title: 'Swim', start: '2026-10-22', allDay: true }], widget: true } });
     expect(store.getDevice('lenovo')?.localKioskBaseUrl).toBe('http://10.0.0.10:3000');
     expect(store.getFrameState('lenovo')?.deviceId).toBe('lenovo');
     expect(store.getFrameState('lenovo')?.customCssClass).toBe('');

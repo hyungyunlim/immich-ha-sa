@@ -233,6 +233,7 @@ describe('FreeKiosk MQTT bridge', () => {
   });
 
   it('serves remote status from the MQTT cache when REST is unreachable', async () => {
+    // REST goes to the reported 10.0.0.55, which some networks drop silently until the REST timeout
     const { server } = await setupMqttWorld();
 
     const response = await server.inject({
@@ -247,7 +248,7 @@ describe('FreeKiosk MQTT bridge', () => {
     expect(data.status.screen.brightness).toBe(37);
     expect(data.status.webview.motionDetected).toBe(false);
     expect(data.capabilities.brightnessControl).toBe(true);
-  });
+  }, 15_000);
 
   it('returns an offline payload instead of an error when the device is offline', async () => {
     const { server } = await setupMqttWorld({ availability: 'offline' });

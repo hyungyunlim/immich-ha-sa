@@ -2,6 +2,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import type {
+  AgendaItem,
   AlbumCache,
   ControllerApiToken,
   ControllerPairingState,
@@ -151,6 +152,17 @@ export class JsonStore {
 
   addNotice(notice: FrameNotice): FrameNotice {
     this.data.notices = [...this.getNotices(), structuredClone(notice)];
+    this.save();
+    return structuredClone(notice);
+  }
+
+  updateNotice(noticeId: string, patch: Partial<Pick<FrameNotice, 'text' | 'deviceIds' | 'until'>>): FrameNotice | undefined {
+    const notices = this.getNotices();
+    const notice = notices.find((item) => item.id === noticeId);
+    if (!notice) return undefined;
+    Object.assign(notice, structuredClone(patch));
+    if (!notice.until) delete notice.until;
+    this.data.notices = notices;
     this.save();
     return structuredClone(notice);
   }
@@ -353,7 +365,7 @@ export class JsonStore {
       personCache: data.personCache ?? defaults.personCache,
       frameClaims: data.frameClaims ?? defaults.frameClaims,
       notices: data.notices ?? defaults.notices,
-      agenda: data.agenda ?? defaults.agenda,
+      agenda: migrateAgenda(data.agenda) ?? defaults.agenda,
       auth: {
         tokens: {
           ...defaults.auth.tokens,
@@ -419,4 +431,13 @@ export class JsonStore {
     }
     if (changed) this.save();
   }
+}
+
+type LegacyAgenda = { items: AgendaItem[]; deviceIds: string[]; locale: string; widget?: boolean; updatedAt?: string };
+
+/** Before 0.1.108 one agenda went to a list of frames; each of them keeps it. */
+function migrateAgenda(agenda: FrameAgenda | LegacyAgenda | undefined): FrameAgenda | undefined {
+  if (!agenda || !('deviceIds' in agenda)) return agenda;
+  const { items, deviceIds, locale, widget, updatedAt } = agenda;
+  return { frames: Object.fromEntries(deviceIds.map((id) => [id, { items, widget: Boolean(widget) }])), locale, updatedAt };
 }

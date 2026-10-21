@@ -199,18 +199,16 @@ class ImmichFrameClient:
             payload["until"] = until
         return await self._request("POST", "/api/notices", json=payload, auth=True)
 
+    async def update_notice(self, notice_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+        """Changes text, deviceIds or until (None keeps it until deleted); missing keys stay as they are."""
+        return await self._request("PATCH", f"/api/notices/{notice_id}", json=patch, auth=True)
+
     async def delete_notice(self, notice_id: str) -> dict[str, Any]:
         return await self._request("DELETE", f"/api/notices/{notice_id}", auth=True)
 
-    async def set_agenda(
-        self, items: list[dict[str, Any]], device_ids: list[str], locale: str, widget: bool = False
-    ) -> dict[str, Any]:
-        return await self._request(
-            "PUT",
-            "/api/agenda",
-            json={"items": items, "deviceIds": device_ids, "locale": locale, "widget": widget},
-            auth=True,
-        )
+    async def set_agenda(self, frames: dict[str, dict[str, Any]], locale: str) -> dict[str, Any]:
+        """frames: {device_id: {"items": [...], "widget": bool}}; frames left out show no agenda."""
+        return await self._request("PUT", "/api/agenda", json={"frames": frames, "locale": locale}, auth=True)
 
     async def ice_servers(self) -> list[dict[str, Any]]:
         return (await self._request("GET", "/api/calls/ice-servers", auth=True))["iceServers"]
