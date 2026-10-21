@@ -1740,7 +1740,7 @@ describe('calendar agenda', () => {
     expect((await server.inject({ method: 'GET', url: '/api/frame/lenovo/agenda' })).json().data).toEqual({ items: [], locale: 'ko', widget: false });
     expect((await server.inject({ method: 'GET', url: '/api/agenda' })).json().data.deviceIds).toEqual(['kitchen']);
     const page = await server.inject({ method: 'GET', url: '/f/lenovo' });
-    expect(page.body).toContain("addEventListener('agenda'");
+    expect(page.body).toContain("listen('agenda', setAgenda)");
     expect(page.body).toContain('id="agenda-widget"');
     await server.close();
   });
@@ -1867,7 +1867,7 @@ describe('family notices', () => {
     const frameState = await server.inject({ method: 'GET', url: '/api/frame/lenovo/state' });
     expect(frameState.json().data.pageVersion).toBeTruthy();
     expect(page.body).toContain('id="notice"');
-    expect(page.body).toContain("addEventListener('notices'");
+    expect(page.body).toContain("listen('notices'");
     // A fresh renderer gets the controller's Kiosk Video Mute state back
     expect(page.body).toContain('applyVideoMutedState(desiredVideoMuted)');
     expect(page.body).toContain('setInterval(checkVideoStall, 2000)');
