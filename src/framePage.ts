@@ -313,7 +313,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
             return {
               cls: String(frame.className).slice(0, 60),
               media: frameMediaKey(frame),
-              text: String(frame.innerText || '').replace(/\s+/g, ' ').slice(0, 80),
+              text: String(frame.innerText || '').replace(/\\s+/g, ' ').slice(0, 80),
               opacity: style ? style.opacity : null,
               z: style ? style.zIndex : null
             };
@@ -345,7 +345,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       function frameMediaKey(frame) {
         var media = frame && frame.querySelector('video source[src], video[src], img');
         var src = media ? String(media.getAttribute('src') || '') : '';
-        return src.length + ':' + src.replace(/\?.*$/, '').slice(-24);
+        return src.length + ':' + src.replace(/\\?.*$/, '').slice(-24);
       }
 
       var shownFrame = null;
@@ -981,35 +981,44 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         pollTimer = setInterval(loadState, pollIntervalMs);
       }
 
-      function startEvents() {
-        if (previewMode) {
-          startPolling();
-          return;
+      // A controller restart (add-on update) can drop the event stream without telling the browser. The dead
+      // connection then keeps one of the browser's six connections to this host, and a few of them stall every
+      // request from the frame. The controller sends a heartbeat every 25 s, so reopen the stream after 70 s of silence.
+      var events = null;
+      var lastEventAt = Date.now();
+
+      function connectEvents() {
+        try { if (events) events.close(); } catch (error) {}
+        var source = events = new EventSource(eventsUrl);
+        lastEventAt = Date.now();
+        function listen(name, handler) {
+          source.addEventListener(name, function (event) {
+            lastEventAt = Date.now();
+            try { handler(JSON.parse(event.data)); } catch (error) {}
+          });
         }
-        if (!window.EventSource) {
+        listen('heartbeat', function () {});
+        listen('state', applyState);
+        listen('notices', function (data) { setNotices(data.items); });
+        listen('agenda', setAgenda);
+        listen('command', function (payload) {
+          if (payload && payload.command) window.__immichFrameCommand(payload.command, payload);
+        });
+        source.onerror = function () {
+          startPolling();
+        };
+      }
+
+      function startEvents() {
+        if (previewMode || !window.EventSource) {
           startPolling();
           return;
         }
         try {
-          var source = new EventSource(eventsUrl);
-          source.addEventListener('state', function (event) {
-            try { applyState(JSON.parse(event.data)); } catch (error) {}
-          });
-          source.addEventListener('notices', function (event) {
-            try { setNotices(JSON.parse(event.data).items); } catch (error) {}
-          });
-          source.addEventListener('agenda', function (event) {
-            try { setAgenda(JSON.parse(event.data)); } catch (error) {}
-          });
-          source.addEventListener('command', function (event) {
-            try {
-              var payload = JSON.parse(event.data);
-              if (payload && payload.command) window.__immichFrameCommand(payload.command, payload);
-            } catch (error) {}
-          });
-          source.onerror = function () {
-            startPolling();
-          };
+          connectEvents();
+          setInterval(function () {
+            if (Date.now() - lastEventAt > 70000) connectEvents();
+          }, 15000);
         } catch (error) {
           startPolling();
         }

@@ -1862,6 +1862,8 @@ describe('family notices', () => {
     const page = await server.inject({ method: 'GET', url: '/f/lenovo' });
     expect(page.headers['cache-control']).toContain('no-store');
     expect(page.body).toContain('state.pageVersion !== pageVersion');
+    expect(page.body).toContain("src.replace(/\\?.*$/, '')"); // a lost backslash made this an invalid regex
+    expect(page.body).toContain('if (Date.now() - lastEventAt > 70000) connectEvents();');
     const frameState = await server.inject({ method: 'GET', url: '/api/frame/lenovo/state' });
     expect(frameState.json().data.pageVersion).toBeTruthy();
     expect(page.body).toContain('id="notice"');

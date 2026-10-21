@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.107
+
+- Frames reopen their event stream after 70 seconds without a message (the controller sends a heartbeat every 25 seconds). A controller restart can drop the stream silently, and a few dead connections were enough to stall every request from the frame, leaving immich-kiosk on "Trying to reconnect" until the frame rebooted.
+- Fix the renderer watchdog and the `diag` command added in 0.1.105: a lost backslash in the frame page made one of their regular expressions invalid.
+- Frames on a 0.1.106 page reload by themselves to pick this up.
+
 ## 0.1.106
 
 - Frames update themselves: the frame page knows the controller build it came from and reloads when the controller runs a newer one, so frame page fixes no longer wait for a kiosk-browser reload. The frame page is also served with `Cache-Control: no-store`.
