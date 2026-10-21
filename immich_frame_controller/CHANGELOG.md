@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.101
+
+- Steadier video on weak frames: the frame page frees a video's hardware decoder as soon as immich-kiosk swaps it out (WebView otherwise keeps it until garbage collection, so two or three decoders overlapped), and restarts a video whose picture stops while its sound plays on, skipping to the next asset if it sticks again.
+- Reload the frames so they pick up the new frame page.
+
 ## 0.1.100
 
 - Keep frame videos unmuted after a reload: the frame page reapplies the **Kiosk Video Mute** state whenever the renderer loads, including after Screen Off and On. Before, a reloaded renderer fell back to immich-kiosk's muted default until the switch was toggled again.

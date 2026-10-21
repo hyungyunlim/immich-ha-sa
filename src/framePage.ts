@@ -261,7 +261,77 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
           if (desiredVideoMuted !== null) {
             setTimeout(function () { applyVideoMutedState(desiredVideoMuted); }, 1500);
           }
+          watchRendererVideos(target);
         });
+      }
+
+      // Weak frame hardware (MediaTek decoders behind WebView 74) copes badly with overlapping videos and sometimes
+      // stalls: the picture freezes while the sound plays on. WebView frees a removed video's decoder only after
+      // garbage collection, so free it as soon as immich-kiosk swaps the video out.
+      function releaseVideo(video) {
+        try {
+          video.pause();
+          video.removeAttribute('src');
+          Array.prototype.forEach.call(video.querySelectorAll('source'), function (source) {
+            source.removeAttribute('src');
+          });
+          video.load();
+        } catch (error) {}
+      }
+
+      function watchRendererVideos(target) {
+        var doc;
+        try { doc = target.contentWindow.document; } catch (error) { return; }
+        if (!doc || !doc.body || !window.MutationObserver) return;
+        new MutationObserver(function (mutations) {
+          mutations.forEach(function (mutation) {
+            Array.prototype.forEach.call(mutation.removedNodes, function (node) {
+              if (node.nodeType !== 1) return;
+              var videos = node.tagName === 'VIDEO' ? [node] : Array.prototype.slice.call(node.querySelectorAll('video'));
+              videos.forEach(function (video) {
+                // Moved nodes come straight back; only free videos that really left the page
+                setTimeout(function () { if (!doc.contains(video)) releaseVideo(video); }, 0);
+              });
+            });
+          });
+        }).observe(doc.body, { childList: true, subtree: true });
+      }
+
+      // If the playing video keeps its clock running but decodes no frames for 4 s, the decoder is stuck:
+      // restart that video once, and skip to the next asset if it sticks again.
+      var stall = { video: null, frames: 0, time: 0, count: 0, restarted: null };
+
+      function checkVideoStall() {
+        var doc = rendererSuspended ? null : iframeDocument();
+        var video = null;
+        if (doc) {
+          Array.prototype.forEach.call(doc.querySelectorAll('video'), function (candidate) {
+            if (!candidate.paused && !candidate.ended && candidate.readyState >= 2) video = candidate;
+          });
+        }
+        if (!video || typeof video.webkitDecodedFrameCount !== 'number') {
+          stall.video = null;
+          return;
+        }
+        var frames = video.webkitDecodedFrameCount;
+        var stuck = video === stall.video && frames === stall.frames && video.currentTime > stall.time + 1;
+        stall.count = stuck ? stall.count + 1 : 0;
+        stall.video = video;
+        stall.frames = frames;
+        stall.time = video.currentTime;
+        if (stall.count < 2) return;
+        stall.count = 0;
+        if (stall.restarted === video) {
+          triggerKioskCommand('next');
+          return;
+        }
+        stall.restarted = video;
+        var at = video.currentTime;
+        video.addEventListener('loadedmetadata', function () {
+          try { video.currentTime = at; } catch (error) {}
+          video.play().catch(function () {});
+        }, { once: true });
+        video.load();
       }
 
       function createRenderer() {
@@ -835,6 +905,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       loadNotices();
       loadAgenda();
       setInterval(showNextNotice, 8000);
+      if (!previewMode) setInterval(checkVideoStall, 2000);
       setInterval(function () { // safety net next to the live notices and agenda events
         loadNotices();
         loadAgenda();

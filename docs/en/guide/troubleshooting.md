@@ -8,6 +8,10 @@ Album options come from the controller cache. The integration reads the cache ev
 
 Turn off the frame's **Kiosk Video Mute** switch, and check the **Media Volume** and **Device Mute Toggle**. Controller 0.1.100 and newer reapply the Kiosk Video Mute state whenever the renderer reloads (a page reload, or Screen Off then On); before that, immich-kiosk could fall back to its own muted default until the switch was toggled again.
 
+## Videos stutter or freeze while the sound plays on
+
+Some frames (such as the Lenovo Smart Frame's MediaTek chip behind WebView 74) have fragile hardware video decoders. Controller 0.1.101 and newer free each video's decoder as soon as immich-kiosk moves on, and restart a video whose picture stops while its sound runs (or skip to the next asset if it sticks again). If freezes persist, lower **Exclude Videos Over**, or turn off **Show Videos** on that frame.
+
 ## Videos show a poster but do not play
 
 - Turn on the frame's **Show Videos** switch (`show_videos=true`).

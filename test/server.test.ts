@@ -1864,6 +1864,7 @@ describe('family notices', () => {
     expect(page.body).toContain("addEventListener('notices'");
     // A fresh renderer gets the controller's Kiosk Video Mute state back
     expect(page.body).toContain('applyVideoMutedState(desiredVideoMuted)');
+    expect(page.body).toContain('setInterval(checkVideoStall, 2000)');
     await server.close();
   });
 });
