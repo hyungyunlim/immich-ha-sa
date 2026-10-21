@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.105
+
+- The renderer watchdog compares the picture or video a frame shows instead of the element, so it also notices immich-kiosk staying on one asset while it reuses or adds elements.
+- New `diag` frame command (`POST /api/frames/:deviceId/command` with `{"command":"diag"}`): the frame posts a snapshot of the renderer (frames, what each shows, video states) to the controller log as a `frame watchdog report`.
+- Reload the frames so they pick up the new frame page.
+
 ## 0.1.104
 
 - The renderer watchdog also reloads immich-kiosk when old frames pile up (more than two for 30 seconds), which can leave a stale picture on top while new assets load behind it, and reports such states to the controller log.

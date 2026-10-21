@@ -13,7 +13,7 @@ export type RemoteControlType = 'none' | 'freekiosk';
 export type PreviewOrientation = 'landscape' | 'portrait';
 export type KioskArrowAction = 'none' | 'mute' | 'redirects' | 'pause' | 'more-info' | 'fullscreen';
 export type PlaybackState = 'playing' | 'paused' | 'unknown';
-export type FrameCommand = 'next' | 'previous' | 'play' | 'pause' | 'play-pause' | 'reload' | 'mute-toggle' | 'mute-on' | 'mute-off' | 'renderer-suspend' | 'renderer-resume' | 'screen-on' | 'screen-off' | 'volume-up' | 'volume-down' | 'device-mute-toggle' | 'dpad-up';
+export type FrameCommand = 'next' | 'previous' | 'play' | 'pause' | 'play-pause' | 'reload' | 'mute-toggle' | 'mute-on' | 'mute-off' | 'renderer-suspend' | 'renderer-resume' | 'screen-on' | 'screen-off' | 'volume-up' | 'volume-down' | 'device-mute-toggle' | 'dpad-up' | 'diag';
 
 export interface FrameCommandEvent {
   command: FrameCommand;

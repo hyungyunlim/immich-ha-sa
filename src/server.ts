@@ -332,7 +332,7 @@ const FrameAudioPlaySchema = z.object({
 });
 
 const FrameCommandSchema = z.object({
-  command: z.enum(['next', 'previous', 'play', 'pause', 'play-pause', 'reload', 'mute-toggle', 'mute-on', 'mute-off', 'screen-on', 'screen-off', 'volume-up', 'volume-down', 'device-mute-toggle', 'dpad-up']),
+  command: z.enum(['next', 'previous', 'play', 'pause', 'play-pause', 'reload', 'mute-toggle', 'mute-on', 'mute-off', 'screen-on', 'screen-off', 'volume-up', 'volume-down', 'device-mute-toggle', 'dpad-up', 'diag']),
 });
 
 const FrameCommandAckSchema = z.object({
@@ -2594,6 +2594,7 @@ function freeKioskMqttCommandPublication(
       return { suffix: 'screen', payload: 'OFF' };
     case 'renderer-suspend':
     case 'renderer-resume':
+    case 'diag':
       return undefined;
     case 'volume-up':
     case 'volume-down': {
@@ -3337,6 +3338,7 @@ function freeKioskEndpoint(command: FrameCommand): string | null {
     case 'mute-off':
     case 'renderer-suspend':
     case 'renderer-resume':
+    case 'diag':
       return null;
     case 'screen-on':
       return '/api/screen/on';
@@ -3354,7 +3356,8 @@ function freeKioskEndpoint(command: FrameCommand): string | null {
 }
 
 function commandUsesFrameEvents(command: FrameCommand): boolean {
-  return command === 'next'
+  return command === 'diag' // the frame page reports its renderer state to the controller log
+    || command === 'next'
     || command === 'previous'
     || command === 'play'
     || command === 'pause'

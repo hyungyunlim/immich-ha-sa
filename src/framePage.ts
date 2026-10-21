@@ -301,9 +301,20 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       // Tells the controller log what the renderer looked like when a watchdog stepped in.
       function reportDiag(reason) {
         var doc = iframeDocument();
-        var body = { reason: reason, frames: 0, videos: [], bodyClass: '' };
+        var body = { reason: reason, frames: 0, videos: [], bodyClass: '', shownForSec: Math.round((Date.now() - shownSince) / 1000) };
         if (doc) {
           body.frames = doc.querySelectorAll('.frame').length;
+          body.kioskChildren = doc.getElementById('kiosk') ? doc.getElementById('kiosk').children.length : null;
+          body.frameList = Array.prototype.slice.call(doc.querySelectorAll('.frame'), -4).map(function (frame) {
+            var style = window.getComputedStyle ? doc.defaultView.getComputedStyle(frame) : null;
+            return {
+              cls: String(frame.className).slice(0, 60),
+              media: frameMediaKey(frame),
+              text: String(frame.innerText || '').replace(/\s+/g, ' ').slice(0, 80),
+              opacity: style ? style.opacity : null,
+              z: style ? style.zIndex : null
+            };
+          });
           body.bodyClass = String(doc.body && doc.body.className || '').slice(0, 200);
           body.videos = Array.prototype.slice.call(doc.querySelectorAll('video'), 0, 4).map(function (video) {
             return {
@@ -327,6 +338,13 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
 
       // Watchdog for a wedged renderer: if immich-kiosk shows the same asset for longer than an asset plus the longest
       // allowed video, reload the renderer. Skipped while the slideshow is paused.
+      // What a frame shows, for telling assets apart: its video or image source (often a long data URI).
+      function frameMediaKey(frame) {
+        var media = frame && frame.querySelector('video source[src], video[src], img');
+        var src = media ? String(media.getAttribute('src') || '') : '';
+        return src.length + ':' + src.replace(/\?.*$/, '').slice(-24);
+      }
+
       var shownFrame = null;
       var shownSince = Date.now();
       var piledSince = 0;
@@ -347,7 +365,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         var doc = rendererSuspended ? null : iframeDocument();
         if (!doc) return;
         var frames = doc.querySelectorAll('.frame');
-        var current = frames.length ? frames[frames.length - 1] : null;
+        var current = frames.length ? frameMediaKey(frames[frames.length - 1]) : null;
         // immich-kiosk normally holds one frame (two during a transition). Old frames piling up means the
         // swap is wedged and a stale frame may stay on top, so report it and reload after 30 s.
         if (frames.length > 2) {
@@ -673,6 +691,10 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       }
 
       function triggerKioskCommand(command) {
+        if (command === 'diag') {
+          reportDiag('requested');
+          return true;
+        }
         if (command === 'renderer-suspend') return suspendRenderer();
         if (command === 'renderer-resume') return resumeRenderer();
         if (rendererSuspended) return false;
