@@ -12,7 +12,7 @@ Open **Frames** in the Home Assistant sidebar and choose the **Notices** tab.
 
 The list below the form shows every notice on the frames, where it shows, and until when. **Edit** loads a notice into the form: change the text, the frames, or how long it stays (or keep its current end), then select **Save changes**, or **Cancel**. **Delete** removes it from the frames right away. Expired notices disappear by themselves.
 
-Notices work on every frame the controller serves; no companion app is needed. Frames hide them while the screen is off.
+Notices work on every frame the controller serves; no companion app is needed. Frames hide them while the screen is off. When a photo shows its description, the pill (and the calendar widget) moves up above it.
 
 ## Calendar events
 

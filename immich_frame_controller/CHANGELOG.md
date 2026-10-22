@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.110
+
+- Notices and the calendar widget move up above a photo's description (the scrolling caption at the bottom) while it shows, and back down for photos without one, instead of covering it.
+- Frames pick up the new page by themselves.
+
 ## 0.1.109
 
 - Notices can go to several frames at once: the Frames panel's notice form picks frames with buttons (**All frames**, or any number of frames) instead of a one-frame list, both for new notices and when editing.

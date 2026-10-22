@@ -69,7 +69,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       text-overflow: ellipsis;
       opacity: 0;
       transform: translateX(-50%);
-      transition: opacity 0.6s;
+      transition: opacity 0.6s, bottom 0.6s;
       pointer-events: none;
     }
     #notice.show {
@@ -110,6 +110,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       font-size: 1.85vmin;
       white-space: nowrap;
       transform: translateX(-50%);
+      transition: bottom 0.6s;
       pointer-events: none;
     }
     #agenda-widget.show {
@@ -905,17 +906,35 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
         widgetEl.className = 'show';
       }
 
+      // The widget sits 11vmin up, clear of immich-kiosk's date line, and the pill just above the widget when it
+      // shows. A photo with a description (shown in the metadata block at the bottom) lifts both above that block.
+      function placeOverlays() {
+        var vmin = Math.min(window.innerWidth, window.innerHeight) / 100;
+        var bottom = 11 * vmin;
+        var doc = rendererSuspended ? null : iframeDocument();
+        var frames = doc ? doc.querySelectorAll('.frame') : [];
+        var description = frames.length && frames[frames.length - 1].querySelector('.asset--metadata--description');
+        var block = description && description.offsetHeight ? description.closest('.asset--metadata') : null;
+        if (block) {
+          var top = block.getBoundingClientRect().top + iframe.getBoundingClientRect().top;
+          bottom = Math.max(bottom, window.innerHeight - top + 2 * vmin);
+        }
+        var widgetBottom = Math.round(bottom) + 'px';
+        var noticeBottom = Math.round(agenda.widget ? bottom + widgetEl.offsetHeight + 1.5 * vmin : bottom) + 'px';
+        if (widgetEl.style.bottom !== widgetBottom) widgetEl.style.bottom = widgetBottom;
+        if (noticeEl.style.bottom !== noticeBottom) noticeEl.style.bottom = noticeBottom;
+      }
+
       // Keeps the widget current and rotates the pill (fading out before swapping). With the widget on, the
       // pill carries only notices and sits just above the widget; without it, events take turns too.
       function showNextNotice() {
         if (!agendaLoaded) return;
         if (agenda.widget) {
           renderWidget();
-          noticeEl.style.bottom = 'calc(12.5vmin + ' + widgetEl.offsetHeight + 'px)';
         } else {
           widgetEl.className = '';
-          noticeEl.style.bottom = '';
         }
+        placeOverlays();
         var items = noticeItems().concat(agenda.widget ? [] : eventItems());
         if (!items.length) {
           noticeEl.className = '';
@@ -1031,6 +1050,7 @@ export function renderFramePage(device: FrameDevice, options: FramePageOptions =
       loadNotices();
       loadAgenda();
       setInterval(showNextNotice, 8000);
+      setInterval(placeOverlays, 1000); // photos change under the pill between rotations
       if (!previewMode) {
         setInterval(checkVideoStall, 2000);
         setInterval(checkRendererStuck, 5000);

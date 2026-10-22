@@ -1750,6 +1750,7 @@ describe('calendar agenda', () => {
     expect(Object.keys((await server.inject({ method: 'GET', url: '/api/agenda' })).json().data.frames)).toEqual(['kitchen', 'lenovo']);
     const page = await server.inject({ method: 'GET', url: '/f/lenovo' });
     expect(page.body).toContain("listen('agenda', setAgenda)");
+    expect(page.body).toContain("querySelector('.asset--metadata--description')"); // overlays move above photo descriptions
     expect(page.body).toContain('id="agenda-widget"');
     await server.close();
   });
