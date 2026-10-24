@@ -1607,42 +1607,55 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       ));
       return;
     }
+    try {
+      return ok(await runRemoteCommand(device, parsed.data.command));
+    } catch (error) {
+      const remoteError = error as RemoteCommandError;
+      reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
+    }
+  });
+
+  // A FreeKiosk command with what goes with it: Screen Off suspends the renderer first (no image
+  // traffic while dark), captures brightness and mutes the device; Screen On resumes the renderer
+  // and restores brightness. Throws a RemoteCommandError.
+  async function runRemoteCommand(device: FrameDevice, command: FrameCommand): Promise<object> {
+    const deviceId = device.id;
     let rendererSuspend: Awaited<ReturnType<typeof setRendererSuspended>> | undefined;
     let screenOffDispatchStarted = false;
     try {
-      if (parsed.data.command === 'screen-off') {
+      if (command === 'screen-off') {
         rendererSuspend = await setRendererSuspended(deviceId, true);
         requireSuccessfulFrameAck('renderer-suspend', rendererSuspend.frameEvent);
       }
-      const screenOffPreparation = parsed.data.command === 'screen-off'
+      const screenOffPreparation = command === 'screen-off'
         ? await prepareScreenOff(device)
         : undefined;
-      screenOffDispatchStarted = parsed.data.command === 'screen-off';
-      const result = await dispatchRemoteCommand(device, parsed.data.command);
+      screenOffDispatchStarted = command === 'screen-off';
+      const result = await dispatchRemoteCommand(device, command);
       app.log.info({
         deviceId,
-        command: parsed.data.command,
+        command,
         source: result.source,
         target: 'endpoint' in result ? result.endpoint : result.topic,
         screenOffPreparation,
       }, 'FreeKiosk command completed');
-      if (parsed.data.command === 'screen-on') {
+      if (command === 'screen-on') {
         updateFrameRuntimeState(deviceId, { playbackState: 'playing' });
         const rendererResume = await setRendererSuspended(deviceId, false);
         requireSuccessfulFrameAck('renderer-resume', rendererResume.frameEvent);
-        return ok({
+        return {
           ...result,
           rendererResume: rendererTransitionResult(rendererResume),
           brightnessRestore: await restoreBrightnessAfterScreenOn(deviceId),
-        });
+        };
       }
-      return ok(screenOffPreparation
+      return screenOffPreparation
         ? {
             ...result,
             ...screenOffPreparation,
             rendererSuspend: rendererSuspend ? rendererTransitionResult(rendererSuspend) : undefined,
           }
-        : result);
+        : result;
     } catch (error) {
       const remoteError = error instanceof RemoteCommandError
         ? error
@@ -1657,9 +1670,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
       if (shouldRollbackSuspend) {
         updateFrameRuntimeState(deviceId, { rendererSuspended: false });
       }
-      reply.status(remoteError.statusCode).send(fail(remoteError.code, remoteError.message));
+      throw remoteError;
     }
-  });
+  }
 
   app.get('/api/frames/:deviceId/remote/status', async (request, reply) => {
     if (!auth.requireMutationAuth(request, reply)) return;
@@ -1998,7 +2011,7 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     if (!device) return;
     try {
       const sdp = await micStreamCall(device, parsed.data.sdp, await callIceServers());
-      void raiseCallVolume(device);
+      void prepareFrameForCall(device);
       return ok({ sdp });
     } catch (error) {
       sendRemoteFailure(reply, error);
@@ -2011,47 +2024,57 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     if (!device) return;
     try {
       const result = await micStreamRequest(device, 'hangup');
-      void restoreCallVolume(device.id);
+      void restoreFrameAfterCall(device.id);
       return ok(result);
     } catch (error) {
       sendRemoteFailure(reply, error);
     }
   });
 
-  // Frame Mic plays a call at the media volume, which Screen Off sets to 0. A frame quieter than
-  // CALL_MIN_VOLUME is raised to CALL_VOLUME for the call and put back when Frame Mic reports the
-  // call idle again, however it ended (hang-up here, the caller leaving, or a dropped connection).
-  const callVolumes = new Map<string, { restore: number; watch: NodeJS.Timeout }>();
+  // A call should be seen and heard. Frame Mic plays it at the media volume, which Screen Off sets
+  // to 0, so a frame quieter than CALL_MIN_VOLUME is raised to CALL_VOLUME, and a dark frame turns its
+  // screen on (for the On call pill). Both go back once Frame Mic reports the call idle again, however
+  // it ended (hang-up here, the caller leaving, or a dropped connection).
+  const calls = new Map<string, { volume?: number; screenWasOff: boolean; watch: NodeJS.Timeout }>();
 
-  async function raiseCallVolume(device: FrameDevice): Promise<void> {
-    if (callVolumes.has(device.id)) return;
+  async function prepareFrameForCall(device: FrameDevice): Promise<void> {
+    if (calls.has(device.id)) return;
     try {
-      const volume = remoteVolumeValue((await remoteStatusForDevice(device)).status);
-      if (volume === undefined || volume >= CALL_MIN_VOLUME) return;
-      await dispatchRemoteLevel(device, 'volume', CALL_VOLUME);
+      const status = (await remoteStatusForDevice(device)).status;
+      const volume = remoteVolumeValue(status);
+      const raise = volume !== undefined && volume < CALL_MIN_VOLUME;
+      const screenWasOff = isRecord(status) && isRecord(status.screen) && status.screen.on === false;
+      if (!raise && !screenWasOff) return;
       const watch = setInterval(() => {
         micStreamRequest(device, 'status')
-          .then((status) => { if (status.call === 'idle') void restoreCallVolume(device.id); })
+          .then((mic) => { if (mic.call === 'idle') void restoreFrameAfterCall(device.id); })
           .catch(() => undefined);
       }, 5000);
       watch.unref();
-      callVolumes.set(device.id, { restore: volume, watch });
-      app.log.info({ deviceId: device.id, from: volume, to: CALL_VOLUME }, 'Raised frame volume for a call');
+      calls.set(device.id, { volume: raise ? volume : undefined, screenWasOff, watch });
+      // Volume first: Screen On waits a moment before restoring brightness
+      if (raise) await dispatchRemoteLevel(device, 'volume', CALL_VOLUME);
+      if (screenWasOff) await runRemoteCommand(device, 'screen-on');
+      app.log.info({ deviceId: device.id, volume: raise ? `${volume} -> ${CALL_VOLUME}` : undefined, screenOn: screenWasOff }, 'Prepared frame for a call');
     } catch (error) {
-      app.log.warn({ deviceId: device.id, error: error instanceof Error ? error.message : String(error) }, 'Could not raise frame volume for a call');
+      app.log.warn({ deviceId: device.id, error: error instanceof Error ? error.message : String(error) }, 'Could not prepare frame for a call');
     }
   }
 
-  async function restoreCallVolume(deviceId: string): Promise<void> {
-    const call = callVolumes.get(deviceId);
+  async function restoreFrameAfterCall(deviceId: string): Promise<void> {
+    const call = calls.get(deviceId);
     const device = store.getDevice(deviceId);
     if (!call) return;
     clearInterval(call.watch);
-    callVolumes.delete(deviceId);
+    calls.delete(deviceId);
     if (!device) return;
-    await dispatchRemoteLevel(device, 'volume', call.restore)
-      .then(() => app.log.info({ deviceId, to: call.restore }, 'Restored frame volume after a call'))
-      .catch((error) => app.log.warn({ deviceId, error: error instanceof Error ? error.message : String(error) }, 'Could not restore frame volume after a call'));
+    try {
+      if (call.volume !== undefined) await dispatchRemoteLevel(device, 'volume', call.volume);
+      if (call.screenWasOff) await runRemoteCommand(device, 'screen-off');
+      app.log.info({ deviceId, volume: call.volume, screenOff: call.screenWasOff }, 'Restored frame after a call');
+    } catch (error) {
+      app.log.warn({ deviceId, error: error instanceof Error ? error.message : String(error) }, 'Could not restore frame after a call');
+    }
   }
 
   function deviceOrReply(request: FastifyRequest, reply: FastifyReply): FrameDevice | undefined {

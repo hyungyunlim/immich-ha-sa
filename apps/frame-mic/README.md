@@ -33,7 +33,7 @@ The app listens on port `8765`. Every endpoint needs `?k=<key>`.
 
 Streams and calls return `423` while disabled, and `/disable` also ends a call. A new stream request takes the mic over from the previous listener, because players such as nPlayer reconnect with `Range` requests right after the first connection. A call and a stream take the mic from each other the same way.
 
-The controller sends Cloudflare's STUN server with each call, plus short-lived Cloudflare TURN credentials when it has a TURN key, so callers outside the home network can connect too. Without them the caller must reach the frame directly (home network or VPN). The frame cancels its own speaker echo with WebRTC's software echo canceller, and plays the call at the media volume. The controller raises a frame quieter than 40% (Screen Off sets it to 0) to 70% for the call and restores it once the app reports the call idle.
+The controller sends Cloudflare's STUN server with each call, plus short-lived Cloudflare TURN credentials when it has a TURN key, so callers outside the home network can connect too. Without them the caller must reach the frame directly (home network or VPN). The frame cancels its own speaker echo with WebRTC's software echo canceller, and plays the call at the media volume. The controller raises a frame quieter than 40% (Screen Off sets it to 0) to 70% and turns a dark screen on for the call, and restores both once the app reports the call idle.
 
 The app picks the first Android audio source that delivers samples and remembers it. On the Lenovo Smart Frame `VOICE_COMMUNICATION` does not initialize, so it uses `VOICE_RECOGNITION` or `MIC`. Only one app can capture the microphone at a time, so close pages that use `getUserMedia` while listening.
 

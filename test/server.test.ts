@@ -1907,6 +1907,7 @@ describe('frame mic and speaker', () => {
     const seen: Array<{ method?: string; url?: string; type?: string; body: string }> = [];
     let enabled = false;
     let volume = 0; // Screen Off muted the frame
+    let screenOn = false;
     const frame = createHttpServer((request, response) => {
       let raw = '';
       request.on('data', (chunk) => { raw += chunk; });
@@ -1921,11 +1922,16 @@ describe('frame mic and speaker', () => {
         response.setHeader('Content-Type', 'application/json');
         // The same server stands in for FreeKiosk's REST API
         if (url.pathname === '/api/status') {
-          response.end(JSON.stringify({ success: true, data: { audio: { volume } } }));
+          response.end(JSON.stringify({ success: true, data: { audio: { volume }, screen: { on: screenOn } } }));
           return;
         }
         if (url.pathname === '/api/volume') {
           volume = JSON.parse(raw).value;
+          response.end(JSON.stringify({ success: true, data: { executed: true } }));
+          return;
+        }
+        if (url.pathname.startsWith('/api/screen')) {
+          screenOn = url.pathname.endsWith('/on');
           response.end(JSON.stringify({ success: true, data: { executed: true } }));
           return;
         }
@@ -1954,19 +1960,21 @@ describe('frame mic and speaker', () => {
     const answered = await server.inject({ method: 'POST', url: '/api/frames/lenovo/call', payload: { sdp: offer } });
     expect(answered.statusCode).toBe(200);
     expect(answered.json().data.sdp).toBe('v=0\r\no=answer\r\na=end\r\n'); // byte-exact, trailing CRLF kept
-    // A muted frame is raised so the call can be heard, and put back after the hang-up
-    await vi.waitFor(() => expect(volume).toBe(70));
+    // A muted, dark frame is raised and lit for the call, and put back after the hang-up
+    await vi.waitFor(() => expect({ volume, screenOn }).toEqual({ volume: 70, screenOn: true }));
     const hangup = await server.inject({ method: 'DELETE', url: '/api/frames/lenovo/call' });
     expect(hangup.statusCode).toBe(200);
     expect(hangup.json().data.call).toBe('idle');
-    await vi.waitFor(() => expect(volume).toBe(0));
+    await vi.waitFor(() => expect({ volume, screenOn }).toEqual({ volume: 0, screenOn: false }), { timeout: 5000 });
 
-    expect(seen.map(({ method, url }) => `${method} ${url}`).filter((line) => /call|hangup|volume/.test(line))).toEqual([
+    expect(seen.map(({ method, url }) => `${method} ${url}`).filter((line) => /call|hangup|volume|screen/.test(line))).toEqual([
       'POST /call?k=mic-secret',
       'POST /call?k=mic-secret',
       'POST /api/volume',
+      'POST /api/screen/on',
       'GET /hangup?k=mic-secret',
       'POST /api/volume',
+      'POST /api/screen/off',
     ]);
     expect(seen[1]).toMatchObject({ type: 'application/sdp', body: offer });
     await server.close();

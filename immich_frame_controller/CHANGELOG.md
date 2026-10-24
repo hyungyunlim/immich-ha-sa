@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.112
+
+- A frame whose screen is off turns it on when a call is answered, so the *On call* pill shows, and turns it off again when the call ends. Like the call volume from 0.1.111, it goes back however the call ends.
+
 ## 0.1.111
 
 - Calls can be heard on muted frames: Screen Off sets a frame's media volume to 0, and calls play at that volume. When a call starts on a frame below 40%, the controller raises it to 70% and puts it back when Frame Mic reports the call idle (hang-up, the caller leaving, or a dropped connection).
