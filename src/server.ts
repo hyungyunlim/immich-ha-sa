@@ -1997,7 +1997,9 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     const device = deviceOrReply(request, reply);
     if (!device) return;
     try {
-      return ok({ sdp: await micStreamCall(device, parsed.data.sdp, await callIceServers()) });
+      const sdp = await micStreamCall(device, parsed.data.sdp, await callIceServers());
+      void raiseCallVolume(device);
+      return ok({ sdp });
     } catch (error) {
       sendRemoteFailure(reply, error);
     }
@@ -2008,11 +2010,49 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     const device = deviceOrReply(request, reply);
     if (!device) return;
     try {
-      return ok(await micStreamRequest(device, 'hangup'));
+      const result = await micStreamRequest(device, 'hangup');
+      void restoreCallVolume(device.id);
+      return ok(result);
     } catch (error) {
       sendRemoteFailure(reply, error);
     }
   });
+
+  // Frame Mic plays a call at the media volume, which Screen Off sets to 0. A frame quieter than
+  // CALL_MIN_VOLUME is raised to CALL_VOLUME for the call and put back when Frame Mic reports the
+  // call idle again, however it ended (hang-up here, the caller leaving, or a dropped connection).
+  const callVolumes = new Map<string, { restore: number; watch: NodeJS.Timeout }>();
+
+  async function raiseCallVolume(device: FrameDevice): Promise<void> {
+    if (callVolumes.has(device.id)) return;
+    try {
+      const volume = remoteVolumeValue((await remoteStatusForDevice(device)).status);
+      if (volume === undefined || volume >= CALL_MIN_VOLUME) return;
+      await dispatchRemoteLevel(device, 'volume', CALL_VOLUME);
+      const watch = setInterval(() => {
+        micStreamRequest(device, 'status')
+          .then((status) => { if (status.call === 'idle') void restoreCallVolume(device.id); })
+          .catch(() => undefined);
+      }, 5000);
+      watch.unref();
+      callVolumes.set(device.id, { restore: volume, watch });
+      app.log.info({ deviceId: device.id, from: volume, to: CALL_VOLUME }, 'Raised frame volume for a call');
+    } catch (error) {
+      app.log.warn({ deviceId: device.id, error: error instanceof Error ? error.message : String(error) }, 'Could not raise frame volume for a call');
+    }
+  }
+
+  async function restoreCallVolume(deviceId: string): Promise<void> {
+    const call = callVolumes.get(deviceId);
+    const device = store.getDevice(deviceId);
+    if (!call) return;
+    clearInterval(call.watch);
+    callVolumes.delete(deviceId);
+    if (!device) return;
+    await dispatchRemoteLevel(device, 'volume', call.restore)
+      .then(() => app.log.info({ deviceId, to: call.restore }, 'Restored frame volume after a call'))
+      .catch((error) => app.log.warn({ deviceId, error: error instanceof Error ? error.message : String(error) }, 'Could not restore frame volume after a call'));
+  }
 
   function deviceOrReply(request: FastifyRequest, reply: FastifyReply): FrameDevice | undefined {
     const { deviceId } = request.params as { deviceId: string };
@@ -3188,6 +3228,9 @@ async function setRemoteAutoBrightness(
 }
 
 const MIC_STREAM_DEFAULT_PORT = 8765;
+// ponytail: fixed call loudness; make it a device setting if a frame turns out too loud or too quiet
+const CALL_MIN_VOLUME = 40;
+const CALL_VOLUME = 70;
 type MicStreamAction = 'status' | 'enable' | 'disable' | 'hangup' | 'notify?on=1' | 'notify?on=0';
 
 // The Frame Mic app runs next to FreeKiosk, so it shares the host of the frame's REST endpoint.

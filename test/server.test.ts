@@ -1906,6 +1906,7 @@ describe('frame mic and speaker', () => {
     tempDirs.push(dir);
     const seen: Array<{ method?: string; url?: string; type?: string; body: string }> = [];
     let enabled = false;
+    let volume = 0; // Screen Off muted the frame
     const frame = createHttpServer((request, response) => {
       let raw = '';
       request.on('data', (chunk) => { raw += chunk; });
@@ -1918,6 +1919,16 @@ describe('frame mic and speaker', () => {
           return;
         }
         response.setHeader('Content-Type', 'application/json');
+        // The same server stands in for FreeKiosk's REST API
+        if (url.pathname === '/api/status') {
+          response.end(JSON.stringify({ success: true, data: { audio: { volume } } }));
+          return;
+        }
+        if (url.pathname === '/api/volume') {
+          volume = JSON.parse(raw).value;
+          response.end(JSON.stringify({ success: true, data: { executed: true } }));
+          return;
+        }
         response.end(JSON.stringify({ version: '0.6', enabled, call: 'idle' }));
       });
     });
@@ -1943,14 +1954,19 @@ describe('frame mic and speaker', () => {
     const answered = await server.inject({ method: 'POST', url: '/api/frames/lenovo/call', payload: { sdp: offer } });
     expect(answered.statusCode).toBe(200);
     expect(answered.json().data.sdp).toBe('v=0\r\no=answer\r\na=end\r\n'); // byte-exact, trailing CRLF kept
+    // A muted frame is raised so the call can be heard, and put back after the hang-up
+    await vi.waitFor(() => expect(volume).toBe(70));
     const hangup = await server.inject({ method: 'DELETE', url: '/api/frames/lenovo/call' });
     expect(hangup.statusCode).toBe(200);
     expect(hangup.json().data.call).toBe('idle');
+    await vi.waitFor(() => expect(volume).toBe(0));
 
-    expect(seen.map(({ method, url }) => `${method} ${url}`)).toEqual([
+    expect(seen.map(({ method, url }) => `${method} ${url}`).filter((line) => /call|hangup|volume/.test(line))).toEqual([
       'POST /call?k=mic-secret',
       'POST /call?k=mic-secret',
+      'POST /api/volume',
       'GET /hangup?k=mic-secret',
+      'POST /api/volume',
     ]);
     expect(seen[1]).toMatchObject({ type: 'application/sdp', body: offer });
     await server.close();

@@ -54,7 +54,7 @@ The **Calls** tab of the **Frames** panel in the Home Assistant sidebar calls a 
 - Leaving the panel hangs up. A call and a Frame Mic stream share the microphone, so whichever starts last takes it over.
 - The frame cancels its own speaker echo in software. If the other side hears an echo, mute yourself while listening.
 
-The call plays at the frame's media volume, the same one the slideshow and the Frame Speaker use.
+The call plays at the frame's media volume, the same one the slideshow and the Frame Speaker use. Screen Off sets that volume to 0, so when a frame is below 40% the controller raises it to 70% for the call and puts it back when the call ends, however it ends.
 
 ### Calls from outside
 

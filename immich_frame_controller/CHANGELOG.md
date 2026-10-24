@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.111
+
+- Calls can be heard on muted frames: Screen Off sets a frame's media volume to 0, and calls play at that volume. When a call starts on a frame below 40%, the controller raises it to 70% and puts it back when Frame Mic reports the call idle (hang-up, the caller leaving, or a dropped connection).
+
 ## 0.1.110
 
 - Notices and the calendar widget move up above a photo's description (the scrolling caption at the bottom) while it shows, and back down for photos without one, instead of covering it.
