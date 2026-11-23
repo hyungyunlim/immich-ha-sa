@@ -838,6 +838,27 @@ describe('controller API', () => {
     await server.close();
   });
 
+  it('edits and deletes a device whose id has uppercase letters from DEFAULT_FRAME_ID', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
+    tempDirs.push(dir);
+    const config = buildConfig(dir);
+    const headers = { host: '10.0.0.10:18082' };
+
+    let server = createTestServer({ config: { ...config, defaultDevice: { ...config.defaultDevice, id: 'FireHD' } } });
+    const renamed = await server.inject({ method: 'PATCH', url: '/api/devices/FireHD', headers, payload: { name: 'Fire HD' } });
+    expect(renamed.statusCode).toBe(200);
+    expect(renamed.json().data.device).toMatchObject({ id: 'FireHD', name: 'Fire HD' });
+    expect((await server.inject({ method: 'DELETE', url: '/api/devices/FireHD', headers })).json().error.code).toBe('DEFAULT_DEVICE');
+    await server.close();
+
+    server = createTestServer({ config });
+    const deleted = await server.inject({ method: 'DELETE', url: '/api/devices/FireHD', headers });
+    expect(deleted.statusCode).toBe(200);
+    expect(deleted.json().data).toEqual({ deleted: true, deviceId: 'FireHD' });
+    expect((await server.inject({ method: 'GET', url: '/frame/FireHD' })).statusCode).toBe(404);
+    await server.close();
+  });
+
   it('preserves device URLs when patching remote settings only', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'immich-frame-api-'));
     tempDirs.push(dir);

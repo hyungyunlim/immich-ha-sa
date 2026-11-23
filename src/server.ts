@@ -1357,28 +1357,25 @@ export function createServer(deps: ServerDeps): FastifyInstance {
     });
   });
 
+  // Existing devices are looked up by their stored id as-is, like every other :deviceId route.
+  // DeviceIdSchema lowercases new ids only; DEFAULT_FRAME_ID may carry uppercase (issue #1).
   app.patch('/api/devices/:deviceId', async (request, reply) => {
     if (!requireLocalConsoleAccess(request, reply)) return;
     const { deviceId } = request.params as { deviceId: string };
-    const parsedDeviceId = DeviceIdSchema.safeParse(deviceId);
-    if (!parsedDeviceId.success) {
-      reply.status(400).send(fail('VALIDATION_ERROR', parsedDeviceId.error.errors[0]?.message ?? 'Invalid device id.'));
-      return;
-    }
     const parsed = DevicePatchSchema.safeParse(request.body);
     if (!parsed.success) {
       reply.status(400).send(fail('VALIDATION_ERROR', parsed.error.errors[0]?.message ?? 'Invalid device.'));
       return;
     }
     const patch = normalizeDevicePatch(parsed.data);
-    const topicConflict = mqttTopicConflict(patch.mqttTopicId, parsedDeviceId.data);
+    const topicConflict = mqttTopicConflict(patch.mqttTopicId, deviceId);
     if (topicConflict) {
       reply.status(409).send(fail('MQTT_TOPIC_BOUND', `MQTT topic "${patch.mqttTopicId}" is already bound to device ${topicConflict.id}. Unbind it there first.`));
       return;
     }
-    const updated = store.updateDevice(parsedDeviceId.data, patch);
+    const updated = store.updateDevice(deviceId, patch);
     if (!updated) {
-      reply.status(404).send(fail('DEVICE_NOT_FOUND', `Device not found: ${parsedDeviceId.data}`));
+      reply.status(404).send(fail('DEVICE_NOT_FOUND', `Device not found: ${deviceId}`));
       return;
     }
     const state = store.getFrameState(updated.id);
@@ -1403,20 +1400,15 @@ export function createServer(deps: ServerDeps): FastifyInstance {
   app.delete('/api/devices/:deviceId', async (request, reply) => {
     if (!requireLocalConsoleAccess(request, reply)) return;
     const { deviceId } = request.params as { deviceId: string };
-    const parsedDeviceId = DeviceIdSchema.safeParse(deviceId);
-    if (!parsedDeviceId.success) {
-      reply.status(400).send(fail('VALIDATION_ERROR', parsedDeviceId.error.errors[0]?.message ?? 'Invalid device id.'));
-      return;
-    }
-    if (parsedDeviceId.data === deps.config.defaultDevice.id) {
+    if (deviceId === deps.config.defaultDevice.id) {
       reply.status(400).send(fail('DEFAULT_DEVICE', 'The default device cannot be deleted.'));
       return;
     }
-    if (!store.deleteDevice(parsedDeviceId.data)) {
-      reply.status(404).send(fail('DEVICE_NOT_FOUND', `Device not found: ${parsedDeviceId.data}`));
+    if (!store.deleteDevice(deviceId)) {
+      reply.status(404).send(fail('DEVICE_NOT_FOUND', `Device not found: ${deviceId}`));
       return;
     }
-    return ok({ deleted: true, deviceId: parsedDeviceId.data });
+    return ok({ deleted: true, deviceId });
   });
 
   app.get('/frame/:deviceId', async (request, reply) => {

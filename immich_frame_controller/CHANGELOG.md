@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.113
+
+- Devices whose id has uppercase letters, such as one created from `default_frame_id: FireHD`, can be edited and deleted in the setup console again. Editing and deleting looked the id up in lowercase and reported *Device not found*. ([#1](https://github.com/hyungyunlim/immich-ha-sa/issues/1))
+
 ## 0.1.112
 
 - A frame whose screen is off turns it on when a call is answered, so the *On call* pill shows, and turns it off again when the call ends. Like the call volume from 0.1.111, it goes back however the call ends.
