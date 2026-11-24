@@ -1649,6 +1649,10 @@ describe('controller API', () => {
     expect(css.body).toContain('--ifc-description-scroll-duration');
     expect(css.body).toContain('immich-frame-description-is-long');
     expect(css.body).toContain('immich-frame-description-slide-up');
+    // An !important transform on the text outranks the slide-up animation in modern Chromium.
+    const textRule = css.body.match(/\n\.asset--metadata--description small \{[^}]*\}/)?.[0] ?? '';
+    expect(textRule).toContain('transform: none;');
+    expect(textRule).not.toContain('transform: none !important');
 
     const javascript = await server.inject({
       method: 'GET',

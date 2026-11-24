@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.114
+
+- Long photo descriptions scroll again on frames with a recent Android WebView (Chromium 97 and later). The caption's slide-up animation ran, but a leftover style held the text in place, so only older WebViews such as the Lenovo Smart Frame's showed it moving.
+
 ## 0.1.113
 
 - Devices whose id has uppercase letters, such as one created from `default_frame_id: FireHD`, can be edited and deleted in the setup console again. Editing and deleting looked the id up in lowercase and reported *Device not found*. ([#1](https://github.com/hyungyunlim/immich-ha-sa/issues/1))

@@ -3726,7 +3726,8 @@ const KIOSK_PROXY_COMPAT_CSS = `
   line-height: 1.45 !important;
   overflow-wrap: anywhere !important;
   white-space: normal !important;
-  transform: none !important;
+  /* Not !important: an !important transform beats the slide-up animation in Chromium 97+ (WebView 120 froze the text). */
+  transform: none;
 }
 .asset--metadata--description.immich-frame-description-is-long small {
   animation-name: immich-frame-description-slide-up;
