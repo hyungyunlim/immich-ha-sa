@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.116
+
+- The first frame is set up without a pairing code too. When the controller runs as a Home Assistant add-on, it offers itself to Home Assistant through Supervisor discovery: **Settings → Devices & services** shows *Discovered: Immich Frame Controller*, and **Configure** goes straight to choosing a frame. Update both the add-on and the integration.
+- Controllers already paired with a code are left as they are and send no discovery. The standalone Docker controller still pairs with a code.
+
 ## 0.1.115
 
 - Adding another frame from a controller that already has one in Home Assistant no longer asks for a pairing code. The integration reuses the controller token it already holds, prefills the controller URL, and lists only the frames not added yet. If that token stops working (for example after the add-on's data is reset), it asks for a pairing code as before.
