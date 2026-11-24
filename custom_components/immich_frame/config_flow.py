@@ -36,11 +36,8 @@ class InvalidPairingCode(Exception):
 DEFAULT_ADDON_CONTROLLER_URL = "http://homeassistant.local:8082"
 CONF_SETUP_URL = "setup_url"
 
-CONNECT_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_CONTROLLER_URL, default=DEFAULT_ADDON_CONTROLLER_URL): str,
-    }
-)
+def connect_schema(default_url: str) -> vol.Schema:
+    return vol.Schema({vol.Required(CONF_CONTROLLER_URL, default=default_url): str})
 
 
 def normalize_connection_data(data: dict[str, Any]) -> dict[str, str]:
@@ -204,12 +201,22 @@ class ImmichFrameConfigFlow(ConfigFlow, domain=DOMAIN):
     _api_token: str | None = None
     _devices: list[dict[str, Any]]
     _device_manual_reason: str | None
+    _token_reused: bool
 
     def __init__(self) -> None:
         self._connection_data = None
         self._api_token = None
         self._devices = []
         self._device_manual_reason = None
+        self._token_reused = False
+
+    def _stored_api_token(self, controller_url: str) -> str | None:
+        # The controller token is controller-wide, so a frame already added for
+        # this URL means Home Assistant is paired and needs no new code.
+        for entry in self._async_current_entries(include_ignore=False):
+            if entry.data.get(CONF_CONTROLLER_URL) == controller_url and entry.data.get(CONF_API_TOKEN):
+                return str(entry.data[CONF_API_TOKEN])
+        return None
 
     async def async_step_user(
         self,
@@ -224,11 +231,24 @@ class ImmichFrameConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors[CONF_CONTROLLER_URL] = "invalid_url"
             else:
                 self._connection_data = {CONF_CONTROLLER_URL: data[CONF_CONTROLLER_URL]}
+                self._api_token = self._stored_api_token(data[CONF_CONTROLLER_URL])
+                if self._api_token:
+                    self._token_reused = True
+                    return await self._async_step_load_devices({})
                 return await self.async_step_pair()
 
+        # Most homes run one controller: offer the URL of the frame already added.
+        default_url = next(
+            (
+                str(entry.data[CONF_CONTROLLER_URL])
+                for entry in self._async_current_entries(include_ignore=False)
+                if entry.data.get(CONF_CONTROLLER_URL)
+            ),
+            DEFAULT_ADDON_CONTROLLER_URL,
+        )
         return self.async_show_form(
             step_id="user",
-            data_schema=CONNECT_SCHEMA,
+            data_schema=connect_schema(default_url),
             errors=errors,
         )
 
@@ -260,23 +280,35 @@ class ImmichFrameConfigFlow(ConfigFlow, domain=DOMAIN):
                 except Exception:
                     errors["base"] = "unknown"
                 else:
-                    try:
-                        self._devices = await fetch_devices(
-                            self.hass,
-                            self._connection_data[CONF_CONTROLLER_URL],
-                            self._api_token,
-                        )
-                    except InvalidAuth:
-                        errors["base"] = "invalid_auth"
-                    except Exception:
-                        self._device_manual_reason = "cannot_load_devices"
-                        return await self.async_step_device_manual()
-                    else:
-                        if self._devices:
-                            return await self.async_step_device()
-                        self._device_manual_reason = "no_devices"
-                        return await self.async_step_device_manual()
+                    return await self._async_step_load_devices(errors)
 
+        return self._show_pair_form(errors)
+
+    async def _async_step_load_devices(self, errors: dict[str, str]) -> ConfigFlowResult:
+        controller_url = self._connection_data[CONF_CONTROLLER_URL]
+        try:
+            devices = await fetch_devices(self.hass, controller_url, self._api_token)
+        except InvalidAuth:
+            errors["base"] = "invalid_auth"
+            return self._show_pair_form(errors)
+        except Exception:
+            self._device_manual_reason = "cannot_load_devices"
+            return await self.async_step_device_manual()
+
+        added = {
+            entry.data.get(CONF_DEVICE_ID)
+            for entry in self._async_current_entries(include_ignore=False)
+            if entry.data.get(CONF_CONTROLLER_URL) == controller_url
+        }
+        self._devices = [device for device in devices if str(device.get("id")) not in added]
+        if self._devices:
+            return await self.async_step_device()
+        if devices:
+            return self.async_abort(reason="all_devices_configured")
+        self._device_manual_reason = "no_devices"
+        return await self.async_step_device_manual()
+
+    def _show_pair_form(self, errors: dict[str, str]) -> ConfigFlowResult:
         return self.async_show_form(
             step_id="pair",
             data_schema=pair_schema(self._connection_data[CONF_CONTROLLER_URL]),
@@ -384,6 +416,11 @@ class ImmichFrameConfigFlow(ConfigFlow, domain=DOMAIN):
         except InvalidPairingCode:
             errors["base"] = "invalid_pairing_code"
         except InvalidAuth:
+            if self._token_reused:
+                # The controller lost its tokens (e.g. add-on data reset): pair again.
+                self._token_reused = False
+                self._api_token = None
+                return self._show_pair_form({"base": "invalid_auth"}), {}
             errors["base"] = "invalid_auth"
         except Exception:
             errors["base"] = "unknown"

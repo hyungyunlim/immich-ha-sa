@@ -18,6 +18,8 @@ http://<controller-host>:8082/setup
 
 When pairing succeeds, Home Assistant stores the issued controller API token in the config entry. You normally never need `controller_api_token`; it exists only as a static fallback.
 
+Adding more frames from the same controller reuses the stored token, so you never enter a code again: confirm the URL and pick the frame.
+
 ::: warning Pair before exposing externally
 Complete pairing while the controller is reachable only on the LAN, before exposing it through a [tunnel](./remote-frames). The setup page rejects requests that arrive on the configured external controller host.
 :::

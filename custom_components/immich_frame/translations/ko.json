@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Immich Frame Controller",
-        "description": "Controller URL을 입력하세요. Pairing 후 프레임 device를 선택합니다.",
+        "description": "Controller URL을 입력하세요. 이 컨트롤러의 액자를 이미 추가했다면 페어링 없이 바로 액자를 선택합니다.",
         "data": {
           "controller_url": "Controller URL"
         }
@@ -43,7 +43,8 @@
       "unknown": "예상하지 못한 오류가 발생했습니다."
     },
     "abort": {
-      "already_configured": "이 프레임 컨트롤러는 이미 설정되어 있습니다."
+      "already_configured": "이 프레임 컨트롤러는 이미 설정되어 있습니다.",
+      "all_devices_configured": "이 컨트롤러의 액자는 모두 추가되어 있습니다."
     }
   }
 }

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Immich Frame Controller",
-        "description": "Enter the controller URL. You will choose a frame device after pairing.",
+        "description": "Enter the controller URL. If a frame from this controller is already added, pairing is skipped.",
         "data": {
           "controller_url": "Controller URL"
         }
@@ -43,7 +43,8 @@
       "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "This frame controller is already configured."
+      "already_configured": "This frame controller is already configured.",
+      "all_devices_configured": "Every frame on this controller is already added."
     }
   }
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.115
+
+- Adding another frame from a controller that already has one in Home Assistant no longer asks for a pairing code. The integration reuses the controller token it already holds, prefills the controller URL, and lists only the frames not added yet. If that token stops working (for example after the add-on's data is reset), it asks for a pairing code as before.
+- Integration-only change; the controller is unchanged apart from the version.
+
 ## 0.1.114
 
 - Long photo descriptions scroll again on frames with a recent Android WebView (Chromium 97 and later). The caption's slide-up animation ran, but a leftover style held the text in place, so only older WebViews such as the Lenovo Smart Frame's showed it moving.
