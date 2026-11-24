@@ -20,6 +20,10 @@ HACS는 최신 GitHub 릴리스 태그 버전을 설치합니다. 업데이트�
 
 ## 3. 통합 추가
 
+::: tip 애드온을 쓰고 있다면
+재시작 후 **설정 → 기기 및 서비스**에 **발견됨: Immich Frame Controller**가 표시됩니다. **구성**을 누르고 확인한 뒤 액자를 고르면 됩니다. URL도 [페어링 코드](./pairing)도 필요 없습니다.
+:::
+
 [![Add integration to my Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=immich_frame)
 
 또는 **설정 → 기기 및 서비스 → 통합구성요소 추가 → Immich Frame Controller**로 이동해 다음을 입력합니다:

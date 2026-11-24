@@ -1,5 +1,6 @@
 {
   "config": {
+    "flow_title": "{name}",
     "step": {
       "user": {
         "title": "Immich Frame Controller",
@@ -30,6 +31,10 @@
         "data": {
           "device_id": "Device ID"
         }
+      },
+      "hassio_confirm": {
+        "title": "Immich Frame Controller 애드온",
+        "description": "{addon} 애드온에 연결할까요? 페어링 코드 없이 연결되며, 다음 단계에서 액자를 선택합니다."
       }
     },
     "error": {

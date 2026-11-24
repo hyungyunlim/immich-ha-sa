@@ -142,6 +142,10 @@ export class JsonStore {
     return this.data.auth.pairing ? structuredClone(this.data.auth.pairing) : undefined;
   }
 
+  getDiscoveryToken(): string | undefined {
+    return this.data.auth.discoveryToken;
+  }
+
   /** Notices that have not expired, oldest first. */
   getNotices(): FrameNotice[] {
     const now = Date.now();
@@ -230,6 +234,11 @@ export class JsonStore {
     } else {
       delete this.data.auth.pairing;
     }
+    this.save();
+  }
+
+  setDiscoveryToken(token: string): void {
+    this.data.auth.discoveryToken = token;
     this.save();
   }
 
@@ -372,6 +381,7 @@ export class JsonStore {
           ...(data.auth?.tokens ?? {}),
         },
         pairing: data.auth?.pairing,
+        discoveryToken: data.auth?.discoveryToken,
       },
     };
   }

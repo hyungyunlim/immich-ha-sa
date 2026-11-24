@@ -5,6 +5,7 @@ import type { JsonStore } from './store.js';
 
 const PAIRING_TTL_MS = 15 * 60 * 1000;
 const PAIRING_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const DISCOVERY_TOKEN_ID = 'supervisor-discovery';
 
 interface ActivePairingCode {
   code: string;
@@ -65,18 +66,34 @@ export class ControllerAuthManager {
     const codeHash = hashSecret(normalizePairingCode(pairingCode));
     if (!safeHashEquals(pairing.codeHash, codeHash)) return undefined;
 
-    const apiToken = `ifha_${randomBytes(32).toString('base64url')}`;
     const tokenId = randomBytes(8).toString('hex');
-    const createdAt = new Date().toISOString();
-    this.store.upsertAuthToken({
-      id: tokenId,
-      name,
-      tokenHash: hashSecret(apiToken),
-      createdAt,
-    });
+    const { apiToken, createdAt } = this.issueToken(tokenId, name);
     this.activePairingCode = undefined;
     this.store.setPairingState(undefined);
     return { apiToken, tokenId, createdAt };
+  }
+
+  /**
+   * The token Supervisor discovery hands to Home Assistant, so the first frame
+   * is added without a pairing code. It is kept and resent on every start,
+   * because config entries store it. A controller already paired by hand gets
+   * none: no extra credential, and auth is not switched on under entries that
+   * never needed a token.
+   */
+  ensureDiscoveryToken(): string | undefined {
+    const existing = this.store.getDiscoveryToken();
+    if (existing) return existing;
+    if (this.status().paired) return undefined;
+    const { apiToken } = this.issueToken(DISCOVERY_TOKEN_ID, 'Home Assistant (discovery)');
+    this.store.setDiscoveryToken(apiToken);
+    return apiToken;
+  }
+
+  private issueToken(id: string, name: string): { apiToken: string; createdAt: string } {
+    const apiToken = `ifha_${randomBytes(32).toString('base64url')}`;
+    const createdAt = new Date().toISOString();
+    this.store.upsertAuthToken({ id, name, tokenHash: hashSecret(apiToken), createdAt });
+    return { apiToken, createdAt };
   }
 
   requireMutationAuth(request: FastifyRequest, reply: FastifyReply): boolean {

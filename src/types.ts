@@ -324,6 +324,8 @@ export interface FrameClaim {
 export interface ControllerAuth {
   tokens: Record<string, ControllerApiToken>;
   pairing?: ControllerPairingState;
+  /** Plaintext of the token sent to Home Assistant through Supervisor discovery; resent on every start. */
+  discoveryToken?: string;
 }
 
 export interface ControllerApiToken {

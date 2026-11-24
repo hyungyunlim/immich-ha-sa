@@ -20,6 +20,10 @@ The integration adds a **Frames** panel to the sidebar for [calls](./speaker-mic
 
 ## 3. Add the integration
 
+::: tip Running the add-on?
+After the restart, **Settings → Devices & services** shows **Discovered: Immich Frame Controller**. Select **Configure**, confirm, and pick a frame: no URL or [pairing code](./pairing) needed.
+:::
+
 [![Add integration to my Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=immich_frame)
 
 Or go to **Settings → Devices & services → Add integration → Immich Frame Controller**, then enter:

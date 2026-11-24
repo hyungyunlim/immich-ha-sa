@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import ClientError
 import voluptuous as vol
@@ -19,6 +19,9 @@ from .const import (
     DEFAULT_DEVICE_ID,
     DOMAIN,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 
 class CannotConnect(Exception):
@@ -250,6 +253,34 @@ class ImmichFrameConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=connect_schema(default_url),
             errors=errors,
+        )
+
+    async def async_step_hassio(self, discovery_info: HassioServiceInfo) -> ConfigFlowResult:
+        """The controller add-on offered itself and a token through Supervisor discovery."""
+        # ponytail: one add-on per Home Assistant, so any configured frame means it is set up.
+        if self._async_current_entries(include_ignore=False):
+            return self.async_abort(reason="already_configured")
+        await self.async_set_unique_id(discovery_info.uuid)
+        self._abort_if_unique_id_configured()
+
+        self._connection_data = {
+            CONF_CONTROLLER_URL: str(discovery_info.config["url"]).rstrip("/"),
+        }
+        self._api_token = str(discovery_info.config["api_token"])
+        # A rejected token falls back to the pairing form, as for a reused one.
+        self._token_reused = True
+        self.context["title_placeholders"] = {"name": discovery_info.name}
+        return await self.async_step_hassio_confirm()
+
+    async def async_step_hassio_confirm(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return await self._async_step_load_devices({})
+        return self.async_show_form(
+            step_id="hassio_confirm",
+            description_placeholders={"addon": self.context["title_placeholders"]["name"]},
         )
 
     async def async_step_pair(

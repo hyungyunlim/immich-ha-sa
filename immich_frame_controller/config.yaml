@@ -22,6 +22,8 @@ ports_description:
 webui: http://[HOST]:[PORT:8080]/
 watchdog: http://[HOST]:[PORT:8080]/api/health
 hassio_api: true
+discovery:
+  - immich_frame
 services:
   - mqtt:want
 options:

@@ -6,6 +6,8 @@ Two pairings happen once each: Home Assistant pairs with the controller, and eac
 
 The integration authenticates to the controller with an API token issued through a short pairing code — no manual token copying, no SSH.
 
+With the [add-on](./addon-install) you don't need the code either. Home Assistant discovers the add-on when it starts: **Settings → Devices & services** shows **Discovered: Immich Frame Controller**. Select **Configure**, confirm, and pick a frame. The code steps below are for the standalone container, or for a controller that was already paired with a code (it isn't offered for discovery).
+
 1. Start the [add-on](./addon-install) (or the standalone container).
 2. In the integration config flow, after entering the controller URL, the pairing step appears.
 3. Open the setup page link shown by Home Assistant — or the prefilled Setup URL:
