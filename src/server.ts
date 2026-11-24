@@ -3866,9 +3866,21 @@ const KIOSK_PROXY_COMPAT_JS = `
       api.startPolling();
     }
 
+    // immich-kiosk pauses its progress loop before an asset request (setRequestLock), but only for unproxied
+    // paths. Without this, Previous left the old loop running next to the restarted one: Pause stopped one,
+    // Play was ignored, and the survivor advanced the slideshow anyway.
+    function stopPolling() {
+      var api = window.kiosk;
+      if (!api || typeof api.stopPolling !== 'function') return;
+      api.stopPolling();
+    }
+
     function attach() {
       var target = document.body || document.documentElement;
       if (!target || typeof target.addEventListener !== 'function') return;
+      target.addEventListener('htmx:beforeRequest', function (event) {
+        if (shouldStartPolling(event)) stopPolling();
+      });
       target.addEventListener('htmx:afterRequest', function (event) {
         if (shouldStartPolling(event)) startPolling();
       });

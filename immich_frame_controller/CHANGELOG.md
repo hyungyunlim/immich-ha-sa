@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.117
+
+- After Previous, Pause holds and Play resumes again. The slideshow kept a second progress timer running after going back a photo, so Pause stopped only one of them: Play was reported as failed, and the leftover timer moved on to the next photo by itself a few seconds later.
+
 ## 0.1.116
 
 - The first frame is set up without a pairing code too. When the controller runs as a Home Assistant add-on, it offers itself to Home Assistant through Supervisor discovery: **Settings → Devices & services** shows *Discovered: Immich Frame Controller*, and **Configure** goes straight to choosing a frame. Update both the add-on and the integration.

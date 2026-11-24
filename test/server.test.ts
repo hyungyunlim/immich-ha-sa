@@ -1669,6 +1669,20 @@ describe('controller API', () => {
     expect(javascript.body).toContain('early/proxied immich-kiosk asset request lifecycle compatibility');
     expect(javascript.body).toContain('EXACT_ASSET_REQUEST_PATH = /^\\/asset\\/(new|offline|previous)$/');
     expect(javascript.body).toContain('/^\\/kiosk-proxy\\/[^/]+\\/asset\\/(new|offline|previous)$/');
+    // A proxied asset request stops immich-kiosk's progress loop before it starts and restarts it after,
+    // so Previous never leaves two loops running (Pause then Play was rejected).
+    const lifecycle = javascript.body.match(/function installProxyAssetLifecycle\(\) \{[\s\S]*?\n {2}\}\n/)?.[0];
+    expect(lifecycle).toBeTruthy();
+    const listeners: Record<string, (event: unknown) => void> = {};
+    const calls: string[] = [];
+    const fakeDocument = { readyState: 'complete', body: { addEventListener: (type: string, fn: (event: unknown) => void) => { listeners[type] = fn; } } };
+    const fakeWindow = { kiosk: { stopPolling: () => calls.push('stop'), startPolling: () => calls.push('start') } };
+    new Function('document', 'window', `${lifecycle}; installProxyAssetLifecycle();`)(fakeDocument, fakeWindow);
+    const request = (path: string) => ({ detail: { pathInfo: { requestPath: path } } });
+    listeners['htmx:beforeRequest'](request('/kiosk-proxy/lenovo/asset/previous'));
+    listeners['htmx:afterRequest'](request('/kiosk-proxy/lenovo/asset/previous'));
+    listeners['htmx:beforeRequest'](request('/kiosk-proxy/lenovo/weather'));
+    expect(calls).toEqual(['stop', 'start']);
     expect(javascript.body).toContain('image description overflow helper');
     expect(javascript.body).toContain('ifc_description_scroll_duration');
     expect(javascript.body).toContain('ifc_description_scroll_speed');
