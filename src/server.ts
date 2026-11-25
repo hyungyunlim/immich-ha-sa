@@ -2707,8 +2707,7 @@ function freeKioskMqttCommandPublication(
     case 'volume-down': {
       const volume = remoteVolumeValue(cachedState);
       if (volume === undefined) return undefined;
-      const next = Math.max(0, Math.min(100, volume + (command === 'volume-up' ? REMOTE_VOLUME_STEP : -REMOTE_VOLUME_STEP)));
-      return { suffix: 'volume', payload: String(next) };
+      return { suffix: 'volume', payload: String(steppedRemoteVolume(volume, command)) };
     }
     case 'device-mute-toggle': {
       const muted = remoteDeviceMutedValue(cachedState);
@@ -2725,6 +2724,10 @@ function freeKioskMqttCommandPublication(
       };
     }
   }
+}
+
+function steppedRemoteVolume(volume: number, command: 'volume-up' | 'volume-down'): number {
+  return Math.max(0, Math.min(100, volume + (command === 'volume-up' ? REMOTE_VOLUME_STEP : -REMOTE_VOLUME_STEP)));
 }
 
 function remoteVolumeValue(status: unknown): number | undefined {
@@ -2772,6 +2775,32 @@ async function sendRemoteCommand(
     } catch {
       // Older FreeKiosk builds or non-controller pages can still be driven by the native key endpoints.
     }
+  }
+
+  if (command === 'volume-up' || command === 'volume-down') {
+    // FreeKiosk's volume key reports executed but Android drops it while no media plays (the first press only
+    // asks for a volume panel, which kiosk mode never shows): 8 presses moved a Toss Front 2 of 15 steps.
+    // Step the media volume absolutely instead, from the volume the device reports right now.
+    const status = await sendRemoteRequest(device, '/api/status', { method: 'GET', timeoutMs });
+    const volume = remoteVolumeValue(status.result);
+    if (volume === undefined) {
+      throw new RemoteCommandError('REMOTE_VOLUME_UNAVAILABLE', 'FreeKiosk did not report its media volume.', 502, true);
+    }
+    const endpoint = '/api/volume';
+    const remote = await sendRemoteRequest(device, endpoint, {
+      method: 'POST',
+      body: { value: steppedRemoteVolume(volume, command) },
+      timeoutMs,
+    });
+    return {
+      provider: 'freekiosk',
+      command,
+      endpoint,
+      baseUrl: remote.baseUrl,
+      source: remote.source,
+      statusCode: remote.statusCode,
+      result: remote.result,
+    };
   }
 
   const endpoint = freeKioskEndpoint(command);
@@ -3455,9 +3484,8 @@ function freeKioskEndpoint(command: FrameCommand): string | null {
     case 'screen-off':
       return '/api/screen/off';
     case 'volume-up':
-      return '/api/remote/keyboard/volumeup';
     case 'volume-down':
-      return '/api/remote/keyboard/volumedown';
+      return null; // sendRemoteCommand sets these as an absolute volume
     case 'device-mute-toggle':
       return '/api/remote/keyboard/mute';
     case 'dpad-up':

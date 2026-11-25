@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.118
+
+- Volume Up/Down on a FreeKiosk frame reached over REST now steps the media volume by 10 % from the volume the device reports, instead of pressing a volume key. FreeKiosk reported the key as executed, but Android dropped it while nothing was playing (8 presses moved a Toss Front 2 of 15 steps); a muted frame now comes back up too.
+
 ## 0.1.117
 
 - After Previous, Pause holds and Play resumes again. The slideshow kept a second progress timer running after going back a photo, so Pause stopped only one of them: Play was reported as failed, and the leftover timer moved on to the next photo by itself a few seconds later.

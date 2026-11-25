@@ -972,7 +972,9 @@ describe('controller API', () => {
           apiKey: request.headers['x-api-key'],
         });
         response.setHeader('content-type', 'application/json');
-        response.end(JSON.stringify({ success: true, data: { executed: true, command: 'remoteKey' } }));
+        response.end(JSON.stringify(request.url === '/api/status'
+          ? { success: true, data: { audio: { volume: 13 } } }
+          : { success: true, data: { executed: true, command: 'remoteKey' } }));
       });
     });
     await new Promise<void>((resolve) => remote.listen(0, '127.0.0.1', resolve));
@@ -1008,14 +1010,12 @@ describe('controller API', () => {
       payload: { command: 'volume-up' },
     });
 
+    // An absolute step from the volume the device reports, not a volume key Android may drop.
     expect(volume.statusCode).toBe(200);
-    expect(volume.json().data.endpoint).toBe('/api/remote/keyboard/volumeup');
-    expect(requests).toHaveLength(2);
-    expect(requests[1]).toMatchObject({
-      method: 'POST',
-      url: '/api/remote/keyboard/volumeup',
-      apiKey: 'test-key',
-    });
+    expect(volume.json().data.endpoint).toBe('/api/volume');
+    expect(requests).toHaveLength(3);
+    expect(requests[1]).toMatchObject({ method: 'GET', url: '/api/status', apiKey: 'test-key' });
+    expect(requests[2]).toMatchObject({ method: 'POST', url: '/api/volume', body: { value: 23 }, apiKey: 'test-key' });
 
     const deviceMute = await server.inject({
       method: 'POST',
@@ -1025,8 +1025,8 @@ describe('controller API', () => {
 
     expect(deviceMute.statusCode).toBe(200);
     expect(deviceMute.json().data.endpoint).toBe('/api/remote/keyboard/mute');
-    expect(requests).toHaveLength(3);
-    expect(requests[2]).toMatchObject({
+    expect(requests).toHaveLength(4);
+    expect(requests[3]).toMatchObject({
       method: 'POST',
       url: '/api/remote/keyboard/mute',
       apiKey: 'test-key',
@@ -1040,8 +1040,8 @@ describe('controller API', () => {
 
     expect(dpadUp.statusCode).toBe(200);
     expect(dpadUp.json().data.endpoint).toBe('/api/remote/up');
-    expect(requests).toHaveLength(4);
-    expect(requests[3]).toMatchObject({
+    expect(requests).toHaveLength(5);
+    expect(requests[4]).toMatchObject({
       method: 'POST',
       url: '/api/remote/up',
       apiKey: 'test-key',
@@ -1057,13 +1057,13 @@ describe('controller API', () => {
     expect(mute.json().data.frameEvent).toBeNull();
     expect(mute.json().data.remoteFallback.endpoint).toBe('/api/js');
     expect(mute.json().data.remoteFallback.result.strategy).toBe('webview-js');
-    expect(requests).toHaveLength(5);
-    expect(requests[4]).toMatchObject({
+    expect(requests).toHaveLength(6);
+    expect(requests[5]).toMatchObject({
       method: 'POST',
       url: '/api/js',
       apiKey: 'test-key',
     });
-    expect(requests[4].body).toMatchObject({
+    expect(requests[5].body).toMatchObject({
       code: expect.stringContaining('mute-toggle'),
     });
 
@@ -1079,16 +1079,16 @@ describe('controller API', () => {
     expect(muteOn.json().data.remoteFallback.endpoint).toBe('/api/js');
     expect(muteOn.json().data.remoteFallback.result.strategy).toBe('webview-js');
     expect(store.getFrameState('lenovo')?.kioskVideoMuted).toBe(true);
-    expect(requests).toHaveLength(6);
-    expect(requests[5]).toMatchObject({
+    expect(requests).toHaveLength(7);
+    expect(requests[6]).toMatchObject({
       method: 'POST',
       url: '/api/js',
       apiKey: 'test-key',
     });
-    expect(requests[5].body).toMatchObject({
+    expect(requests[6].body).toMatchObject({
       code: expect.stringContaining('mute-on'),
     });
-    expect(requests[5].body).toMatchObject({
+    expect(requests[6].body).toMatchObject({
       code: expect.stringContaining('api.setMuted(muted)'),
     });
 
@@ -1103,13 +1103,13 @@ describe('controller API', () => {
     expect(muteOff.json().data.frameEvent.delivered).toBe(0);
     expect(muteOff.json().data.remoteFallback.endpoint).toBe('/api/js');
     expect(store.getFrameState('lenovo')?.kioskVideoMuted).toBe(false);
-    expect(requests).toHaveLength(7);
-    expect(requests[6]).toMatchObject({
+    expect(requests).toHaveLength(8);
+    expect(requests[7]).toMatchObject({
       method: 'POST',
       url: '/api/js',
       apiKey: 'test-key',
     });
-    expect(requests[6].body).toMatchObject({
+    expect(requests[7].body).toMatchObject({
       code: expect.stringContaining('mute-off'),
     });
 
